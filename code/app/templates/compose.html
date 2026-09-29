@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% block title %}Post yaratish{% endblock %}
+{% block content %}
+<h1>Yangi post</h1>
+{% if not st.authorized %}<div class="warn">Telegram akkaunt ulanmagan. Post tayyorlashingiz mumkin, lekin yuborish uchun <a href="/settings">Sozlamalar</a> da ulang.</div>{% endif %}
+<form method="post" action="/compose/preview" enctype="multipart/form-data">
+  <input type="hidden" name="replace_job" value="{{ form.replace_job }}">
+  <div class="card">
+    <h2>1. Post mazmuni</h2>
+    <label>Matn</label>
+    <textarea name="text" placeholder="Post matni...">{{ form.text }}</textarea>
+    <div class="row">
+      <div><label>Format</label><select name="parse_mode">
+        <option value="none" {{ 'selected' if form.parse_mode=='none' }}>Oddiy matn</option>
+        <option value="html" {{ 'selected' if form.parse_mode=='html' }}>HTML (&lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt; &lt;code&gt; &lt;a href="..."&gt;)</option></select></div>
+      <div><label>Rasm yoki video (ixtiyoriy)</label><input type="file" name="media" accept="image/*,video/*"></div>
+    </div>
+    {% if form.media_path %}
+      <input type="hidden" name="keep_media" value="{{ form.media_path }}"><input type="hidden" name="keep_media_type" value="{{ form.media_type }}">
+      <p class="mut small">Joriy fayl: {{ 'rasm' if form.media_type=='image' else 'video' }} ({{ form.media_path }}). Yangi fayl tanlasangiz almashtiriladi.</p>
+    {% endif %}
+    <p class="mut small">Rasm/video ostidagi matn {{ caption_limit }} belgigacha bo'lishi mumkin; uzunroq bo'lsa alohida xabar bo'lib yuboriladi.</p>
+  </div>
+  <div class="card">
+    <h2>2. Guruhlarni tanlash</h2>
+    {% if lists %}<div class="chips"><span class="mut small">Ro'yxatlar:</span>{% for l in lists %}<button type="button" class="chip" data-ids='{{ l.ids|tojson }}'>{{ l.name }} ({{ l.ids|length }})</button>{% endfor %}</div>{% endif %}
+    <div class="tools"><input type="text" id="gsearch" placeholder="Qidirish...">
+      <button type="button" class="btn sec sm" id="selAll">Ko'rinayotganlarni tanlash</button>
+      <button type="button" class="btn sec sm" id="selNone">Tozalash</button><span class="mut small">Tanlangan: <b id="gcount">0</b></span></div>
+    <div class="glist" id="glist">
+      {% for g in groups %}<label class="grow {{ '' if g.can_post else 'off' }}" data-title="{{ g.title|lower }}">
+        <input type="checkbox" name="tg_ids" value="{{ g.tg_id }}" {{ 'checked' if g.tg_id in form.selected }} {{ '' if g.can_post else 'disabled' }}>
+        <span>{{ g.title }} <span class="mut small">· {{ {'channel':'kanal','supergroup':'superguruh','group':'guruh'}[g.kind] }}{% if g.members %} · {{ g.members }} a'zo{% endif %}{% if not g.can_post %} · yozish taqiqlangan{% endif %}</span></span></label>
+      {% else %}<p style="padding:12px" class="mut">Guruhlar yo'q. Avval <a href="/groups">Guruhlar</a> sahifasida yangilang.</p>{% endfor %}
+    </div>
+  </div>
+  <div class="card">
+    <h2>3. Interval va vaqt</h2>
+    <div class="row">
+      <div><label>Guruhlar orasida min (soniya)</label><input type="number" name="min_delay" value="{{ form.min_delay }}" min="3"></div>
+      <div><label>Guruhlar orasida max (soniya)</label><input type="number" name="max_delay" value="{{ form.max_delay }}" min="3"></div>
+      <div><label>Rejalashtirish (ixtiyoriy)</label><input type="datetime-local" name="scheduled_at" value="{{ form.scheduled_at }}"></div>
+    </div>
+    <p class="mut small">Har bir guruh orasida min–max oralig'ida tasodifiy kutiladi. Bo'sh qoldirilsa, tasdiqlagandan keyin darhol yuboriladi.</p>
+    <label>Shablon sifatida saqlash (ixtiyoriy nom)</label>
+    <input type="text" name="template_name" value="{{ form.template_name }}" placeholder="Masalan: Aksiya e'loni">
+  </div>
+  <button class="btn">Oldindan ko'rish →</button>
+</form>
+{% endblock %}

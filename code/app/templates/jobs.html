@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block title %}Yuborishlar{% endblock %}
+{% block content %}
+<h1>Yuborishlar tarixi</h1>
+<div class="card">
+{% if jobs %}<table><tr><th>#</th><th>Post</th><th>Holat</th><th>Natija</th><th>Yaratilgan</th></tr>
+{% for j in jobs %}<tr>
+  <td><a href="/jobs/{{ j.id }}">{{ j.id }}</a></td>
+  <td>{{ '🖼 ' if j.media_type=='image' }}{{ '🎬 ' if j.media_type=='video' }}{{ (j.text or '(matnsiz)')[:70] }}</td>
+  <td><span class="badge {{ j.status }}">{{ STATUS[j.status] }}</span>{% if j.status=='scheduled' %}<div class="mut small">{{ j.scheduled_at }}</div>{% endif %}</td>
+  <td>{{ j.done }}/{{ j.total }}{% if j.failed %} <span style="color:var(--bad)">· {{ j.failed }} xato</span>{% endif %}</td>
+  <td class="mut small">{{ j.created_at }}</td></tr>{% endfor %}</table>
+{% else %}<p class="mut">Hali yuborishlar yo'q.</p>{% endif %}
+</div>
+{% endblock %}

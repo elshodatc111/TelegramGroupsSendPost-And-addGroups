@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Telegram Group Post{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body>
+{% set p = request.url.path %}
+<nav>
+  <span class="brand">Telegram Group Post</span>
+  <a href="/compose" class="{{ 'active' if p.startswith('/compose') or p.startswith('/preview') }}">Post yaratish</a>
+  <a href="/groups" class="{{ 'active' if p.startswith('/groups') }}">Guruhlar</a>
+  <a href="/templates" class="{{ 'active' if p.startswith('/templates') }}">Shablonlar</a>
+  <a href="/jobs" class="{{ 'active' if p.startswith('/jobs') }}">Yuborishlar</a>
+  <a href="/settings" class="{{ 'active' if p.startswith('/settings') }}">Sozlamalar</a>
+</nav>
+<main>
+{% if msg %}<div class="flash msg">{{ msg }}</div>{% endif %}
+{% if err %}<div class="flash err">{{ err }}</div>{% endif %}
+{% block content %}{% endblock %}
+</main>
+<script src="/static/app.js"></script>
+{% block scripts %}{% endblock %}
+</body></html>

@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block title %}Sozlamalar{% endblock %}
+{% block content %}
+<h1>Sozlamalar</h1>
+<div class="card">
+  <h2>Telegram akkaunt</h2>
+  {% if st.authorized %}
+    <p>Ulangan: <b>{{ st.name }}</b> {% if st.username %}(@{{ st.username }}){% endif %} <span class="mut">+{{ st.phone }}</span></p>
+    <form method="post" action="/settings/logout" onsubmit="return confirm('Akkauntdan chiqasizmi?')"><button class="btn sec">Akkauntdan chiqish</button></form>
+  {% else %}
+    {% if st.error %}<div class="warn">Ulanishda xato: {{ st.error }}</div>{% endif %}
+    <p class="mut small">1) <a href="https://my.telegram.org" target="_blank">my.telegram.org</a> ga kiring → "API development tools" → ilova yarating → <b>api_id</b> va <b>api_hash</b> ni oling.</p>
+    <form method="post" action="/settings/api">
+      <div class="row">
+        <div><label>API ID</label><input type="text" name="api_id" value="{{ api_id }}" required></div>
+        <div><label>API HASH {% if has_hash %}<span class="mut small">(saqlangan, o'zgartirish uchun yangisini kiriting)</span>{% endif %}</label><input type="password" name="api_hash" autocomplete="off"></div>
+      </div><br><button class="btn">Saqlash</button>
+    </form>
+    {% if st.configured %}
+    <hr style="border:0;border-top:1px solid var(--bd);margin:18px 0">
+    <p class="mut small">2) Telefon raqam orqali kirish</p>
+    {% if step == 'code' %}
+      <form method="post" action="/settings/login/code"><label>Telegram'ga kelgan kod</label>
+        <input type="text" name="code" autofocus required><br><br><button class="btn">Tasdiqlash</button>
+        <a class="btn sec" href="/settings">Bekor qilish</a></form>
+    {% elif step == 'password' %}
+      <form method="post" action="/settings/login/password"><label>2 bosqichli parol (Cloud password)</label>
+        <input type="password" name="password" autofocus required><br><br><button class="btn">Kirish</button></form>
+    {% else %}
+      <form method="post" action="/settings/login/phone"><label>Telefon raqam (xalqaro formatda)</label>
+        <input type="text" name="phone" placeholder="+998901234567" required><br><br><button class="btn">Kod yuborish</button></form>
+    {% endif %}{% endif %}
+  {% endif %}
+</div>
+<div class="card">
+  <h2>Standart interval</h2>
+  <p class="mut small">Har bir guruhga yuborish orasida shu oraliqda tasodifiy kutiladi (spamdan saqlanish uchun).</p>
+  <form method="post" action="/settings/defaults"><div class="row">
+    <div><label>Minimal (soniya)</label><input type="number" name="min_delay" value="{{ default_min }}" min="3"></div>
+    <div><label>Maksimal (soniya)</label><input type="number" name="max_delay" value="{{ default_max }}" min="3"></div>
+  </div><br><button class="btn">Saqlash</button></form>
+</div>
+{% endblock %}

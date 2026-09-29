@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}Shablonlar{% endblock %}
+{% block content %}
+<h1>Shablonlar</h1>
+<div class="card">
+{% if items %}<table><tr><th>Nom</th><th>Mazmun</th><th></th></tr>
+{% for t in items %}<tr><td><b>{{ t.name }}</b></td>
+  <td>{{ '🖼 ' if t.media_type=='image' }}{{ '🎬 ' if t.media_type=='video' }}{{ (t.text or '')[:90] }}</td>
+  <td class="actions"><a class="btn sm" href="/compose?template={{ t.id }}">Ishlatish</a>
+   <form method="post" action="/templates/{{ t.id }}/delete" onsubmit="return confirm('O\'chirilsinmi?')"><button class="btn sec sm">O'chirish</button></form></td></tr>{% endfor %}</table>
+{% else %}<p class="mut">Shablon yo'q. Post yaratishda "Shablon sifatida saqlash" nomini kiriting.</p>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% block title %}Oldindan ko'rish{% endblock %}
+{% block content %}
+<h1>Oldindan ko'rish</h1>
+{% if not st.authorized %}<div class="warn">Telegram akkaunt ulanmagan. <a href="/settings">Sozlamalar</a> da ulang, keyin tasdiqlang.</div>{% endif %}
+{% for w in warnings %}<div class="warn">{{ w }}</div>{% endfor %}
+<div class="card">
+  <h2>Post shunday ko'rinadi</h2>
+  <div class="bubble">
+    {% if job.media_path %}
+      {% if job.media_type == 'video' %}<video src="/media/{{ job.media_path }}" controls preload="metadata"></video>
+      {% else %}<img src="/media/{{ job.media_path }}" alt="">{% endif %}
+    {% endif %}
+    <div class="t">{{ job.text|render_text(job.parse_mode) }}</div>
+  </div>
+</div>
+<div class="card">
+  <h2>Yuboriladigan guruhlar ({{ targets|length }})</h2>
+  <div class="glist"><table>{% for t in targets %}<tr><td>{{ loop.index }}</td><td>{{ t.title }}</td></tr>{% endfor %}</table></div>
+  <dl class="kv" style="margin-top:12px">
+    <dt>Interval</dt><dd>{{ job.min_delay }}–{{ job.max_delay }} soniya (tasodifiy)</dd>
+    <dt>Taxminiy davomiylik</dt><dd>~{{ (est_sec // 60) }} daqiqa {{ est_sec % 60 }} soniya</dd>
+  </dl>
+</div>
+<div class="card">
+  <form method="post" action="/preview/{{ job.id }}/confirm" class="actions">
+    <div><label style="margin:0 0 4px">Yuborish vaqti (bo'sh = hoziroq)</label><input type="datetime-local" name="when" value="{{ when }}"></div>
+    <button class="btn ok" style="align-self:end">✔ Tasdiqlash va yuborish</button>
+    <a class="btn sec" style="align-self:end" href="/compose?job={{ job.id }}">← Tahrirlash</a>
+  </form>
+  <form method="post" action="/preview/{{ job.id }}/discard" style="margin-top:10px" onsubmit="return confirm('Qoralama bekor qilinsinmi?')"><button class="btn sec sm">Bekor qilish</button></form>
+</div>
+{% endblock %}

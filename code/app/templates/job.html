@@ -1,0 +1,47 @@
+{% extends "base.html" %}{% block title %}Yuborish #{{ job.id }}{% endblock %}
+{% block content %}
+<h1>Yuborish #{{ job.id }} <span class="badge" id="st">{{ STATUS[job.status] }}</span></h1>
+<div class="card">
+  <div class="bubble" style="margin-bottom:14px">
+    {% if job.media_path %}{% if job.media_type=='video' %}<video src="/media/{{ job.media_path }}" controls preload="metadata"></video>{% else %}<img src="/media/{{ job.media_path }}" alt="">{% endif %}{% endif %}
+    <div class="t">{{ job.text|render_text(job.parse_mode) }}</div>
+  </div>
+  <div class="bar"><i id="bar" style="width:0"></i></div>
+  <p><b id="cnt">0/0</b> <span class="mut" id="info"></span></p>
+  <div id="jerr" class="warn" style="display:none"></div>
+  <div class="actions" id="acts"></div>
+</div>
+<div class="card"><h2>Guruhlar bo'yicha natija</h2>
+  <table><thead><tr><th>#</th><th>Guruh</th><th>Holat</th><th>Izoh</th></tr></thead><tbody id="rows"></tbody></table></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const ID={{ job.id }};
+const LBL={{ STATUS|tojson }};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function btn(action,label,cls,confirmMsg){
+  return `<form method="post" action="/jobs/${ID}/${action}" ${confirmMsg?`onsubmit="return confirm('${confirmMsg}')"`:''}><button class="btn ${cls}">${label}</button></form>`;
+}
+async function tick(){
+  try{
+    const r=await fetch('/api/jobs/'+ID); if(!r.ok) return; const d=await r.json(); const j=d.job;
+    document.getElementById('st').textContent=d.status_label; document.getElementById('st').className='badge '+j.status;
+    document.getElementById('cnt').textContent=`${j.done+j.failed}/${j.total}`;
+    document.getElementById('bar').style.width=(j.total?(j.done+j.failed)*100/j.total:0)+'%';
+    let info=`${j.done} yuborildi`+(j.failed?`, ${j.failed} xato`:'');
+    if(j.status==='running'&&j.next_at){const s=Math.max(0,Math.round((new Date(j.next_at.replace(' ','T'))-new Date(d.server_now.replace(' ','T')))/1000));info+=` · keyingisigacha ~${s}s`;}
+    if(j.status==='scheduled') info+=` · ${j.scheduled_at} da boshlanadi`;
+    document.getElementById('info').textContent=info;
+    const e=document.getElementById('jerr'); e.style.display=j.error?'block':'none'; e.textContent=j.error||'';
+    let a='';
+    if(['queued','scheduled','running'].includes(j.status)) a+=btn('cancel','To\'xtatish','bad','Yuborish to\'xtatilsinmi?');
+    if(['cancelled','interrupted','failed'].includes(j.status)&&d.pending>0) a+=btn('resume','Davom ettirish','');
+    if(!['running','queued'].includes(j.status)) a+=btn('delete','O\'chirish','sec','Tarixdan o\'chirilsinmi?');
+    a+=`<a class="btn sec" href="/compose?job=${ID}">Nusxa olib yangi post</a>`;
+    document.getElementById('acts').innerHTML=a;
+    document.getElementById('rows').innerHTML=d.targets.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t.title)}</td><td><span class="badge ${t.status}">${LBL[t.status]}</span></td><td class="small mut">${esc(t.error||t.sent_at||'')}</td></tr>`).join('');
+  }catch(e){}
+}
+tick(); setInterval(tick,2000);
+</script>
+{% endblock %}

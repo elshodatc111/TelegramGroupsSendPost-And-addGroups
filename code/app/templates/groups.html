@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% block title %}Guruhlar{% endblock %}
+{% block content %}
+<h1>Guruhlar</h1>
+{% if not st.authorized %}<div class="warn">Avval <a href="/settings">Sozlamalar</a> da Telegram akkauntni ulang.</div>{% endif %}
+<div class="card">
+  <div class="actions"><form method="post" action="/groups/sync"><button class="btn" {{ '' if st.authorized else 'disabled' }}>Telegramdan guruhlarni yangilash</button></form>
+  <span class="mut small">Jami: {{ groups|length }} ta</span></div>
+</div>
+{% if lists %}<div class="card"><h2>Saqlangan ro'yxatlar</h2>
+  {% for l in lists %}<form method="post" action="/groups/lists/{{ l.id }}/delete" style="display:inline" onsubmit="return confirm('O\'chirilsinmi?')">
+    <span class="badge">{{ l.name }} · {{ l.ids|length }}</span> <button class="btn sec sm">×</button></form>&nbsp;{% endfor %}
+</div>{% endif %}
+<form method="post" action="/groups/lists" class="card">
+  <h2>Ro'yxat (toifa) yaratish</h2>
+  <p class="mut small">Guruhlarni belgilang, nom bering va saqlang. Post yaratishda bitta bosishda shu guruhlar tanlanadi. Mavjud nom kiritilsa, ro'yxat yangilanadi.</p>
+  <div class="tools"><input type="text" id="gsearch" placeholder="Guruh nomi bo'yicha qidirish...">
+    <button type="button" class="btn sec sm" id="selAll">Ko'rinayotganlarni tanlash</button>
+    <button type="button" class="btn sec sm" id="selNone">Tozalash</button><span class="mut small">Tanlangan: <b id="gcount">0</b></span></div>
+  <div class="glist" id="glist">
+    {% for g in groups %}<label class="grow {{ '' if g.can_post else 'off' }}" data-title="{{ g.title|lower }}">
+      <input type="checkbox" name="tg_ids" value="{{ g.tg_id }}" {{ '' if g.can_post else 'disabled' }}>
+      <span>{{ g.title }} <span class="mut small">· {{ {'channel':'kanal','supergroup':'superguruh','group':'guruh'}[g.kind] }}{% if g.members %} · {{ g.members }} a'zo{% endif %}{% if not g.can_post %} · yozish taqiqlangan{% endif %}</span></span></label>
+    {% else %}<p class="mut" style="padding:12px">Guruhlar yo'q. "Yangilash" tugmasini bosing.</p>{% endfor %}
+  </div>
+  <div class="row" style="margin-top:12px;align-items:end"><div><label>Ro'yxat nomi</label><input type="text" name="name" placeholder="Masalan: Savdo guruhlari" required></div>
+  <div><button class="btn">Ro'yxatni saqlash</button></div></div>
+</form>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Kampaniyalar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Kampaniyalar</h1><p class="sub">Saqlangan reklamalar: qayta ishga tushirish va takrorlanuvchi (kunlik/haftalik) yuborish</p></div><a class="btn" href="/compose">{{ ic('plus') }} Yangi kampaniya</a></div>
+{% if items %}<div class="grid g2">{% for c in items %}
+<div class="card"><div class="card-h"><h2>{{ ic('repeat') }} {{ c.name }}</h2>
+  {% if c.recurrence != 'none' %}<span class="badge {{ 'b-good' if c.rec_active else 'b-cancelled' }}">{{ 'Faol' if c.rec_active else 'To\'xtatilgan' }}</span>{% endif %}</div>
+  <p class="mut small" style="margin:0 0 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ (c.preview or '(matnsiz, faqat media)')[:90] }}</p>
+  <dl class="kv"><dt>Variantlar</dt><dd>{{ c.nv }}</dd><dt>Guruhlar</dt><dd>{{ c.ng }}</dd><dt>Yuborilgan marta</dt><dd>{{ c.runs }}</dd><dt>Interval</dt><dd>{{ c.min_delay }}–{{ c.max_delay }}s</dd>
+   <dt>Takrorlash</dt><dd>{% if c.recurrence == 'daily' %}Har kuni, {{ c.rec_time }}{% elif c.recurrence == 'weekly' %}Haftalik, {{ c.rec_time }}{% else %}Yo'q{% endif %}</dd>
+   {% if c.next_run and c.rec_active %}<dt>Keyingi</dt><dd>{{ c.next_run[:16] }}</dd>{% endif %}{% if c.last_run %}<dt>Oxirgi</dt><dd>{{ c.last_run[:16] }}</dd>{% endif %}</dl>
+  <div class="actions" style="margin-top:14px">
+   <form method="post" action="/campaigns/{{ c.id }}/run" onsubmit="return confirm('Kampaniya hozir yuborilsinmi?')"><button class="btn sm">{{ ic('play') }} Hozir yuborish</button></form>
+   <a class="btn sec sm" href="/compose?campaign={{ c.id }}">{{ ic('edit') }} Tahrirlash</a>
+   {% if c.recurrence != 'none' %}<form method="post" action="/campaigns/{{ c.id }}/toggle"><button class="btn blue sm">{{ 'To\'xtatish' if c.rec_active else 'Yoqish' }}</button></form>{% endif %}
+   <form method="post" action="/campaigns/{{ c.id }}/delete" onsubmit="return confirm('Kampaniya o\'chirilsinmi?')"><button class="btn ghost sm">{{ ic('trash') }}</button></form></div></div>
+{% endfor %}</div>
+{% else %}<div class="card empty">{{ ic('repeat') }}<div>Hali kampaniya yo'q. Post yaratishda "Kampaniya nomi" ni kiriting, u shu yerda saqlanadi.</div></div>{% endif %}
+{% endblock %}

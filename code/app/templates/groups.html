@@ -1,31 +1,50 @@
-{% extends "base.html" %}{% block title %}Guruhlar{% endblock %}
+{% extends "base.html" %}{% block title %}Mening guruhlarim{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Mening guruhlarim</h1><p class="sub">Akkauntingiz a'zo bo'lgan va post yoza oladigan guruh/kanallar</p></div>
-  <div class="actions"><a class="btn sec" href="/join">{{ ic('table') }} Excel orqali a'zo bo'lish</a>
-  <form method="post" action="/groups/sync"><button class="btn" {{ '' if st.authorized else 'disabled' }}>{{ ic('refresh') }} Telegramdan yangilash</button></form></div></div>
-{% if not st.authorized %}<div class="note">{{ ic('alert') }}<div>Avval <a href="/settings"><b>Sozlamalar</b></a> da Telegram akkauntni ulang.</div></div>{% endif %}
-<div class="grid g3" style="margin-bottom:18px">
-  <div class="stat pri"><div class="k">Jami</div><div class="v">{{ groups|length }}</div></div>
-  <div class="stat"><div class="k">Guruh / superguruh</div><div class="v">{{ groups|selectattr('kind','ne','channel')|list|length }}</div></div>
-  <div class="stat"><div class="k">Kanal</div><div class="v">{{ groups|selectattr('kind','eq','channel')|list|length }}</div></div>
+<div class="page-h"><div><h1>Mening guruhlarim</h1><p class="sub">{{ groups|length }} ta guruh/kanal · teglar, qora ro'yxat va qoidalarni tekshirish</p></div>
+  <div class="actions"><form method="post" action="/groups/rules/start"><button class="btn sec">{{ ic('shield') }} Qoidalarni tekshirish</button></form>
+  <form method="post" action="/groups/sync"><button class="btn">{{ ic('refresh') }} Yangilash</button></form></div></div>
+<div id="rp" class="card" style="display:none"><div class="card-h"><h2>{{ ic('shield') }} Guruh qoidalari tekshirilmoqda</h2><span class="mut small" id="rpn"></span></div><div class="bar blue"><i id="rpb" style="width:0"></i></div></div>
+{% if groups %}
+<form method="post" action="/groups/tags" id="gf">
+<div class="card">
+  <div class="tools"><input type="search" id="gsearch" placeholder="Nom yoki #teg bo'yicha qidirish...">
+    <button type="button" class="btn sec sm" id="selAll">Hammasini belgilash</button><button type="button" class="btn sec sm" id="selNone">Tozalash</button><span class="badge">Tanlangan: <b id="gcount">0</b></span></div>
+  {% if lists or tags %}<div class="chips" style="margin-bottom:10px">{% for l in lists %}<span class="chip" data-ids='{{ l.ids|tojson }}'>{{ ic('users') }} {{ l.name }} ({{ l.ids|length }}) <button type="submit" formaction="/groups/lists/{{ l.id }}/delete" class="btn ghost sm" style="padding:0 4px" title="Ro'yxatni o'chirish" formnovalidate>×</button></span>{% endfor %}
+    {% for t, ids in tags.items() %}<span class="chip tag" data-ids='{{ ids|tojson }}'>#{{ t }} ({{ ids|length }})</span>{% endfor %}</div>{% endif %}
+  <div class="glist" id="glist" style="max-height:520px">
+  {% for g in groups %}<label class="grow" data-title="{{ (g.title or '')|lower }}" data-tags="{{ g.tags|join(' ') }}"><input type="checkbox" name="tg_ids" value="{{ g.tg_id }}">
+    <span class="gava">{{ (g.title or '?')[:1]|upper }}</span>
+    <span class="t"><b>{{ g.title }}</b><span class="mut tiny">{% if g.username %}@{{ g.username }} · {% endif %}{{ {'channel':'kanal','supergroup':'superguruh','group':'guruh'}.get(g.kind,'guruh') }}{% if g.members %} · {{ g.members }} a'zo{% endif %}{% if deltas.get(g.tg_id) %} <b style="color:{{ 'var(--blue)' if deltas[g.tg_id] > 0 else 'var(--pri)' }}">{{ '%+d' % deltas[g.tg_id] }}</b> (7 kun){% endif %}{% if g.slowmode %} · slowmode {{ g.slowmode }}s{% endif %}</span></span>
+    <span style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+     {% if g.bl %}<span class="flag red">Qora ro'yxat</span>{% endif %}{% if not g.can_post %}<span class="flag red">Yozib bo'lmaydi</span>{% endif %}
+     {% if g.ads_flag %}<span class="flag {{ '' if g.ads_ok else 'red' }}">{{ 'Reklama (ruxsat)' if g.ads_ok else 'Reklama taqiqlangan' }}</span>{% endif %}{% if g.no_media %}<span class="flag">Media yo'q</span>{% endif %}{% if g.no_links %}<span class="flag">Havola yo'q</span>{% endif %}
+     {% for t in g.tags %}<span class="chip tag" style="pointer-events:none">#{{ t }}</span>{% endfor %}</span></label>
+  {% endfor %}</div>
 </div>
-{% if lists %}<div class="card"><div class="card-h"><h2>Saqlangan ro'yxatlar</h2></div><div class="chips">
-  {% for l in lists %}<form method="post" action="/groups/lists/{{ l.id }}/delete" onsubmit="return confirm('Ro\'yxat o\'chirilsinmi?')" style="margin:0">
-    <span class="chip" style="cursor:default">{{ l.name }} · {{ l.ids|length }} <button class="x" style="background:none;border:0;color:inherit;cursor:pointer;padding:0" title="O'chirish">{{ ic('x') }}</button></span></form>{% endfor %}</div></div>{% endif %}
-<form method="post" action="/groups/lists" class="card">
-  <div class="card-h"><h2>Ro'yxat (toifa) yaratish</h2></div>
-  <p class="mut small" style="margin-top:0">Guruhlarni belgilang, nom bering va saqlang. Post yaratishda bitta bosishda shu guruhlar tanlanadi. Mavjud nom kiritilsa, ro'yxat yangilanadi.</p>
-  <div class="tools"><input type="search" id="gsearch" placeholder="Guruh nomi bo'yicha qidirish...">
-    <button type="button" class="btn sec sm" id="selAll">Ko'rinayotganlarni tanlash</button>
-    <button type="button" class="btn sec sm" id="selNone">Tozalash</button><span class="mut small">Tanlangan: <b id="gcount">0</b></span></div>
-  <div class="glist" id="glist">
-    {% for g in groups %}<label class="grow {{ '' if g.can_post else 'off' }}" data-title="{{ g.title|lower }}">
-      <input type="checkbox" name="tg_ids" value="{{ g.tg_id }}" {{ '' if g.can_post else 'disabled' }}>
-      <span class="ava">{{ (g.title or '?')[:1]|upper }}</span>
-      <span class="t"><b>{{ g.title }}</b><span class="mut tiny">{{ {'channel':'kanal','supergroup':'superguruh','group':'guruh'}[g.kind] }}{% if g.username %} · @{{ g.username }}{% endif %}{% if g.members %} · {{ g.members }} a'zo{% endif %}{% if not g.can_post %} · yozish taqiqlangan{% endif %}</span></span></label>
-    {% else %}<div class="empty">{{ ic('users') }}<div>Guruhlar yo'q. "Telegramdan yangilash" tugmasini bosing.</div></div>{% endfor %}
-  </div>
-  <div class="row" style="margin-top:14px;align-items:end"><div><label class="l">Ro'yxat nomi</label><input type="text" name="name" placeholder="Masalan: Savdo guruhlari" required></div>
-  <div><button class="btn">Ro'yxatni saqlash</button></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('tag') }} Tanlanganlar bilan amallar</h2></div>
+  <div class="row"><div><label class="l" style="margin-top:0">Teglar (vergul bilan)</label><input type="text" name="tags" placeholder="toshkent, savdo">
+    <div class="actions" style="margin-top:8px"><button class="btn sm" name="mode" value="add">Teg qo'shish</button><button class="btn sec sm" name="mode" value="set">Almashtirish</button><button class="btn sec sm" name="mode" value="remove">Olib tashlash</button><button class="btn ghost sm" name="mode" value="clear">Hammasini tozalash</button></div></div>
+   <div><label class="l" style="margin-top:0">Ro'yxat nomi</label><input type="text" name="name" placeholder="Masalan: Toshkent guruhlari">
+    <div class="actions" style="margin-top:8px"><button class="btn blue sm" formaction="/groups/lists">{{ ic('layers') }} Ro'yxat sifatida saqlash</button></div></div>
+   <div><label class="l" style="margin-top:0">Qora ro'yxat sababi</label><input type="text" name="reason" placeholder="Qo'lda qo'shildi">
+    <div class="actions" style="margin-top:8px"><button class="btn bad sm" formaction="/groups/blacklist">Qora ro'yxatga</button><button class="btn sec sm" formaction="/groups/blacklist/remove">Chiqarish</button></div></div></div>
+  <div class="actions" style="margin-top:14px"><span class="mut small">Reklama taqiqi:</span><button class="btn sec sm" formaction="/groups/ads-ok" name="value" value="1">Baribir yuborishga ruxsat</button><button class="btn sec sm" formaction="/groups/ads-ok" name="value" value="0">Ruxsatni bekor qilish</button></div></div>
 </form>
+{% if bl %}<div class="card"><div class="card-h"><h2>{{ ic('shield') }} Qora ro'yxat ({{ bl|length }})</h2></div>
+ <div class="tbl-wrap" style="border:0"><table><thead><tr><th>Guruh</th><th>Sabab</th><th>Sana</th></tr></thead><tbody>{% for b in bl %}<tr><td>{{ b.title or b.tg_id }}</td><td class="small mut">{{ b.reason }}</td><td class="small mut">{{ (b.created_at or '')[:16] }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+{% else %}<div class="card empty">{{ ic('users') }}<div>Guruhlar yo'q. {% if st.authorized %}"Yangilash" tugmasini bosing.{% else %}Avval akkauntni ulang.{% endif %}</div></div>{% endif %}
 {% endblock %}
+{% block scripts %}<script>
+(function(){
+  const rp=document.getElementById('rp');
+  async function poll(){
+    try{const d=await (await fetch('/api/groups/rules-progress')).json();
+      rp.style.display=(d.running||(d.total&&d.done<d.total))?'block':'none';
+      rpn.textContent=d.done+'/'+d.total+(d.fail?' · '+d.fail+' xato':''); rpb.style.width=(d.total?d.done*100/d.total:0)+'%';
+      if(d.running) setTimeout(poll,1500); else if(rp.dataset.was){location.reload();}
+      if(d.running) rp.dataset.was='1';
+    }catch(e){}
+  }
+  poll();
+})();
+</script>{% endblock %}

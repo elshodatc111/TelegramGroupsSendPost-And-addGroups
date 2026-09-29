@@ -1,15 +1,21 @@
 {% extends "base.html" %}{% block title %}Oldindan ko'rish{% endblock %}
 {% block content %}
 <div class="page-h"><div><h1>Oldindan ko'rish</h1><p class="sub">Hammasini tekshiring. Tasdiqlamaguncha hech narsa yuborilmaydi.</p></div></div>
-{% if not st.authorized %}<div class="note">{{ ic('alert') }}<div>Telegram akkaunt ulanmagan. <a href="/settings"><b>Sozlamalar</b></a> da ulang, keyin tasdiqlang.</div></div>{% endif %}
-{% for w in warnings %}<div class="note">{{ ic('alert') }}<div>{{ w }}</div></div>{% endfor %}
+{% if not authorized %}<div class="note red">{{ ic('alert') }}<div>Bu akkaunt ulanmagan. <a href="/accounts"><b>Akkauntlar</b></a> bo'limida ulang, keyin tasdiqlang.</div></div>{% endif %}
+{% for w in warns %}<div class="note">{{ ic('alert') }}<div>{{ w }}</div></div>{% endfor %}
 <div class="cols">
  <div>
   <div class="card">
-    <div class="card-h"><h2>{{ ic('users') }} Yuboriladigan guruhlar ({{ targets|length }})</h2></div>
-    <div class="glist"><table><tbody>{% for t in targets %}<tr><td class="mut" style="width:44px">{{ loop.index }}</td><td>{{ t.title }}</td></tr>{% endfor %}</tbody></table></div>
+    <div class="card-h"><h2>{{ ic('users') }} Yuboriladigan guruhlar ({{ n }})</h2>{% if camp %}<span class="badge b-scheduled">Kampaniya: {{ camp.name }}</span>{% endif %}</div>
+    {% if nvars > 1 %}<div class="note info" style="margin-top:0">{{ ic('layers') }}<div>{{ nvars }} ta variant ketma-ket tarqatiladi. Rotatsiya <b>V{{ ptr }}</b> dan boshlanadi (oldingi yuborishdan davom etadi).</div></div>{% endif %}
+    <div class="glist"><table><tbody>{% set ns = namespace(k=0) %}{% for t in targets %}<tr {% if t.status=='skipped' %}style="opacity:.55"{% endif %}>
+      <td class="mut" style="width:44px">{{ loop.index }}</td><td>{{ t.title }}</td>
+      <td style="text-align:right">{% if t.status=='skipped' %}<span class="badge b-skipped">O'tkazib yuboriladi</span>{% else %}<span class="badge {{ 'b-running' if t.vn % 2 == 0 else 'b-failed' }}">V{{ t.vn }}</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+    {% if skipped %}<div class="hint">{{ skipped|length }} ta guruh o'tkazib yuboriladi: qora ro'yxat yoki reklama taqiqlangan.</div>{% endif %}
     <dl class="kv" style="margin-top:14px"><dt>Interval</dt><dd>{{ job.min_delay }}–{{ job.max_delay }} soniya (tasodifiy)</dd>
-      <dt>Taxminiy davomiylik</dt><dd>~{{ est_sec // 60 }} daqiqa {{ est_sec % 60 }} soniya</dd></dl>
+      <dt>Taxminiy davomiylik</dt><dd>~{{ est_sec // 3600 }} soat {{ est_sec % 3600 // 60 }} daqiqa</dd>
+      {% if job.utm_on %}<dt>UTM</dt><dd>{{ job.utm_source }} / {{ job.utm_campaign }}</dd>{% endif %}
+      {% if camp and camp.recurrence != 'none' %}<dt>Takrorlash</dt><dd>{{ 'Har kuni' if camp.recurrence == 'daily' else 'Haftalik' }}, {{ camp.rec_time }}</dd>{% endif %}</dl>
   </div>
   <div class="card">
     <form method="post" action="/preview/{{ job.id }}/confirm">
@@ -21,9 +27,17 @@
     <form method="post" action="/preview/{{ job.id }}/discard" style="margin-top:12px" onsubmit="return confirm('Qoralama bekor qilinsinmi?')"><button class="btn ghost sm">{{ ic('trash') }} Bekor qilish</button></form>
   </div>
  </div>
- <aside class="sticky"><div class="card"><div class="card-h"><h2>{{ ic('eye') }} Post shunday ko'rinadi</h2></div>
-  <div class="tgview"><div class="bubble">
-    {% if job.media_path %}<div class="media">{% if job.media_type == 'video' %}<video src="/media/{{ job.media_path }}" controls preload="metadata"></video>{% else %}<img src="/media/{{ job.media_path }}" alt="">{% endif %}</div>{% endif %}
-    <div class="t">{{ job.text|render_text(job.parse_mode) }}</div></div></div></div></aside>
+ <aside class="sticky"><div class="card"><div class="card-h"><h2>{{ ic('eye') }} Variantlar</h2></div>
+  {% if previews|length > 1 %}<div class="vtabs" id="vt">{% for p in previews %}<button type="button" class="{{ 'on' if loop.first }}" data-v="{{ p.n }}">V{{ p.n }}</button>{% endfor %}</div>{% endif %}
+  {% for p in previews %}<div class="pvv" data-v="{{ p.n }}" {% if not loop.first %}style="display:none"{% endif %}>
+   <div class="tgview"><div class="bubble">
+    {% if p.media %}<div class="media {{ 'n2' if p.media|length in (2,3) else 'n4' if p.media|length > 3 }}">{% for m in p.media[:4] %}{% if p.type == 'video' %}<video src="/media/{{ m }}" controls preload="metadata"></video>{% else %}<img src="/media/{{ m }}" alt="">{% endif %}{% endfor %}</div>{% endif %}
+    <div class="t">{{ p.html }}</div></div></div>
+   <div class="dist"><span class="badge b-running">{{ p.count }} ta guruhga</span>{% if p.media|length > 1 %}<span class="badge">Albom: {{ p.media|length }} rasm</span>{% endif %}{% if p.spin > 1 %}<span class="badge">Spintax: {{ p.spin }} xil</span>{% endif %}{% if p.long %}<span class="badge b-warn">Matn uzun</span>{% endif %}</div>
+  </div>{% endfor %}
+ </div></aside>
 </div>
 {% endblock %}
+{% block scripts %}<script>
+document.querySelectorAll('#vt button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#vt button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.pvv').forEach(p=>p.style.display=p.dataset.v===b.dataset.v?'':'none');});
+</script>{% endblock %}

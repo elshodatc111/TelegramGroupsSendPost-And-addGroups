@@ -1,27 +1,35 @@
-# Telegram Group Post — loyiha xotirasi
+# Telegram Group Post — loyiha hujjati
 
-**Maqsad:** Telegram akkauntga ulangan guruhlarga interval bilan ommaviy post yuborish uchun local web platforma (Python).
-**Joylashuv:** `C:\TelegramGroupPost\` → `data\` (ma'lumotlar), `code\` (kod). Faqat web platforma.
+Local kompyuterda ishlaydigan veb-platforma (Python, FastAPI + Jinja2, Telethon/MTProto). Telegram akkaunt(lar)dagi guruhlarga
+reklama postlarini (matn, matn+rasm, matn+video, albom) tasodifiy interval bilan yuboradi.
 
-## Qarorlar
-- Framework: FastAPI + Jinja2 (server-side render), oddiy JS (polling orqali jonli progress)
-- Telegram: Telethon (user account/MTProto); API ID/HASH va login web'dan sozlanadi
-- DB: SQLite (`data\app.db`), session `data\sessions\account.session`, media `data\media`
-- Post turlari: text, text+image, text+video; format: oddiy yoki HTML
-- Interval: har guruh orasida min–max tasodifiy (default 20–60s, min 3s); FloodWait/SlowMode avtomatik kutish
-- Jarayon: post tayyorlash → guruh tanlash → **preview** → tasdiqlash → navbat (bir vaqtda bitta job)
-- Qo'shimcha: jonli progress+to'xtatish/davom, rejalashtirish, guruh ro'yxatlari, shablonlar, tarix
-- Faqat 127.0.0.1 da tinglaydi (parolsiz, local foydalanish)
+## Papkalar
+- `C:\TelegramGroupPost\data\`  — baza (app.db), sessionlar, media, importlar, loglar
+- `C:\TelegramGroupPost\code\`  — dastur kodi (`app\` paketi, `requirements.txt`, `run.bat`)
+- `C:\TelegramGroupPost\run.bat` — bir marta bosib ishga tushirish (venv, kutubxonalar, brauzer)
 
-## v2 (Excel a'zo bo'lish + dizayn)
-- Yangi modullar: excel_import.py (parse/eksport), joiner.py (a'zo bo'lish navbati), web.py (umumiy web yordamchilar)
-- A'zo bo'lish: default 60-180s, kuniga 40 (24 soatlik oyna), FloodWait>5daq bo'lsa 'waiting' + avtomatik davom; ChannelsTooMuch bo'lsa to'xtaydi
-- Video: hachoir metadata (DocumentAttributeVideo), bir marta yuklab boshqa guruhlarga qayta ishlatish (media cache), yuklash progressi
-- Loglar: data\logs\app.log; global xato sahifasi
-- Dizayn: yon panel, qorong'u/yorug' rejim, jonli ko'rinish, dashboard
+## Imkoniyatlar (v3)
+- **Ko'p akkaunt**: tepada akkaunt tanlagich; guruhlar, yuborishlar, kampaniyalar, a'zo bo'lish, statistika, inbox — tanlangan akkauntga bog'liq. Session: `data/sessions/acc_<id>.session`.
+- **Post variantlari**: har variantning o'z matni va media (rasm, albom<=10, video). Guruhlarga qat'iy ketma-ket (V1,V2,V3,V1...), bitta guruhga bitta variant, ketma-ket bir xil emas. Boshlanish nuqtasi oldingi yuborishdan davom etadi (`variant_ptr`).
+- **Xavfsizlik**: akkaunt salomatligi (FloodWait/xato asosida sekinlashtirish), ish vaqti oynasi, kunlik limit, spintax `{a|b}`, `{guruh}`, `{username}`, qora ro'yxat (yozish taqiqlansa avtomatik), reklama taqiqi aniqlash.
+- **Kampaniyalar**: saqlash, qayta ishga tushirish, takrorlash (kunlik/haftalik), A/B (variantlar), UTM, yuborilgan xabarlarni tahrirlash/o'chirish.
+- **Statistika**: ko'rishlar/reaksiya/javoblar, kunlik grafik, variantlar taqqoslash, guruhlar reytingi, Excel va PDF eksport.
+- **Guruhlar**: teglar, ro'yxatlar, qoidalarni tekshirish, qidiruv (discover), a'zolar soni dinamikasi, Excel orqali ommaviy a'zo bo'lish + hisobot.
+- **Inbox**: javoblar, eslatmalar, shaxsiy xabarlar; tayyor javoblar.
+- **Media kutubxona**, **parol himoyasi** (Sozlamalar), qizil/ko'k/oq dizayn (qorong'u rejim bor).
 
-## Holat
-v1 tayyor (smoke-test o'tgan, Telegram'siz mock bilan). Haqiqiy akkaunt bilan birinchi sinov foydalanuvchi tomonidan.
+## Cheklovlar / qarorlar
+- Foydalanuvchi akkauntlari inline URL tugma yubora olmaydi (faqat bot) — qo'shilmadi.
+- Bitta API ID/HASH barcha akkauntlar uchun.
+- Keyinga qoldirilgan: AI (matn yaratish), Telegram bot bildirishnomalari, Windows avtoishga tushirish/zaxira, .exe.
 
-## Kengaytirish rejasi
-Ko'p akkaunt, takrorlanuvchi postlar, forum topic, o'zgaruvchilar, albom, statistika/CSV, parol himoyasi.
+## Modullar (app/)
+main.py (ilova, parol, middleware) · r_account/r_posts/r_groups/r_join/r_stats/r_inbox (marshrutlar) · sender.py (yuborish, rejalashtiruvchi) ·
+joiner.py (a'zo bo'lish) · jobsvc.py (variantlar, kampaniya) · jobops.py (statistika/o'chirish/tahrir) · limits.py (salomatlik, chegaralar) ·
+telegram_service.py (Telethon, akkaunt bo'yicha) · accounts.py · reports.py · textutil.py · db.py (SQLite + migratsiya)
+
+## Ma'lumotlar bazasi
+Eski bazadan avtomatik migratsiya: `account.session` -> akkaunt #1, eski postlar -> 1 variantli yuborishlar, shablonlar -> kampaniyalar.
+
+## Sinov holati
+Soxta Telegram xizmati bilan avtomatik sinovdan o'tgan (variant rotatsiyasi va davomi, akkauntlar ajratilishi, statistika/eksport, inbox, parol). Haqiqiy akkaunt bilan sinash kerak.

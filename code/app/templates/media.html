@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}Media kutubxona{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Media kutubxona</h1><p class="sub">Yuklangan rasm va videolar. Post variantlarida qayta ishlatish mumkin.</p></div></div>
+<div class="card"><form method="post" action="/media-library/upload" enctype="multipart/form-data">
+  <label class="drop" data-drop><input type="file" name="files" multiple accept="image/*,video/*" hidden required><span class="di">{{ ic('upload') }}</span><span><b>Fayllarni tanlang</b> yoki shu yerga tashlang<br><span class="mut small" data-name>Rasm va videolar (bir nechta tanlash mumkin)</span></span></label>
+  <div class="actions" style="margin-top:12px"><button class="btn">{{ ic('upload') }} Yuklash</button></div></form></div>
+{% if items %}<div class="mgrid">{% for m in items %}<div class="mitem" style="cursor:default"><div class="pic">{% if m.kind == 'video' %}<video src="/media/{{ m.name }}#t=0.1" preload="metadata" muted></video>{% else %}<img src="/media/{{ m.name }}" loading="lazy" alt="">{% endif %}</div>
+  <div class="cap" title="{{ m.original }}">{{ m.original }}</div>
+  <div class="cap" style="display:flex;justify-content:space-between;align-items:center;padding-top:0">{{ (m.size / 1048576)|round(1) }} MB {% if m.used %}<span class="badge b-good" style="font-size:10px">ishlatilgan</span>{% else %}
+   <form method="post" action="/media-library/{{ m.name }}/delete" onsubmit="return confirm('Fayl o\'chirilsinmi?')" style="margin:0"><button class="btn ghost sm" style="padding:2px 6px">{{ ic('trash') }}</button></form>{% endif %}</div></div>{% endfor %}</div>
+{% else %}<div class="card empty">{{ ic('image') }}<div>Kutubxona bo'sh</div></div>{% endif %}
+{% endblock %}

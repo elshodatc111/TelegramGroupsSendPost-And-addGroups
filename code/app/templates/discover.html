@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Guruh qidirish{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Yangi guruhlarni topish</h1><p class="sub">Telegram'dagi ommaviy guruh va kanallarni kalit so'z bo'yicha qidiring va a'zo bo'ling</p></div></div>
+<div class="card"><form method="get" action="/discover" class="tools" style="margin:0"><input type="search" name="q" value="{{ q }}" placeholder="Masalan: toshkent savdo, ish e'lonlari, avto..." autofocus><button class="btn">{{ ic('search') }} Qidirish</button></form></div>
+{% if error %}<div class="note red">{{ ic('alert') }}<div>{{ error }}</div></div>{% endif %}
+{% if q and not results and not error %}<div class="card empty">{{ ic('search') }}<div>Hech narsa topilmadi</div></div>{% endif %}
+{% if results %}<form method="post" action="/discover/join"><input type="hidden" name="q" value="{{ q }}">
+<div class="card"><div class="card-h"><h2>Natijalar ({{ results|length }})</h2><button class="btn ok sm">{{ ic('user-plus') }} Belgilanganlarga a'zo bo'lish</button></div>
+ <div class="glist" id="glist" style="max-height:none">{% for r in results %}<label class="grow" data-title="{{ (r.title or '')|lower }}"><input type="checkbox" name="usernames" value="{{ r.username }}" {{ 'disabled' if r.joined }}>
+  <span class="gava">{{ (r.title or '?')[:1]|upper }}</span><span class="t"><b>{{ r.title }}</b><span class="mut tiny">@{{ r.username }} · {{ {'channel':'kanal','supergroup':'superguruh','group':'guruh'}.get(r.kind,'guruh') }}{% if r.members %} · {{ r.members }} a'zo{% endif %}</span></span>
+  {% if r.joined %}<span class="badge b-good">A'zosiz</span>{% endif %}</label>{% endfor %}</div>
+ <div class="hint">Belgilaganingizdan keyin interval va kunlik limit sozlanadigan a'zo bo'lish sahifasiga o'tasiz.</div></div></form>{% endif %}
+{% endblock %}

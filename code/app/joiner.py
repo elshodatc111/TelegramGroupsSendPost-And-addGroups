@@ -7,6 +7,7 @@ from telethon import errors
 
 from . import db
 from .config import log
+from .limits import event, slow_factor, work_gate
 from .telegram_service import NotAGroup
 
 FMT = "%Y-%m-%d %H:%M:%S"
@@ -34,10 +35,10 @@ def _fmt(dt):
 
 
 class Joiner:
-    def __init__(self, tg):
-        self.tg = tg
+    def __init__(self, manager):
+        self.mgr = manager
         self.tasks: dict[int, asyncio.Task] = {}
-        self.lock = asyncio.Lock()      # bir vaqtda bitta paket
+        self.locks: dict[int, asyncio.Lock] = {}     # har akkaunt uchun bitta paket
         self._sched = None
 
     # ---------- boshqaruv ----------
@@ -67,6 +68,9 @@ class Joiner:
                 log.exception("Joiner scheduler")
             await asyncio.sleep(10)
 
+    def _lock(self, aid):
+        return self.locks.setdefault(aid, asyncio.Lock())
+
     def _status(self, bid):
         r = db.one("SELECT status FROM join_batches WHERE id=?", (bid,))
         return r["status"] if r else None
@@ -89,7 +93,11 @@ class Joiner:
 
     # ---------- ishlash ----------
     async def _run(self, bid: int):
-        async with self.lock:
+        b0 = db.one("SELECT * FROM join_batches WHERE id=?", (bid,))
+        if not b0:
+            return
+        aid = b0["account_id"]
+        async with self._lock(aid):
             b = db.one("SELECT * FROM join_batches WHERE id=?", (bid,))
             if not b or b["status"] != "queued":
                 return
@@ -111,22 +119,23 @@ class Joiner:
                     db.ex("UPDATE join_batches SET finished_at=? WHERE id=?", (db.now(), bid))
             if self._status(bid) == "done":
                 try:      # yangi qo'shilgan guruhlar post yuborish ro'yxatida chiqishi uchun
-                    await self.tg.fetch_groups()
+                    await self.mgr.get(aid).fetch_groups()
                 except Exception:
                     log.warning("Guruhlarni yangilab bo'lmadi", exc_info=True)
 
-    def _daily_wait(self, limit: int):
+    def _daily_wait(self, aid: int, limit: int):
         """Kunlik limit to'lgan bo'lsa, qachon davom etish mumkinligini qaytaradi."""
         since = _fmt(datetime.now() - timedelta(hours=24))
-        rows = db.q("SELECT tried_at FROM join_targets WHERE status IN ('joined','requested') "
-                    "AND tried_at>=? ORDER BY tried_at", (since,))
+        rows = db.q("SELECT jt.tried_at FROM join_targets jt JOIN join_batches jb ON jb.id=jt.batch_id "
+                    "WHERE jb.account_id=? AND jt.status IN ('joined','requested') "
+                    "AND jt.tried_at>=? ORDER BY jt.tried_at", (aid, since))
         if len(rows) < limit:
             return None
         free_at = datetime.strptime(rows[len(rows) - limit]["tried_at"], FMT) + timedelta(hours=24, minutes=1)
         return free_at
 
     async def _process(self, b):
-        bid = b["id"]
+        bid, aid = b["id"], b["account_id"]
         first, last_heavy = True, True
         while True:
             if self._status(bid) != "running":
@@ -134,13 +143,17 @@ class Joiner:
             t = db.one("SELECT * FROM join_targets WHERE batch_id=? AND status='pending' ORDER BY id LIMIT 1", (bid,))
             if not t:
                 return
-            free_at = self._daily_wait(b["daily_limit"])
+            wg = work_gate(aid)
+            if wg:
+                self._wait_until(bid, wg[0], wg[1])
+                return
+            free_at = self._daily_wait(aid, b["daily_limit"])
             if free_at:
                 self._wait_until(bid, free_at, f"Kunlik limit ({b['daily_limit']}) to'ldi. Avtomatik davom etadi.")
                 return
             if not first:
                 # a'zo bo'lish bo'lmagan (topilmadi/allaqachon a'zo) holatlardan keyin qisqa kutish
-                delay = random.uniform(b["min_delay"], b["max_delay"]) if last_heavy else random.uniform(4, 9)
+                delay = (random.uniform(b["min_delay"], b["max_delay"]) * slow_factor(aid)) if last_heavy else random.uniform(4, 9)
                 if not await self._sleep(bid, delay):
                     return
             first = False
@@ -153,18 +166,21 @@ class Joiner:
             last_heavy = outcome in ("joined", "requested")
 
     async def _join_one(self, b, t) -> str:
-        bid = b["id"]
+        bid, aid = b["id"], b["account_id"]
 
         def save(status, detail=None, title=None):
             db.ex("UPDATE join_targets SET status=?, detail=?, title=COALESCE(?,title), tried_at=? WHERE id=?",
                   (status, detail, title, db.now(), t["id"]))
 
         try:
-            status, title = await self.tg.join(t["kind"], t["key"])
+            status, title = await self.mgr.get(aid).join(t["kind"], t["key"])
+            if status == "joined":
+                event(aid, "joined")
             save(status, "Muvaffaqiyatli a'zo bo'lindi" if status == "joined" else "Allaqachon a'zo edingiz", title)
             return status
         except errors.FloodWaitError as e:
             secs = int(e.seconds)
+            event(aid, "flood", str(secs))
             if secs <= 300:
                 db.ex("UPDATE join_batches SET error=? WHERE id=?", (f"Telegram {secs}s kutishni so'radi...", bid))
                 ok = await self._sleep(bid, secs + 2)

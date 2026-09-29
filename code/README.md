@@ -50,3 +50,9 @@ Xatolar `data\logs\app.log` fayliga yoziladi.
 Bir nechta akkaunt · avtomatik takrorlanuvchi postlar (kunlik/haftalik) · guruh mavzulari (forum topic) ·
 o'zgaruvchilar ({guruh_nomi}) · bir nechta rasm (albom) · statistika/eksport (CSV) · parol bilan himoya ·
 Telegram bot orqali bildirishnoma · alembic migratsiyalari.
+
+
+## v3 yangiliklari
+- Bir nechta akkaunt (tepada tanlagich), post variantlari (ketma-ket tarqatish), kampaniyalar va takrorlash, statistika (Excel/PDF), inbox, teglar/qora ro'yxat, guruh qidirish, media kutubxona, parol himoyasi.
+- Kutubxonalar `requirements.txt` da (yangi: reportlab). `run.bat` ularni avtomatik o'rnatadi.
+- Sozlamalar sahifasida API ID/HASH kiriting, so'ng Akkauntlar bo'limida akkaunt qo'shing.

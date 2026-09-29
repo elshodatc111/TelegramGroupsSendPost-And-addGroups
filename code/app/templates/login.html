@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kirish · Group Post</title>
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t)t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}})()</script>
+<link rel="stylesheet" href="/static/style.css"></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>{% for n, d in ICONS.items() %}<symbol id="i-{{ n }}" viewBox="0 0 24 24">{{ d }}</symbol>{% endfor %}</defs></svg>
+<div class="login-wrap"><form class="login-card" method="post" action="/login">
+  <div class="logo">{{ ic('lock') }}</div><h1 style="font-size:22px">Group Post</h1><p class="mut">Davom etish uchun parolni kiriting</p>
+  {% if err %}<div class="flash err" style="text-align:left">{{ ic('alert') }}<span>{{ err }}</span></div>{% endif %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <input type="password" name="password" placeholder="Parol" autofocus required style="text-align:center;font-size:16px">
+  <button class="btn lg" style="width:100%;margin-top:14px">Kirish</button>
+</form></div></body></html>

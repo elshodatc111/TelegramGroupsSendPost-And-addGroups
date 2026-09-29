@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% block title %}Akkauntlar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Telegram akkauntlar</h1><p class="sub">Bir nechta akkaunt qo'shing. Yuqoridagi tanlagichdan qaysi biri bilan ishlashni belgilaysiz: guruhlar, yuborishlar va statistika akkaunt bo'yicha alohida.</p></div></div>
+{% if not api_ok %}<div class="note red">{{ ic('alert') }}<div>Avval <a href="/settings"><b>Sozlamalar</b></a> bo'limida <b>API ID</b> va <b>API HASH</b> ni kiriting (barcha akkauntlar uchun bitta yetadi).</div></div>{% endif %}
+
+{% if login_id %}
+<div class="card" style="border-color:var(--pri)">
+  <div class="card-h"><h2>{{ ic('lock') }} Akkauntni ulash</h2></div>
+  {% if step == 'password' %}
+  <form method="post" action="/accounts/{{ login_id }}/password"><label class="l">2 bosqichli parol (Cloud password)</label><input type="password" name="password" autofocus required>
+    <div class="actions" style="margin-top:14px"><button class="btn">Kirish</button><a class="btn sec" href="/accounts">Bekor qilish</a></div></form>
+  {% else %}
+  <form method="post" action="/accounts/{{ login_id }}/code"><label class="l">Telegram'ga kelgan kod</label><input type="text" name="code" autofocus required autocomplete="off" inputmode="numeric" style="max-width:260px">
+    <div class="actions" style="margin-top:14px"><button class="btn">Tasdiqlash</button><a class="btn sec" href="/accounts">Bekor qilish</a></div></form>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="grid g2" style="align-items:start">
+{% for a in accounts %}
+<div class="card" style="margin:0;{{ 'border-color:var(--pri)' if cur and cur.id == a.id }}">
+  <div class="card-h"><h2><span class="ava {{ 'blue' if loop.index0 % 2 }}" style="width:38px;height:38px">{{ a.name[:1]|upper }}</span> {{ a.name }}</h2>
+    <div class="actions">{% if cur and cur.id == a.id %}<span class="badge b-running">Faol</span>{% endif %}
+    {% if a.connected %}<span class="badge b-good">Ulangan</span>{% else %}<span class="badge b-bad">Ulanmagan</span>{% endif %}</div></div>
+  <p class="mut small" style="margin:0 0 12px">{% if a.connected %}{{ a.info.name }} · +{{ a.info.phone }}{% if a.info.username %} · @{{ a.info.username }}{% endif %}{% else %}Telegram'ga ulanmagan{% endif %}</p>
+  <div class="health"><span class="small b">Akkaunt holati</span><div class="hbar"><i class="{{ a.health.level }}" style="width:{{ a.health.score }}%"></i></div><span class="badge b-{{ a.health.level }}">{{ a.health.label }} · {{ a.health.score }}</span></div>
+  <p class="hint">Oxirgi 24 soat: {{ a.health.sent }} ta yuborildi · {{ a.health.joined }} ta a'zo bo'lindi · {{ a.health.errors }} xato · {{ a.health.flood }} FloodWait{% if a.health.slow > 1 %} · <b>tezlik ×{{ a.health.slow }} sekinlashtirilgan</b>{% endif %}</p>
+  <form method="post" action="/accounts/{{ a.id }}/settings" style="margin-top:12px">
+    <div class="row"><div style="flex:2"><label class="l">Nomi</label><input type="text" name="name" value="{{ a.name }}" required></div>
+      <div><label class="l">Kunlik limit (xabar)</label><input type="number" name="daily_limit" value="{{ a.daily_limit }}" min="0" max="2000"></div></div>
+    <div class="row"><div><label class="l">Ish vaqti: boshlanishi</label><input type="time" name="work_start" value="{{ a.work_start }}"></div>
+      <div><label class="l">Tugashi</label><input type="time" name="work_end" value="{{ a.work_end }}"></div></div>
+    <div class="hint">Ish vaqti oynasi belgilansa, yuborish va a'zo bo'lish faqat shu soatlarda ishlaydi, tashqarisida avtomatik kutadi. Bo'sh qoldirsangiz, cheklovsiz.</div>
+    <div class="actions" style="margin-top:14px"><button class="btn sm">Saqlash</button>
+      {% if not cur or cur.id != a.id %}</form><form method="post" action="/accounts/switch"><input type="hidden" name="id" value="{{ a.id }}"><input type="hidden" name="next" value="/"><button class="btn sec sm">Shu akkauntga o'tish</button>{% endif %}
+    </div>
+  </form>
+  <div class="actions" style="margin-top:10px">
+    {% if not a.connected %}
+    <form method="post" action="/accounts/{{ a.id }}/reconnect" class="actions" style="display:flex"><input type="text" name="phone" placeholder="+998901234567" required style="width:190px"><button class="btn sm blue">Qayta ulash</button></form>
+    {% else %}
+    <form method="post" action="/accounts/{{ a.id }}/logout" onsubmit="return confirm('Akkauntdan chiqilsinmi?')"><button class="btn ghost sm">Chiqish</button></form>
+    {% endif %}
+    <form method="post" action="/accounts/{{ a.id }}/delete" onsubmit="return confirm('Akkaunt va uning barcha guruhlari, yuborishlari o\'chiriladi. Davom etasizmi?')"><button class="btn ghost sm">{{ ic('trash') }} O'chirish</button></form>
+  </div>
+</div>
+{% endfor %}
+<div class="card" style="margin:0">
+  <div class="card-h"><h2>{{ ic('plus') }} Yangi akkaunt qo'shish</h2></div>
+  <form method="post" action="/accounts/add">
+    <label class="l">Akkaunt nomi</label><input type="text" name="name" placeholder="Masalan: Asosiy, Savdo-2" required>
+    <label class="l">Telefon raqam (xalqaro formatda)</label><input type="text" name="phone" placeholder="+998901234567" required>
+    <div class="actions" style="margin-top:14px"><button class="btn" {{ '' if api_ok else 'disabled' }}>Kod yuborish</button></div>
+    <div class="hint">Telegram'ga kelgan kod, kerak bo'lsa 2 bosqichli parol so'raladi.</div>
+  </form>
+</div>
+</div>
+{% endblock %}

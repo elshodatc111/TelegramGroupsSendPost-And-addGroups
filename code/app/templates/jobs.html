@@ -1,12 +1,12 @@
 {% extends "base.html" %}{% block title %}Yuborishlar{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Yuborishlar tarixi</h1><p class="sub">Barcha yuborilgan va rejalashtirilgan postlar</p></div><a class="btn" href="/compose">{{ ic('edit') }} Yangi post</a></div>
+<div class="page-h"><div><h1>Yuborishlar tarixi</h1><p class="sub">Faol akkaunt bo'yicha yuborilgan va rejalashtirilgan postlar</p></div><a class="btn" href="/compose">{{ ic('edit') }} Yangi post</a></div>
 <div class="card" style="padding:0">
-{% if jobs %}<div class="tbl-wrap" style="border:0"><table><thead><tr><th>#</th><th>Post</th><th>Holat</th><th>Natija</th><th>Yaratilgan</th></tr></thead><tbody>
+{% if jobs %}<div class="tbl-wrap" style="border:0"><table><thead><tr><th>#</th><th>Post</th><th>Variant</th><th>Holat</th><th>Natija</th><th>Yaratilgan</th></tr></thead><tbody>
 {% for j in jobs %}<tr onclick="location='/jobs/{{ j.id }}'" style="cursor:pointer">
   <td><a href="/jobs/{{ j.id }}">{{ j.id }}</a></td>
-  <td>{{ ic('image') if j.media_type=='image' }}{{ ic('video') if j.media_type=='video' }} {{ (j.text or '(matnsiz)')[:70] }}</td>
-  <td><span class="badge b-{{ j.status }}">{{ STATUS[j.status] }}</span>{% if j.status=='scheduled' %}<div class="mut tiny">{{ j.scheduled_at[:16] }}</div>{% endif %}</td>
+  <td>{{ (j.name or 'Post')[:70] }}</td><td>{{ j.nv }}</td>
+  <td><span class="badge b-{{ j.status }}">{{ STATUS[j.status] }}</span>{% if j.status=='scheduled' and j.scheduled_at %}<div class="mut tiny">{{ j.scheduled_at[:16] }}</div>{% elif j.status=='waiting' and j.resume_at %}<div class="mut tiny">{{ j.resume_at[:16] }} gacha</div>{% endif %}</td>
   <td class="nowrap">{{ j.done }}/{{ j.total }}{% if j.failed %} <span style="color:var(--bad)">· {{ j.failed }} xato</span>{% endif %}</td>
   <td class="mut small nowrap">{{ j.created_at[:16] }}</td></tr>{% endfor %}</tbody></table></div>
 {% else %}<div class="empty">{{ ic('clock') }}<div>Hali yuborishlar yo'q</div></div>{% endif %}

@@ -1,62 +1,111 @@
-"""SQLite yordamchi funksiyalari va jadvallar sxemasi."""
+"""SQLite: sxema, migratsiya va yordamchi funksiyalar."""
 import contextlib
+import json
 import sqlite3
 from datetime import datetime
 
-from .config import DB_PATH
+from .config import DB_PATH, SESSION_DIR
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS settings(
-    key TEXT PRIMARY KEY, value TEXT
+GROUPS_DDL = """CREATE TABLE IF NOT EXISTS groups(
+    account_id INTEGER NOT NULL DEFAULT 1, tg_id INTEGER NOT NULL,
+    title TEXT, username TEXT, kind TEXT, members INTEGER, can_post INTEGER DEFAULT 1, synced_at TEXT,
+    about TEXT, slowmode INTEGER DEFAULT 0, no_media INTEGER DEFAULT 0, no_links INTEGER DEFAULT 0,
+    ads_flag INTEGER DEFAULT 0, ads_ok INTEGER DEFAULT 0, checked_at TEXT,
+    PRIMARY KEY(account_id, tg_id))"""
+LISTS_DDL = """CREATE TABLE IF NOT EXISTS group_lists(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL DEFAULT 1, name TEXT,
+    UNIQUE(account_id, name))"""
+
+SCHEMA = f"""
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS accounts(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT, username TEXT, session TEXT,
+    created_at TEXT, daily_limit INTEGER DEFAULT 150, work_start TEXT DEFAULT '', work_end TEXT DEFAULT ''
 );
-CREATE TABLE IF NOT EXISTS groups(
-    tg_id INTEGER PRIMARY KEY,
-    title TEXT, username TEXT, kind TEXT,
-    members INTEGER, can_post INTEGER DEFAULT 1, synced_at TEXT
-);
-CREATE TABLE IF NOT EXISTS group_lists(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE
-);
+{GROUPS_DDL};
+{LISTS_DDL};
 CREATE TABLE IF NOT EXISTS group_list_items(
-    list_id INTEGER NOT NULL, tg_id INTEGER NOT NULL,
-    PRIMARY KEY(list_id, tg_id),
+    list_id INTEGER NOT NULL, tg_id INTEGER NOT NULL, PRIMARY KEY(list_id, tg_id),
     FOREIGN KEY(list_id) REFERENCES group_lists(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS group_tags(
+    account_id INTEGER NOT NULL, tg_id INTEGER NOT NULL, tag TEXT NOT NULL,
+    PRIMARY KEY(account_id, tg_id, tag)
+);
+CREATE TABLE IF NOT EXISTS group_members_log(
+    account_id INTEGER NOT NULL, tg_id INTEGER NOT NULL, day TEXT NOT NULL, members INTEGER,
+    PRIMARY KEY(account_id, tg_id, day)
+);
+CREATE TABLE IF NOT EXISTS blacklist(
+    account_id INTEGER NOT NULL, tg_id INTEGER NOT NULL, title TEXT, reason TEXT, created_at TEXT,
+    PRIMARY KEY(account_id, tg_id)
+);
 CREATE TABLE IF NOT EXISTS templates(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT, text TEXT, parse_mode TEXT DEFAULT 'none',
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, text TEXT, parse_mode TEXT DEFAULT 'none',
     media_path TEXT, media_type TEXT, created_at TEXT
 );
+CREATE TABLE IF NOT EXISTS campaigns(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL DEFAULT 1, name TEXT, created_at TEXT,
+    min_delay INTEGER, max_delay INTEGER, utm_on INTEGER DEFAULT 0, utm_source TEXT, utm_campaign TEXT,
+    skip_ads INTEGER DEFAULT 1, target_json TEXT DEFAULT '[]',
+    recurrence TEXT DEFAULT 'none', rec_time TEXT DEFAULT '10:00', rec_days TEXT DEFAULT '',
+    rec_active INTEGER DEFAULT 0, next_run TEXT, last_run TEXT,
+    UNIQUE(account_id, name)
+);
+CREATE TABLE IF NOT EXISTS campaign_variants(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, campaign_id INTEGER NOT NULL, idx INTEGER,
+    text TEXT, parse_mode TEXT DEFAULT 'none', media_json TEXT DEFAULT '[]', media_type TEXT,
+    FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS variant_ptr(key TEXT PRIMARY KEY, ptr INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS jobs(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    text TEXT, parse_mode TEXT DEFAULT 'none',
-    media_path TEXT, media_type TEXT,
-    status TEXT DEFAULT 'draft',
-    min_delay INTEGER, max_delay INTEGER,
-    scheduled_at TEXT, created_at TEXT, started_at TEXT, finished_at TEXT,
-    next_at TEXT, error TEXT,
+    account_id INTEGER NOT NULL DEFAULT 1, campaign_id INTEGER,
+    text TEXT, parse_mode TEXT DEFAULT 'none', media_path TEXT, media_type TEXT,
+    status TEXT DEFAULT 'draft', min_delay INTEGER, max_delay INTEGER,
+    scheduled_at TEXT, created_at TEXT, started_at TEXT, finished_at TEXT, next_at TEXT, resume_at TEXT, error TEXT,
+    utm_on INTEGER DEFAULT 0, utm_source TEXT, utm_campaign TEXT, name TEXT,
     total INTEGER DEFAULT 0, done INTEGER DEFAULT 0, failed INTEGER DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS job_variants(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER NOT NULL, idx INTEGER,
+    text TEXT, parse_mode TEXT DEFAULT 'none', media_json TEXT DEFAULT '[]', media_type TEXT,
+    FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS job_targets(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id INTEGER NOT NULL, tg_id INTEGER, title TEXT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER NOT NULL, tg_id INTEGER, title TEXT,
     status TEXT DEFAULT 'pending', error TEXT, sent_at TEXT,
+    variant_id INTEGER, msg_ids TEXT, views INTEGER, forwards INTEGER, reactions INTEGER, replies INTEGER,
+    deleted INTEGER DEFAULT 0, stat_at TEXT,
     FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_targets_job ON job_targets(job_id);
 CREATE TABLE IF NOT EXISTS join_batches(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, status TEXT DEFAULT 'draft',
-    min_delay INTEGER, max_delay INTEGER, daily_limit INTEGER,
+    id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL DEFAULT 1, filename TEXT,
+    status TEXT DEFAULT 'draft', min_delay INTEGER, max_delay INTEGER, daily_limit INTEGER,
     created_at TEXT, started_at TEXT, finished_at TEXT, next_at TEXT, resume_at TEXT, error TEXT,
     total INTEGER DEFAULT 0, raw TEXT
 );
 CREATE TABLE IF NOT EXISTS join_targets(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id INTEGER NOT NULL,
-    ref TEXT, kind TEXT, key TEXT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id INTEGER NOT NULL, ref TEXT, kind TEXT, key TEXT,
     status TEXT DEFAULT 'pending', detail TEXT, title TEXT, tried_at TEXT,
     FOREIGN KEY(batch_id) REFERENCES join_batches(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_jt_batch ON join_targets(batch_id);
+CREATE TABLE IF NOT EXISTS account_events(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, kind TEXT, ts TEXT, info TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_events ON account_events(account_id, kind, ts);
+CREATE TABLE IF NOT EXISTS inbox(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, chat_id INTEGER, chat_title TEXT,
+    sender_id INTEGER, sender_name TEXT, sender_username TEXT, text TEXT, msg_id INTEGER,
+    is_private INTEGER DEFAULT 0, kind TEXT, date TEXT, is_read INTEGER DEFAULT 0, replied INTEGER DEFAULT 0,
+    UNIQUE(account_id, chat_id, msg_id)
+);
+CREATE TABLE IF NOT EXISTS canned_replies(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, text TEXT);
+CREATE TABLE IF NOT EXISTS media_items(
+    name TEXT PRIMARY KEY, original TEXT, kind TEXT, size INTEGER, created_at TEXT
+);
 """
 
 
@@ -64,18 +113,12 @@ def now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _conn():
+def _conn(fk=True):
     c = sqlite3.connect(DB_PATH, timeout=30)
     c.row_factory = sqlite3.Row
-    c.execute("PRAGMA foreign_keys=ON")
+    if fk:
+        c.execute("PRAGMA foreign_keys=ON")
     return c
-
-
-def init():
-    with contextlib.closing(_conn()) as c:
-        c.execute("PRAGMA journal_mode=WAL")
-        c.executescript(SCHEMA)
-        c.commit()
 
 
 def q(sql, args=()):
@@ -107,5 +150,71 @@ def get_setting(key, default=None):
 
 
 def set_setting(key, value):
-    ex("INSERT INTO settings(key,value) VALUES(?,?) "
-       "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, str(value)))
+    ex("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+       (key, str(value)))
+
+
+def del_setting(key):
+    ex("DELETE FROM settings WHERE key=?", (key,))
+
+
+# ---------------- migratsiya ----------------
+def _cols(c, table):
+    return {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+
+
+def _add(c, table, col, ddl):
+    if col not in _cols(c, table):
+        c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+
+
+def init():
+    with contextlib.closing(_conn(fk=False)) as c:
+        c.execute("PRAGMA journal_mode=WAL")
+        # eski sxemalarni yangilash (jadval yaratilishidan oldin)
+        old_groups = _cols(c, "groups")
+        if old_groups and "account_id" not in old_groups:
+            c.executescript("ALTER TABLE groups RENAME TO groups_old;")
+            c.executescript(GROUPS_DDL + ";")
+            c.executescript("INSERT INTO groups(account_id,tg_id,title,username,kind,members,can_post,synced_at) "
+                            "SELECT 1,tg_id,title,username,kind,members,can_post,synced_at FROM groups_old; "
+                            "DROP TABLE groups_old;")
+        old_lists = _cols(c, "group_lists")
+        if old_lists and "account_id" not in old_lists:
+            c.executescript("CREATE TABLE group_lists_n(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                            "account_id INTEGER NOT NULL DEFAULT 1, name TEXT, UNIQUE(account_id,name)); "
+                            "INSERT INTO group_lists_n(id,account_id,name) SELECT id,1,name FROM group_lists; "
+                            "DROP TABLE group_lists; ALTER TABLE group_lists_n RENAME TO group_lists;")
+        c.executescript(SCHEMA)
+        for table, col, ddl in [
+            ("jobs", "account_id", "INTEGER NOT NULL DEFAULT 1"), ("jobs", "campaign_id", "INTEGER"),
+            ("jobs", "resume_at", "TEXT"), ("jobs", "utm_on", "INTEGER DEFAULT 0"), ("jobs", "utm_source", "TEXT"),
+            ("jobs", "utm_campaign", "TEXT"), ("jobs", "name", "TEXT"),
+            ("job_targets", "variant_id", "INTEGER"), ("job_targets", "msg_ids", "TEXT"),
+            ("job_targets", "views", "INTEGER"), ("job_targets", "forwards", "INTEGER"),
+            ("job_targets", "reactions", "INTEGER"), ("job_targets", "replies", "INTEGER"),
+            ("job_targets", "deleted", "INTEGER DEFAULT 0"), ("job_targets", "stat_at", "TEXT"),
+            ("join_batches", "account_id", "INTEGER NOT NULL DEFAULT 1"),
+        ]:
+            _add(c, table, col, ddl)
+        c.commit()
+        # birinchi akkaunt: eski session faylidan
+        if not c.execute("SELECT 1 FROM accounts LIMIT 1").fetchone() and (SESSION_DIR / "account.session").exists():
+            c.execute("INSERT INTO accounts(id,name,session,created_at) VALUES(1,'Asosiy akkaunt','account',?)", (now(),))
+        # eski joblar uchun variantlar
+        for j in c.execute("SELECT * FROM jobs WHERE id NOT IN (SELECT job_id FROM job_variants)").fetchall():
+            media = json.dumps([j["media_path"]]) if j["media_path"] else "[]"
+            c.execute("INSERT INTO job_variants(job_id,idx,text,parse_mode,media_json,media_type) VALUES(?,?,?,?,?,?)",
+                      (j["id"], 0, j["text"], j["parse_mode"], media, j["media_type"]))
+        # eski shablonlar -> kampaniyalar (bir marta)
+        done = c.execute("SELECT value FROM settings WHERE key='templates_migrated'").fetchone()
+        if not done:
+            for t in c.execute("SELECT * FROM templates").fetchall():
+                cur = c.execute("INSERT OR IGNORE INTO campaigns(account_id,name,created_at,min_delay,max_delay) "
+                                "VALUES(1,?,?,20,60)", (t["name"], t["created_at"] or now()))
+                if cur.lastrowid:
+                    media = json.dumps([t["media_path"]]) if t["media_path"] else "[]"
+                    c.execute("INSERT INTO campaign_variants(campaign_id,idx,text,parse_mode,media_json,media_type) "
+                              "VALUES(?,?,?,?,?,?)", (cur.lastrowid, 0, t["text"], t["parse_mode"], media, t["media_type"]))
+            c.execute("INSERT OR REPLACE INTO settings(key,value) VALUES('templates_migrated','1')")
+        c.commit()

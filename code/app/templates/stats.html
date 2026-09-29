@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% block title %}Statistika{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Statistika</h1><p class="sub">Yuborilgan postlar natijasi va guruhlar reytingi</p></div>
+{% if d %}<div class="actions"><form method="post" action="/stats/refresh"><button class="btn sec">{{ ic('refresh') }} Yangilash</button></form>
+ <a class="btn blue" href="/stats/export.xlsx?days={{ days }}">{{ ic('download') }} Excel</a><a class="btn" href="/stats/export.pdf?days={{ days }}">{{ ic('download') }} PDF</a></div>{% endif %}</div>
+{% if not d %}<div class="card empty">{{ ic('bar-chart') }}<div>Avval akkaunt qo'shing</div></div>{% else %}
+<div class="seg" style="margin-bottom:14px">{% for n in [7,30,90] %}<a href="/stats?days={{ n }}" style="text-decoration:none"><label style="cursor:pointer;{{ 'background:var(--pri);color:#fff' if days == n }}">{{ n }} kun</label></a>{% endfor %}</div>
+<div class="grid g6" style="margin-bottom:18px">
+ <div class="stat pri"><div class="k">Yuborildi</div><div class="v">{{ d.sent }}</div></div><div class="stat ok"><div class="k">Ko'rishlar</div><div class="v">{{ d.views }}</div></div>
+ <div class="stat pri"><div class="k">Reaksiyalar</div><div class="v">{{ d.reactions }}</div></div><div class="stat ok"><div class="k">Javoblar</div><div class="v">{{ d.replies }}</div></div>
+ <div class="stat bad"><div class="k">Xatolar</div><div class="v">{{ d.failed }}</div></div><div class="stat bad"><div class="k">O'chirilgan</div><div class="v">{{ d.deleted }}</div></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('bar-chart') }} Kunlar bo'yicha</h2></div>
+{% if d.by_day %}{% set mx = d.by_day|map(attribute='sent')|max %}{% set n = d.by_day|length %}{% set w = 100 / n %}
+<svg class="chart" viewBox="0 0 {{ n * 40 + 20 }} 210" preserveAspectRatio="none">
+ <line x1="10" y1="170" x2="{{ n * 40 + 10 }}" y2="170"/>
+ {% for r in d.by_day %}{% set h = (r.sent / mx * 140) if mx else 0 %}{% set x = 14 + loop.index0 * 40 %}
+  <rect class="bar-s" x="{{ x }}" y="{{ 170 - h }}" width="24" height="{{ h }}" rx="4"><title>{{ r.d }}: {{ r.sent }} yuborildi, {{ r.views }} ko'rish</title></rect>
+  <text x="{{ x + 12 }}" y="{{ 166 - h }}" text-anchor="middle">{{ r.sent }}</text>
+  <text x="{{ x + 12 }}" y="186" text-anchor="middle">{{ r.d[8:] }}.{{ r.d[5:7] }}</text>{% endfor %}</svg>
+<div class="legend"><span><i style="background:var(--pri)"></i>Yuborilgan postlar</span></div>
+{% else %}<div class="empty">Bu davrda ma'lumot yo'q</div>{% endif %}</div>
+{% if d.variants %}<div class="card" style="padding:0"><div class="card-h" style="padding:16px 20px 0"><h2>{{ ic('layers') }} Variantlar taqqoslash (A/B)</h2></div>
+ <div class="tbl-wrap" style="border:0"><table><thead><tr><th>Kampaniya</th><th>Variant</th><th>Yuborildi</th><th>O'rtacha ko'rish</th><th>Reaksiya</th><th>Javob</th></tr></thead><tbody>
+ {% for v in d.variants %}<tr><td>{{ v.name }}</td><td><span class="badge">V{{ v.variant }}</span></td><td>{{ v.sent }}</td><td><b>{{ v.avg_views or 0 }}</b></td><td>{{ v.reactions }}</td><td>{{ v.replies }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+<div class="card" style="padding:0"><div class="card-h" style="padding:16px 20px 0"><h2>{{ ic('users') }} Guruhlar reytingi</h2></div>
+{% if d.groups %}<div class="tbl-wrap" style="border:0"><table><thead><tr><th>Guruh</th><th>Reyting</th><th>Yuborildi</th><th>Xato</th><th>O'chirilgan</th><th>O'rt. ko'rish</th><th>A'zolar</th><th></th></tr></thead><tbody>
+ {% for g in d.groups %}<tr><td>{{ g.title }}</td><td><span class="badge b-{{ g.rating }}">{{ g.label }}</span></td><td>{{ g.sent }}</td><td>{{ g.failed }}</td><td>{{ g.deleted }}</td><td>{{ g.avg_views or '' }}</td>
+  <td>{{ g.members or '' }}{% if g.delta %} <span class="small" style="color:{{ 'var(--blue)' if g.delta > 0 else 'var(--pri)' }}">{{ '%+d' % g.delta }}</span>{% endif %}</td>
+  <td>{% if g.bl %}<span class="mut small">Qora ro'yxatda</span>{% elif g.rating != 'good' %}<form method="post" action="/groups/blacklist" style="margin:0"><input type="hidden" name="tg_ids" value="{{ g.tg_id }}"><input type="hidden" name="reason" value="Reytingi past"><button class="btn ghost sm">Qora ro'yxatga</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Ma'lumot yo'q</div>{% endif %}</div>
+{% endif %}
+{% endblock %}

@@ -1,49 +1,65 @@
 {% extends "base.html" %}{% block title %}Yuborish #{{ job.id }}{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Yuborish #{{ job.id }} <span class="badge b-{{ job.status }}" id="st" style="vertical-align:middle">{{ STATUS[job.status] }}</span></h1>
+<div class="page-h"><div><h1>{{ job.name or ('Yuborish #' ~ job.id) }} <span class="badge b-{{ job.status }}" id="st" style="vertical-align:middle">{{ STATUS[job.status] }}</span></h1>
   <p class="sub" id="info">&nbsp;</p></div><div class="actions" id="acts"></div></div>
-<div class="grid g4" style="margin-bottom:18px">
+<div class="grid g6" style="margin-bottom:18px">
   <div class="stat"><div class="k">Jami</div><div class="v" id="s_total">{{ job.total }}</div></div>
   <div class="stat ok"><div class="k">Yuborildi</div><div class="v" id="s_ok">0</div></div>
   <div class="stat bad"><div class="k">Xato</div><div class="v" id="s_bad">0</div></div>
-  <div class="stat warn"><div class="k">Qoldi</div><div class="v" id="s_left">0</div></div>
+  <div class="stat"><div class="k">Qoldi</div><div class="v" id="s_left">0</div></div>
+  <div class="stat pri"><div class="k">Ko'rishlar</div><div class="v" id="s_views">0</div></div>
+  <div class="stat ok"><div class="k">Reaksiya / javob</div><div class="v" id="s_react">0</div></div>
 </div>
+<div id="opbox" class="card" style="display:none"><div class="card-h"><h2 id="optitle"></h2><span class="mut small" id="opnum"></span></div><div class="bar blue"><i id="opbar" style="width:0"></i></div></div>
 <div class="cols">
  <div>
   <div class="card"><div class="bar"><i id="bar" style="width:0"></i></div><div id="jerr" class="note" style="display:none;margin:12px 0 0"></div></div>
   <div class="card" style="padding:0"><div class="card-h" style="padding:16px 20px 0"><h2>Guruhlar bo'yicha natija</h2></div>
-    <div class="tbl-wrap" style="border:0;max-height:520px"><table><thead><tr><th>#</th><th>Guruh</th><th>Holat</th><th>Izoh</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+    <div class="tbl-wrap" style="border:0;max-height:560px"><table><thead><tr><th>#</th><th>Guruh</th><th>Var.</th><th>Holat</th><th>Ko'rish</th><th>Reaksiya</th><th>Javob</th><th>Izoh</th></tr></thead><tbody id="rows"></tbody></table></div></div>
  </div>
- <aside class="sticky"><div class="card"><div class="card-h"><h2>Post</h2></div><div class="tgview"><div class="bubble">
-    {% if job.media_path %}<div class="media">{% if job.media_type=='video' %}<video src="/media/{{ job.media_path }}" controls preload="metadata"></video>{% else %}<img src="/media/{{ job.media_path }}" alt="">{% endif %}</div>{% endif %}
-    <div class="t">{{ job.text|render_text(job.parse_mode) }}</div></div></div></div></aside>
+ <aside class="sticky"><div class="card"><div class="card-h"><h2>Variantlar</h2></div>
+  {% if variants|length > 1 %}<div class="vtabs" id="vt">{% for v in variants %}<button type="button" class="{{ 'on' if loop.first }}" data-v="{{ v.id }}">V{{ loop.index }}</button>{% endfor %}</div>{% endif %}
+  {% for v in variants %}{% set ms = medias[v.id] %}<div class="pvv" data-v="{{ v.id }}" {% if not loop.first %}style="display:none"{% endif %}><div class="tgview"><div class="bubble">
+    {% if ms %}<div class="media {{ 'n2' if ms|length in (2,3) else 'n4' if ms|length > 3 }}">{% for m in ms[:4] %}{% if v.media_type=='video' %}<video src="/media/{{ m }}" controls preload="metadata"></video>{% else %}<img src="/media/{{ m }}" alt="">{% endif %}{% endfor %}</div>{% endif %}
+    <div class="t">{{ (v.text or '')|render_text(v.parse_mode) }}</div></div></div></div>{% endfor %}
+  <details style="margin-top:14px"><summary class="small" style="cursor:pointer;color:var(--blue);font-weight:600">Yuborilgan xabarlarni tahrirlash</summary>
+   <form method="post" action="/jobs/{{ job.id }}/edit" style="margin-top:10px">{% for v in variants %}<label class="l">Variant {{ loop.index }} yangi matni</label><textarea name="text_{{ v.id }}" style="min-height:90px">{{ v.text }}</textarea>{% endfor %}
+   <div class="hint">Guruhlardagi yuborilgan xabar matni o'zgaradi (spintax/o'zgaruvchilar qayta hisoblanadi).</div><button class="btn sec sm" style="margin-top:8px">{{ ic('edit') }} Tahrirlash</button></form></details>
+ </div></aside>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
 const ID={{ job.id }}, LBL={{ STATUS|tojson }};
 const btn=(a,l,c,ic,cm)=>`<form method="post" action="/jobs/${ID}/${a}" ${cm?`onsubmit="return confirm('${cm}')"`:''}><button class="btn ${c}"><svg class="ic"><use href="#i-${ic}"/></svg> ${l}</button></form>`;
+document.querySelectorAll('#vt button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#vt button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.pvv').forEach(p=>p.style.display=p.dataset.v===b.dataset.v?'':'none');});
 async function tick(){
   try{
     const r=await fetch('/api/jobs/'+ID); if(!r.ok) return; const d=await r.json(), j=d.job;
     const st=document.getElementById('st'); st.textContent=d.status_label; st.className='badge b-'+j.status; st.style.verticalAlign='middle';
-    const done=j.done+j.failed;
+    const done=j.done+j.failed, T=d.targets;
     s_ok.textContent=j.done; s_bad.textContent=j.failed; s_left.textContent=d.pending; s_total.textContent=j.total;
+    s_views.textContent=T.reduce((a,t)=>a+(t.views||0),0); s_react.textContent=T.reduce((a,t)=>a+(t.reactions||0),0)+' / '+T.reduce((a,t)=>a+(t.replies||0),0);
     bar.style.width=(j.total?done*100/j.total:0)+'%';
     let info='';
     if(j.status==='running'&&j.next_at){const s=(parseDt(j.next_at)-parseDt(d.server_now))/1000; info='Keyingi guruhgacha ~'+Math.max(0,Math.round(s))+' soniya';}
     else if(j.status==='scheduled') info=j.scheduled_at.slice(0,16)+' da boshlanadi';
+    else if(j.status==='waiting'&&j.resume_at) info=j.resume_at.slice(0,16)+' da avtomatik davom etadi';
     else if(j.status==='done') info='Yuborish tugadi';
     document.getElementById('info').innerHTML=info||'&nbsp;';
     const e=document.getElementById('jerr'); e.style.display=j.error?'flex':'none'; e.textContent=j.error||'';
+    const op=d.op, busy=op&&op.running;
+    opbox.style.display=op?'block':'none';
+    if(op){optitle.textContent={stats:'Statistika yangilanmoqda',delete:"Xabarlar o'chirilmoqda",edit:'Xabarlar tahrirlanmoqda'}[op.kind]||op.kind; opnum.textContent=op.done+'/'+op.total+(op.fail?' · '+op.fail+' xato':''); opbar.style.width=(op.total?op.done*100/op.total:100)+'%';}
     let a='';
-    if(['queued','scheduled','running'].includes(j.status)) a+=btn('cancel',"To'xtatish",'bad','stop',"Yuborish to'xtatilsinmi?");
-    if(['cancelled','interrupted','failed'].includes(j.status)&&d.pending>0) a+=btn('resume','Davom ettirish','','play');
+    if(['queued','scheduled','running','waiting'].includes(j.status)) a+=btn('cancel',"To'xtatish",'bad','stop',"Yuborish to'xtatilsinmi?");
+    if(['cancelled','interrupted','failed','waiting'].includes(j.status)&&d.pending>0) a+=btn('resume','Davom ettirish','','play');
     if(!['running','queued'].includes(j.status)&&j.failed>0) a+=btn('retry','Xatolarni qayta yuborish','sec','refresh');
+    if(!['running','queued','scheduled'].includes(j.status)&&j.done>0&&!busy){a+=btn('refresh-stats','Statistikani yangilash','blue','bar-chart'); a+=btn('delete-messages',"Xabarlarni guruhlardan o'chirish",'ghost','trash',"Yuborilgan xabarlar barcha guruhlardan o'chirilsinmi?");}
     a+=`<a class="btn sec" href="/compose?job=${ID}">Nusxa olib yangi post</a>`;
-    if(!['running','queued'].includes(j.status)) a+=btn('delete',"O'chirish",'ghost','trash',"Tarixdan o'chirilsinmi?");
+    if(!['running','queued'].includes(j.status)) a+=btn('delete',"Tarixdan o'chirish",'ghost','trash',"Tarixdan o'chirilsinmi?");
     document.getElementById('acts').innerHTML=a;
-    rows.innerHTML=d.targets.map((t,i)=>`<tr><td class="mut">${i+1}</td><td>${esc(t.title)}</td><td><span class="badge b-${t.status}">${LBL[t.status]||t.status}</span></td><td class="small mut">${esc(t.error||(t.sent_at||''))}</td></tr>`).join('');
+    rows.innerHTML=T.map((t,i)=>`<tr><td class="mut">${i+1}</td><td>${esc(t.title)}</td><td>${t.vn?'<span class="badge">V'+t.vn+'</span>':''}</td><td><span class="badge b-${t.status}">${LBL[t.status]||t.status}</span>${t.deleted?' <span class="badge b-cancelled">o\'chirilgan</span>':''}</td><td>${t.views||''}</td><td>${t.reactions||''}</td><td>${t.replies||''}</td><td class="small mut">${esc(t.error||(t.sent_at||''))}</td></tr>`).join('');
   }catch(e){}
 }
 tick(); setInterval(tick,2000);

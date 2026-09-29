@@ -1,11 +1,16 @@
-"""Telegram bilan ishlash (Telethon, user account / MTProto)."""
-from telethon import TelegramClient, errors
-from telethon.tl.functions.channels import JoinChannelRequest
-from telethon.tl.functions.messages import CheckChatInviteRequest, ImportChatInviteRequest
+"""Bitta Telegram akkaunt bilan ishlash (Telethon, user account / MTProto)."""
+import json
+import re
+from datetime import datetime
+
+from telethon import TelegramClient, errors, events
+from telethon.tl.functions.channels import GetFullChannelRequest, JoinChannelRequest
+from telethon.tl.functions.contacts import SearchRequest
+from telethon.tl.functions.messages import CheckChatInviteRequest, GetFullChatRequest, ImportChatInviteRequest
 from telethon.tl.types import Channel, Chat, ChatInviteAlready, DocumentAttributeVideo, User
 
 from . import db
-from .config import CAPTION_LIMIT, MEDIA_DIR, SESSION_PATH, log
+from .config import CAPTION_LIMIT, MEDIA_DIR, SESSION_DIR, log
 
 
 class NotAGroup(Exception):
@@ -14,6 +19,12 @@ class NotAGroup(Exception):
 
 _REFRESH_ERRORS = ("FileReferenceExpiredError", "FileReferenceInvalidError", "MediaInvalidError",
                    "FileIdInvalidError", "MediaEmptyError", "WebpageMediaEmptyError")
+
+_ADS_PATTERNS = [
+    re.compile(r"(reklama|реклама|ads?|advertis\w*|promo\w*|spam|savdo)\s*(taqiqlan\w*|mumkin emas|man etil\w*|yo'?q|"
+               r"запрещ\w*|не допуска\w*|not allowed|forbidden|prohibited|banned|is not permitted)", re.I),
+    re.compile(r"(no|без|yo'?q|yoq|taqiqlanadi|запрет)\s*(reklama|реклама|ads?|advertis\w*|spam|promo\w*)", re.I),
+]
 
 
 def video_attributes(path: str):
@@ -37,27 +48,33 @@ def video_attributes(path: str):
         return None
 
 
+def ads_prohibited(about: str) -> bool:
+    return bool(about) and any(p.search(about) for p in _ADS_PATTERNS)
+
+
 class TelegramService:
-    def __init__(self):
+    def __init__(self, account_id: int, session_name: str):
+        self.account_id = account_id
+        self.session_path = str(SESSION_DIR / session_name)
         self.client: TelegramClient | None = None
         self._creds = None
         self._phone = None
         self._code_hash = None
-        self.info: dict | None = None        # oxirgi ma'lum akkaunt holati (sidebar uchun)
-        self._media_cache: dict = {}         # bir marta yuklab, boshqa guruhlarga qayta ishlatish
+        self._handlers_on = False
+        self.info: dict | None = None
+        self._media_cache: dict = {}
 
     # ---------- ulanish ----------
     async def _get_client(self) -> TelegramClient:
-        api_id = db.get_setting("api_id")
-        api_hash = db.get_setting("api_hash")
+        api_id, api_hash = db.get_setting("api_id"), db.get_setting("api_hash")
         if not api_id or not api_hash:
-            raise RuntimeError("API ID va API HASH hali kiritilmagan")
+            raise RuntimeError("API ID va API HASH hali kiritilmagan (Sozlamalar)")
         creds = (api_id, api_hash)
         if self.client is not None and self._creds != creds:
             await self.client.disconnect()
-            self.client = None
+            self.client, self._handlers_on = None, False
         if self.client is None:
-            self.client = TelegramClient(str(SESSION_PATH), int(api_id), api_hash)
+            self.client = TelegramClient(self.session_path, int(api_id), api_hash)
             self._creds = creds
         if not self.client.is_connected():
             await self.client.connect()
@@ -76,13 +93,14 @@ class TelegramService:
             if await c.is_user_authorized():
                 me = await c.get_me()
                 name = " ".join(x for x in (me.first_name, me.last_name) if x)
-                self.info = {"name": name or (me.username or "Akkaunt"), "phone": me.phone,
-                             "username": me.username}
+                self.info = {"name": name or (me.username or "Akkaunt"), "phone": me.phone, "username": me.username}
+                db.ex("UPDATE accounts SET phone=?, username=? WHERE id=?", (me.phone, me.username, self.account_id))
+                self._register(c)
                 return {"configured": True, "authorized": True, **self.info}
             self.info = None
             return {"configured": True, "authorized": False}
-        except Exception as e:  # tarmoq xatosi va h.k.
-            log.warning("status xatosi: %s", e)
+        except Exception as e:
+            log.warning("status xatosi (akkaunt %s): %s", self.account_id, e)
             return {"configured": True, "authorized": False, "error": str(e)}
 
     # ---------- kirish ----------
@@ -108,13 +126,58 @@ class TelegramService:
         try:
             await c.log_out()
         finally:
-            self.client = None
-            self.info = None
+            self.client, self.info, self._handlers_on = None, None, False
+
+    # ---------- inbox (kiruvchi xabarlar) ----------
+    def _register(self, client):
+        if self._handlers_on:
+            return
+        self._handlers_on = True
+        aid = self.account_id
+
+        @client.on(events.NewMessage(incoming=True))
+        async def _incoming(event):
+            try:
+                msg = event.message
+                if not msg or not (msg.message or "").strip():
+                    return
+                kind, chat_title = None, None
+                if event.is_private:
+                    sender = await event.get_sender()
+                    if getattr(sender, "bot", False) or isinstance(sender, Channel):
+                        return
+                    kind, chat_title = "private", None
+                elif msg.is_reply:
+                    replied = await msg.get_reply_message()
+                    if replied is not None and replied.out:
+                        kind = "reply"
+                    else:
+                        return
+                elif getattr(msg, "mentioned", False):
+                    kind = "mention"
+                else:
+                    return
+                sender = await event.get_sender()
+                chat = await event.get_chat()
+                sname = " ".join(x for x in (getattr(sender, "first_name", None), getattr(sender, "last_name", None)) if x) \
+                    or getattr(sender, "title", None) or "Noma'lum"
+                db.ex("INSERT OR IGNORE INTO inbox(account_id,chat_id,chat_title,sender_id,sender_name,sender_username,"
+                      "text,msg_id,is_private,kind,date) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                      (aid, event.chat_id, getattr(chat, "title", None), getattr(sender, "id", None), sname,
+                       getattr(sender, "username", None), msg.message[:4000], msg.id, int(bool(event.is_private)), kind,
+                       msg.date.astimezone().strftime("%Y-%m-%d %H:%M:%S") if msg.date else db.now()))
+            except Exception:
+                log.warning("inbox handler xatosi", exc_info=True)
+
+    async def reply(self, chat_id: int, text: str, reply_to: int | None):
+        c = await self._get_client()
+        entity = await c.get_input_entity(chat_id)
+        await c.send_message(entity, text, reply_to=reply_to)
 
     # ---------- guruhlar ----------
     async def fetch_groups(self) -> int:
         c = await self._get_client()
-        stamp = db.now()
+        stamp, day = db.now(), datetime.now().strftime("%Y-%m-%d")
         rows = []
         async for d in c.iter_dialogs():
             e = d.entity
@@ -126,7 +189,7 @@ class TelegramService:
                     kind = "channel"
                     can = bool(e.creator or (e.admin_rights and e.admin_rights.post_messages))
                     if not can:
-                        continue  # o'zimiz post yoza olmaydigan kanallar kerak emas
+                        continue
                 else:
                     kind = "supergroup"
                     br = e.default_banned_rights
@@ -137,18 +200,54 @@ class TelegramService:
                 br = e.default_banned_rights
                 can = bool(e.creator or e.admin_rights or not (br and br.send_messages))
             else:
-                continue  # shaxsiy chat/botlar
+                continue
             rows.append((d.id, d.name or "Nomsiz", getattr(e, "username", None), kind,
-                         getattr(e, "participants_count", None), int(can), stamp))
-        db.ex("DELETE FROM groups")
-        db.many("INSERT INTO groups(tg_id,title,username,kind,members,can_post,synced_at) "
-                "VALUES(?,?,?,?,?,?,?)", rows)
-        db.ex("DELETE FROM group_list_items WHERE tg_id NOT IN (SELECT tg_id FROM groups)")
+                         getattr(e, "participants_count", None), int(can)))
+        aid = self.account_id
+        for tg_id, title, uname, kind, members, can in rows:
+            db.ex("INSERT INTO groups(account_id,tg_id,title,username,kind,members,can_post,synced_at) "
+                  "VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account_id,tg_id) DO UPDATE SET title=excluded.title,"
+                  "username=excluded.username,kind=excluded.kind,members=excluded.members,can_post=excluded.can_post,"
+                  "synced_at=excluded.synced_at", (aid, tg_id, title, uname, kind, members, can, stamp))
+            if members:
+                db.ex("INSERT OR REPLACE INTO group_members_log(account_id,tg_id,day,members) VALUES(?,?,?,?)",
+                      (aid, tg_id, day, members))
+        db.ex("DELETE FROM groups WHERE account_id=? AND synced_at!=?", (aid, stamp))
+        db.ex("DELETE FROM group_list_items WHERE list_id IN (SELECT id FROM group_lists WHERE account_id=?) "
+              "AND tg_id NOT IN (SELECT tg_id FROM groups WHERE account_id=?)", (aid, aid))
         return len(rows)
+
+    async def group_info(self, tg_id: int) -> dict:
+        """Guruh qoidalari: tavsif, sekin rejim, media/havola cheklovlari, reklama taqiqi."""
+        c = await self._get_client()
+        e = await c.get_entity(tg_id)
+        about, slow = "", 0
+        rights = getattr(e, "default_banned_rights", None)
+        if isinstance(e, Channel):
+            full = await c(GetFullChannelRequest(e))
+            about = full.full_chat.about or ""
+            slow = getattr(full.full_chat, "slowmode_seconds", 0) or 0
+        elif isinstance(e, Chat):
+            full = await c(GetFullChatRequest(e.id))
+            about = full.full_chat.about or ""
+        no_media = bool(rights and (getattr(rights, "send_media", False) or
+                                    (getattr(rights, "send_photos", False) and getattr(rights, "send_videos", False))))
+        no_links = bool(rights and getattr(rights, "embed_links", False))
+        return {"about": about[:600], "slowmode": slow, "no_media": int(no_media), "no_links": int(no_links),
+                "ads_flag": int(ads_prohibited(about))}
+
+    async def search_public(self, q: str) -> list[dict]:
+        c = await self._get_client()
+        r = await c(SearchRequest(q=q, limit=40))
+        out = []
+        for ch in r.chats:
+            if isinstance(ch, Channel) and ch.username:
+                out.append({"username": ch.username, "title": ch.title, "members": getattr(ch, "participants_count", None),
+                            "kind": "channel" if ch.broadcast else "group", "joined": not getattr(ch, "left", True)})
+        return out
 
     # ---------- a'zo bo'lish ----------
     async def join(self, kind: str, key: str) -> tuple[str, str | None]:
-        """('joined'|'already', guruh_nomi) qaytaradi yoki xato ko'taradi."""
         c = await self._get_client()
         if kind == "invite":
             info = await c(CheckChatInviteRequest(key))
@@ -172,44 +271,77 @@ class TelegramService:
     def clear_media_cache(self):
         self._media_cache.clear()
 
-    async def send(self, tg_id: int, text: str, parse_mode: str,
-                   media_path: str | None, media_type: str | None, progress=None):
+    async def send(self, tg_id: int, text: str, parse_mode: str, media_names: list[str],
+                   media_type: str | None, progress=None) -> list[int]:
+        """Xabar(lar) yuboradi va message id'lar ro'yxatini qaytaradi."""
         c = await self._get_client()
         entity = await c.get_input_entity(tg_id)
         pm = "html" if parse_mode == "html" else None
-        if not media_path:
-            await c.send_message(entity, text, parse_mode=pm)
-            return
+        if not media_names:
+            m = await c.send_message(entity, text, parse_mode=pm)
+            return [m.id]
 
-        path = str(MEDIA_DIR / media_path)
+        paths = [str(MEDIA_DIR / n) for n in media_names]
+        key = tuple(media_names)
         caption_ok = bool(text) and len(text) <= CAPTION_LIMIT
-        cached = self._media_cache.get(media_path)
-        src = cached if cached is not None else path
+        cached = self._media_cache.get(key)
+        single = len(paths) == 1
 
-        async def do_send(source, fresh_upload: bool):
+        async def do_send(fresh: bool):
             kwargs = {}
-            if fresh_upload:
-                kwargs["progress_callback"] = progress
+            if fresh:
+                kwargs["progress_callback"] = progress if single else None
                 if media_type == "video":
                     kwargs["supports_streaming"] = True
-                    attr = video_attributes(path)
+                    attr = video_attributes(paths[0])
                     if attr:
                         kwargs["attributes"] = [attr]
             if caption_ok:
                 kwargs.update(caption=text, parse_mode=pm)
-            return await c.send_file(entity, source, **kwargs)
+            src = paths if fresh else cached
+            if single:
+                src = src[0]
+            return await c.send_file(entity, src, **kwargs)
 
         try:
-            msg = await do_send(src, cached is None)
+            msgs = await do_send(cached is None)
         except Exception as e:
             if cached is not None and type(e).__name__ in _REFRESH_ERRORS:
-                self._media_cache.pop(media_path, None)
-                msg = await do_send(path, True)
+                self._media_cache.pop(key, None)
+                cached = None
+                msgs = await do_send(True)
             else:
                 raise
-        if isinstance(msg, list):
-            msg = msg[0] if msg else None
-        if msg is not None and getattr(msg, "media", None) and media_path not in self._media_cache:
-            self._media_cache[media_path] = msg.media  # keyingi guruhlarga qayta yuklamasdan yuboriladi
+        msgs = msgs if isinstance(msgs, list) else [msgs]
+        ids = [m.id for m in msgs if m is not None]
+        if key not in self._media_cache and all(getattr(m, "media", None) for m in msgs if m is not None):
+            self._media_cache[key] = [m.media for m in msgs if m is not None]
         if text and not caption_ok:
-            await c.send_message(entity, text, parse_mode=pm)
+            t = await c.send_message(entity, text, parse_mode=pm)
+            ids.append(t.id)
+        return ids
+
+    async def delete_messages(self, tg_id: int, ids: list[int]):
+        c = await self._get_client()
+        entity = await c.get_input_entity(tg_id)
+        await c.delete_messages(entity, ids)
+
+    async def edit_message(self, tg_id: int, msg_id: int, text: str, parse_mode: str):
+        c = await self._get_client()
+        entity = await c.get_input_entity(tg_id)
+        await c.edit_message(entity, msg_id, text, parse_mode="html" if parse_mode == "html" else None)
+
+    async def fetch_stats(self, tg_id: int, ids: list[int]) -> list[dict]:
+        c = await self._get_client()
+        entity = await c.get_input_entity(tg_id)
+        msgs = await c.get_messages(entity, ids=ids)
+        out = []
+        for mid, m in zip(ids, msgs):
+            if m is None or type(m).__name__ == "MessageEmpty":
+                out.append({"id": mid, "deleted": True})
+                continue
+            react = sum(r.count for r in m.reactions.results) if getattr(m, "reactions", None) else 0
+            repl = m.replies.replies if getattr(m, "replies", None) else 0
+            out.append({"id": mid, "deleted": False, "views": m.views or 0, "forwards": m.forwards or 0,
+                        "reactions": react, "replies": repl})
+        return out

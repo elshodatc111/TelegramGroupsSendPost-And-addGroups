@@ -1,42 +1,67 @@
 <!doctype html>
 <html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}Telegram Group Post{% endblock %} · Telegram Group Post</title>
+<title>{% block title %}Telegram Group Post{% endblock %} · Group Post</title>
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t)t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}})()</script>
 <link rel="stylesheet" href="/static/style.css">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%232b7bf0'/%3E%3Cpath d='M7 15l17-7-3 16-6-4-3 3v-5l8-7-10 6z' fill='white'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23dc2626'/%3E%3Cpath d='M7 15l17-7-3 16-6-4-3 3v-5l8-7-10 6z' fill='white'/%3E%3C/svg%3E">
 </head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 {% for n, d in ICONS.items() %}<symbol id="i-{{ n }}" viewBox="0 0 24 24">{{ d }}</symbol>{% endfor %}
 </defs></svg>
 {% set p = request.url.path %}
-{% set acc = account() %}
-<div class="topbar"><button id="burger" aria-label="Menyu">{{ ic('menu') }}</button> Telegram Group Post</div>
 <div class="app">
 <aside class="side" id="side">
-  <div class="brand"><div class="logo">{{ ic('send') }}</div><div>Group Post<small>Telegram avtomatlashtirish</small></div></div>
+  <div class="brand"><div class="logo">{{ ic('send') }}</div><div>Group Post<small>Reklama avtomatlashtirish</small></div></div>
   <nav class="nav">
     <a href="/" class="{{ 'active' if p == '/' }}">{{ ic('home') }} Bosh sahifa</a>
-    <div class="nav-sec">Yuborish</div>
+    <div class="nav-sec">Reklama</div>
     <a href="/compose" class="{{ 'active' if p.startswith('/compose') or p.startswith('/preview') }}">{{ ic('edit') }} Post yaratish</a>
+    <a href="/campaigns" class="{{ 'active' if p.startswith('/campaigns') }}">{{ ic('repeat') }} Kampaniyalar</a>
     <a href="/jobs" class="{{ 'active' if p.startswith('/jobs') }}">{{ ic('clock') }} Yuborishlar</a>
-    <a href="/templates" class="{{ 'active' if p.startswith('/templates') }}">{{ ic('file-text') }} Shablonlar</a>
+    <a href="/media-library" class="{{ 'active' if p.startswith('/media-library') }}">{{ ic('image') }} Media kutubxona</a>
     <div class="nav-sec">Guruhlar</div>
     <a href="/groups" class="{{ 'active' if p.startswith('/groups') }}">{{ ic('users') }} Mening guruhlarim</a>
     <a href="/join" class="{{ 'active' if p.startswith('/join') }}">{{ ic('user-plus') }} Excel orqali a'zo bo'lish</a>
+    <a href="/discover" class="{{ 'active' if p.startswith('/discover') }}">{{ ic('search') }} Guruh qidirish</a>
+    <div class="nav-sec">Tahlil</div>
+    <a href="/stats" class="{{ 'active' if p.startswith('/stats') }}">{{ ic('bar-chart') }} Statistika</a>
+    <a href="/inbox" class="{{ 'active' if p.startswith('/inbox') }}">{{ ic('inbox') }} Inbox {% if unread %}<span class="cnt">{{ unread }}</span>{% endif %}</a>
     <div class="nav-sec">Tizim</div>
+    <a href="/accounts" class="{{ 'active' if p.startswith('/accounts') }}">{{ ic('shield') }} Akkauntlar</a>
     <a href="/settings" class="{{ 'active' if p.startswith('/settings') }}">{{ ic('settings') }} Sozlamalar</a>
   </nav>
   <div class="side-foot">
-    <a href="/settings" style="text-decoration:none"><div class="acct {{ 'on' if acc }}"><span class="dot"></span>
-      <div>{% if acc %}<b>{{ acc.name }}</b><small>+{{ acc.phone }}</small>{% else %}<b>Ulanmagan</b><small>Telegram akkaunt</small>{% endif %}</div></div></a>
     <button class="theme-btn" data-theme-toggle><svg class="ic" viewBox="0 0 24 24" data-theme-icon><use href="#i-moon"/></svg><span data-theme-label>Qorong'u rejim</span></button>
   </div>
 </aside>
+<div class="content">
+<header class="top">
+  <button class="burger" id="burger" aria-label="Menyu">{{ ic('menu') }}</button>
+  <div class="dd">
+    {% if cur %}
+    <button class="acc-btn" data-dd type="button"><span class="ava">{{ cur.name[:1]|upper }}<span class="hd {{ cur.health.level }}"></span></span>
+      <span class="t"><b>{{ cur.name }}</b><small>{% if cur.connected %}+{{ cur.info.phone }}{% else %}Ulanmagan{% endif %} · {{ cur.health.label }}</small></span>{{ ic('chevron-down') }}</button>
+    {% else %}
+    <a class="btn" href="/accounts">{{ ic('plus') }} Akkaunt qo'shing</a>
+    {% endif %}
+    <div class="menu">
+      <div class="sec">Faol akkaunt</div>
+      {% for a in accounts %}<form method="post" action="/accounts/switch"><input type="hidden" name="id" value="{{ a.id }}"><input type="hidden" name="next" value="{{ request.url.path }}">
+        <button class="mi {{ 'cur' if cur and a.id == cur.id }}"><span class="ava {{ 'blue' if loop.index0 % 2 }}">{{ a.name[:1]|upper }}<span class="hd {{ a.health.level }}"></span></span>
+          <span class="t"><b>{{ a.name }}</b><small>{% if a.connected %}+{{ a.info.phone }}{% else %}Ulanmagan{% endif %}{% if a.unread %} · {{ a.unread }} yangi xabar{% endif %}</small></span>
+          {% if cur and a.id == cur.id %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>{% endfor %}
+      <hr><a class="mi" href="/accounts">{{ ic('plus') }} <span class="t"><b>Akkaunt qo'shish / boshqarish</b></span></a>
+    </div>
+  </div>
+  <div class="grow-sp"></div>
+  <a class="iconbtn" href="/inbox" title="Inbox">{{ ic('inbox') }}{% if unread %}<span class="dotc">{{ unread }}</span>{% endif %}</a>
+  {% if auth_on %}<form method="post" action="/logout" style="margin:0"><button class="iconbtn" title="Chiqish">{{ ic('log-out') }}</button></form>{% endif %}
+</header>
 <main class="main">
 {% if msg %}<div class="flash msg">{{ ic('check') }}<span>{{ msg }}</span></div>{% endif %}
 {% if err %}<div class="flash err">{{ ic('alert') }}<span>{{ err }}</span></div>{% endif %}
 {% block content %}{% endblock %}
-</main></div>
+</main></div></div>
 <script src="/static/app.js"></script>
 {% block scripts %}{% endblock %}
 </body></html>

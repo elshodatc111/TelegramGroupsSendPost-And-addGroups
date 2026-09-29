@@ -1,93 +1,167 @@
 {% extends "base.html" %}{% block title %}Post yaratish{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Yangi post</h1><p class="sub">Matn, rasm yoki video tayyorlang, guruhlarni tanlang va oldindan ko'ring</p></div></div>
-{% if not st.authorized %}<div class="note">{{ ic('alert') }}<div>Telegram akkaunt ulanmagan. Post tayyorlashingiz mumkin, lekin yuborish uchun <a href="/settings"><b>Sozlamalar</b></a> da ulang.</div></div>{% endif %}
-<form method="post" action="/compose/preview" enctype="multipart/form-data" id="cform"
-      data-media="{{ '/media/' ~ form.media_path if form.media_path }}" data-mtype="{{ form.media_type }}">
+<div class="page-h"><div><h1>Yangi post</h1><p class="sub">Bir nechta variant tayyorlang: guruhlarga ketma-ket bittadan yuboriladi (V1, V2, V3, V1 ...)</p></div></div>
+{% if cur and not cur.connected %}<div class="note red">{{ ic('alert') }}<div>Bu akkaunt Telegram'ga ulanmagan. Post tayyorlash mumkin, yuborish uchun <a href="/accounts"><b>Akkauntlar</b></a> bo'limida ulang.</div></div>{% endif %}
+<form method="post" action="/compose/preview" enctype="multipart/form-data" id="cform">
 <input type="hidden" name="replace_job" value="{{ form.replace_job }}">
+<input type="hidden" name="v_order" id="v_order" value="">
 <div class="cols">
  <div>
   <div class="card">
-    <div class="card-h"><h2><span class="step">1</span> Post mazmuni</h2>
-      <select name="parse_mode" id="parse_mode" style="width:auto"><option value="none" {{ 'selected' if form.parse_mode=='none' }}>Oddiy matn</option><option value="html" {{ 'selected' if form.parse_mode=='html' }}>HTML format</option></select></div>
-    <textarea name="text" id="text" placeholder="Post matnini shu yerga yozing...">{{ form.text }}</textarea>
-    <div class="counter" id="ccount">0 belgi</div>
-    <div class="hint" id="htmlhint" style="display:none">HTML teglar: &lt;b&gt;qalin&lt;/b&gt; &lt;i&gt;kursiv&lt;/i&gt; &lt;u&gt;tagiga chizilgan&lt;/u&gt; &lt;s&gt;o'chirilgan&lt;/s&gt; &lt;code&gt;kod&lt;/code&gt; &lt;a href="https://..."&gt;havola&lt;/a&gt;</div>
-    <label class="l">Rasm yoki video <span class="mut">(ixtiyoriy)</span></label>
-    <label class="drop" data-drop><input type="file" name="media" id="media" accept="image/*,video/*" hidden>
-      <span class="di">{{ ic('upload') }}</span><span><b>Fayl tanlang</b> yoki shu yerga tashlang<br><span class="mut small" data-name>Rasm (jpg, png, webp) yoki video (mp4 tavsiya etiladi)</span></span></label>
-    {% if form.media_path %}<input type="hidden" name="keep_media" value="{{ form.media_path }}"><input type="hidden" name="keep_media_type" value="{{ form.media_type }}">
-    <label class="grow" style="padding:8px 0;margin-top:6px"><input type="checkbox" name="remove_media" value="1" id="rmmedia"> <span class="small">Joriy {{ 'rasm' if form.media_type=='image' else 'video' }}ni olib tashlash</span></label>{% endif %}
-    <div class="hint">Rasm/video ostidagi matn {{ caption_limit }} belgigacha bo'lishi mumkin; uzunroq bo'lsa alohida xabar bo'lib yuboriladi.</div>
+    <div class="card-h"><h2><span class="step">1</span> Post variantlari</h2>
+      <span><button type="button" class="btn sec sm" id="addV">{{ ic('plus') }} Variant qo'shish</button></span></div>
+    <div id="variants"></div>
+    <div class="hint">Har bir variantning o'z matni va o'z rasm/videosi bor. Bitta guruhga faqat bitta variant yuboriladi, ketma-ket ikki guruhga bir xil variant tushmaydi. Boshlanish joyi oldingi yuborishdan davom etadi.
+      Matnda spintax: <code>{salom|assalomu alaykum}</code>, o'zgaruvchilar: <code>{guruh}</code>, <code>{username}</code>.</div>
   </div>
   <div class="card">
     <div class="card-h"><h2><span class="step">2</span> Guruhlarni tanlash</h2><span class="badge">Tanlangan: <b id="gcount">0</b></span></div>
-    {% if lists %}<div class="chips" style="margin-bottom:10px"><span class="mut small" style="align-self:center">Ro'yxatlar:</span>{% for l in lists %}<button type="button" class="chip" data-ids='{{ l.ids|tojson }}'>{{ l.name }} <span class="mut">({{ l.ids|length }})</span></button>{% endfor %}</div>{% endif %}
-    <div class="tools"><input type="search" id="gsearch" placeholder="Guruh nomi bo'yicha qidirish...">
+    {% if lists or tags %}<div class="chips" style="margin-bottom:10px">
+      {% for l in lists %}<button type="button" class="chip" data-ids='{{ l.ids|tojson }}'>{{ ic('users') }} {{ l.name }} <span class="mut">({{ l.ids|length }})</span></button>{% endfor %}
+      {% for t, ids in tags.items() %}<button type="button" class="chip tag" data-ids='{{ ids|tojson }}'>#{{ t }} <span class="mut">({{ ids|length }})</span></button>{% endfor %}</div>{% endif %}
+    <div class="tools"><input type="search" id="gsearch" placeholder="Nom yoki #teg bo'yicha qidirish...">
       <button type="button" class="btn sec sm" id="selAll">Ko'rinayotganlarni tanlash</button><button type="button" class="btn sec sm" id="selNone">Tozalash</button></div>
     <div class="glist" id="glist">
-      {% for g in groups %}<label class="grow {{ '' if g.can_post else 'off' }}" data-title="{{ g.title|lower }}">
-        <input type="checkbox" name="tg_ids" value="{{ g.tg_id }}" {{ 'checked' if g.tg_id in form.selected }} {{ '' if g.can_post else 'disabled' }}>
-        <span class="ava">{{ (g.title or '?')[:1]|upper }}</span>
-        <span class="t"><b>{{ g.title }}</b><span class="mut tiny">{{ {'channel':'kanal','supergroup':'superguruh','group':'guruh'}[g.kind] }}{% if g.members %} · {{ g.members }} a'zo{% endif %}{% if not g.can_post %} · yozish taqiqlangan{% endif %}</span></span></label>
-      {% else %}<div class="empty">{{ ic('users') }}<div>Guruhlar yo'q. Avval <a href="/groups">Guruhlar</a> sahifasida yangilang.</div></div>{% endfor %}
+      {% for g in groups %}{% set ok = g.can_post and not g.bl %}<label class="grow {{ '' if ok else 'off' }}" data-title="{{ (g.title or '')|lower }}" data-tags="{{ g.tags|join(' ') }}">
+        <input type="checkbox" name="tg_ids" value="{{ g.tg_id }}" {{ 'checked' if g.tg_id in form.selected and ok }} {{ '' if ok else 'disabled' }}>
+        <span class="gava">{{ (g.title or '?')[:1]|upper }}</span>
+        <span class="t"><b>{{ g.title }}</b><span class="mut tiny">{{ {'channel':'kanal','supergroup':'superguruh','group':'guruh'}.get(g.kind, 'guruh') }}{% if g.members %} · {{ g.members }} a'zo{% endif %}{% if not g.can_post %} · yozish taqiqlangan{% endif %}{% if g.slowmode %} · slowmode {{ g.slowmode }}s{% endif %}</span></span>
+        {% if g.bl %}<span class="flag red">Qora ro'yxat</span>{% elif g.ads_flag and not g.ads_ok %}<span class="flag red">Reklama taqiqlangan</span>{% elif g.no_media %}<span class="flag">Media yo'q</span>{% endif %}
+        {% for t in g.tags %}<span class="chip tag" style="pointer-events:none">#{{ t }}</span>{% endfor %}</label>
+      {% else %}<div class="empty">{{ ic('users') }}<div>Guruhlar yo'q. <a href="/groups">Guruhlar</a> sahifasida yangilang.</div></div>{% endfor %}
     </div>
+    <label class="grow" style="padding:10px 0 0;margin:0"><input type="checkbox" name="skip_ads" value="1" {{ 'checked' if form.skip_ads }}> <span class="small">Qoidalarida reklama taqiqlangan guruhlarni o'tkazib yuborish</span></label>
   </div>
   <div class="card">
-    <div class="card-h"><h2><span class="step">3</span> Interval va vaqt</h2></div>
+    <div class="card-h"><h2><span class="step">3</span> Interval, vaqt va takrorlash</h2></div>
     <div class="row">
       <div><label class="l">Guruhlar orasida min (soniya)</label><input type="number" name="min_delay" id="mind" value="{{ form.min_delay }}" min="3"></div>
       <div><label class="l">Guruhlar orasida max (soniya)</label><input type="number" name="max_delay" id="maxd" value="{{ form.max_delay }}" min="3"></div>
       <div><label class="l">Rejalashtirish <span class="mut">(ixtiyoriy)</span></label><input type="datetime-local" name="scheduled_at" value="{{ form.scheduled_at }}"></div>
     </div>
-    <div class="hint">Har bir guruh orasida min–max oralig'ida tasodifiy kutiladi. Vaqt bo'sh bo'lsa, tasdiqlagandan keyin darhol yuboriladi.</div>
-    <label class="l">Shablon sifatida saqlash <span class="mut">(ixtiyoriy nom)</span></label>
-    <input type="text" name="template_name" value="{{ form.template_name }}" placeholder="Masalan: Aksiya e'loni">
+    <div class="row" style="margin-top:6px">
+      <div><label class="l">Kampaniya nomi <span class="mut">(saqlash uchun)</span></label><input type="text" name="name" value="{{ form.name }}" placeholder="Masalan: Kuz aksiyasi"></div>
+      <div><label class="l">Takrorlash</label><select name="recurrence" id="rec"><option value="none" {{ 'selected' if form.recurrence=='none' }}>Bir marta</option><option value="daily" {{ 'selected' if form.recurrence=='daily' }}>Har kuni</option><option value="weekly" {{ 'selected' if form.recurrence=='weekly' }}>Haftalik</option></select></div>
+      <div id="rectime"><label class="l">Vaqti</label><input type="time" name="rec_time" value="{{ form.rec_time }}"></div>
+    </div>
+    <div id="recdays" class="chips" style="margin-top:10px">
+      {% for d in ['Du','Se','Chor','Pay','Ju','Sha','Yak'] %}<label class="chip" style="cursor:pointer"><input type="checkbox" name="rec_days" value="{{ loop.index0 }}" {{ 'checked' if loop.index0 in form.rec_days }} style="width:14px;height:14px;margin-right:6px">{{ d }}</label>{% endfor %}</div>
+    <div class="hint">Takrorlanuvchi kampaniya har safar variantlarni oldingi yuborishdan davom ettirib yuboradi. Ish vaqti va kunlik limit akkaunt sozlamalaridan olinadi.</div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2><span class="step">4</span> UTM kuzatuv <span class="mut small">(ixtiyoriy)</span></h2></div>
+    <label class="grow" style="padding:0;margin:0 0 10px"><input type="checkbox" name="utm_on" value="1" id="utm_on" {{ 'checked' if form.utm_on }}> <span>Havolalarga UTM belgilari qo'shish (t.me havolalariga tegilmaydi)</span></label>
+    <div class="row" id="utmrow"><div><label class="l">utm_source</label><input type="text" name="utm_source" value="{{ form.utm_source }}"></div>
+      <div><label class="l">utm_campaign</label><input type="text" name="utm_campaign" value="{{ form.utm_campaign }}" placeholder="bo'sh = kampaniya nomi"></div></div>
   </div>
   <button class="btn lg">{{ ic('eye') }} Oldindan ko'rish</button>
  </div>
  <aside class="sticky">
   <div class="card">
     <div class="card-h"><h2>{{ ic('eye') }} Jonli ko'rinish</h2></div>
+    <div class="vtabs" id="ptabs"></div>
     <div class="tgview"><div class="bubble"><div class="media" id="pv-media"></div><div class="t" id="pv-text"></div><div class="meta" id="pv-time"></div></div></div>
-    <dl class="kv" style="margin:14px 0 0"><dt>Guruhlar</dt><dd id="pv-n">0</dd><dt>Taxminiy davomiylik</dt><dd id="pv-est">—</dd></dl>
+    <dl class="kv" style="margin:14px 0 0"><dt>Variantlar</dt><dd id="pv-v">1</dd><dt>Guruhlar</dt><dd id="pv-n">0</dd><dt>Taxminiy davomiylik</dt><dd id="pv-est">—</dd></dl>
   </div>
  </aside>
 </div>
 </form>
+<div class="modal" id="mlib"><div class="box"><div class="card-h"><h2>{{ ic('image') }} Media kutubxona</h2><button type="button" class="btn sec sm" id="mclose">{{ ic('x') }} Yopish</button></div>
+  <div class="mgrid" id="mgrid"></div><div class="actions" style="margin-top:14px"><button type="button" class="btn" id="mok">Tanlanganlarni qo'shish</button></div></div></div>
+<script type="application/json" id="init">{{ form.variants|tojson }}</script>
 {% endblock %}
 {% block scripts %}
 <script>
 (function(){
-  const $=id=>document.getElementById(id);
-  const form=$('cform'), txt=$('text'), mode=$('parse_mode'), file=$('media');
-  let n=0, objUrl=null;
-  function media(){
-    const box=$('pv-media'); box.innerHTML='';
-    const f=file.files[0], rm=$('rmmedia') && $('rmmedia').checked;
-    if(f){ if(objUrl) URL.revokeObjectURL(objUrl); objUrl=URL.createObjectURL(f);
-      box.innerHTML = f.type.startsWith('video')? '<video src="'+objUrl+'" controls preload="metadata"></video>' : '<img src="'+objUrl+'" alt="">'; }
-    else if(form.dataset.media && !rm){
-      box.innerHTML = form.dataset.mtype==='video'? '<video src="'+form.dataset.media+'" controls preload="metadata"></video>' : '<img src="'+form.dataset.media+'" alt="">'; }
-  }
-  function text(){
-    const v=txt.value; $('pv-text').innerHTML=v?fmtHtml(v,mode.value):($('pv-media').firstChild?'':'<span class="mut">Post matni shu yerda ko\'rinadi...</span>');
-    const c=$('ccount'), hasM=!!($('pv-media').firstChild);
-    c.textContent=v.length+' belgi'+(hasM&&v.length>{{ caption_limit }}?' · media bilan {{ caption_limit }} dan oshdi: alohida xabar bo\'ladi':'');
-    c.classList.toggle('over', hasM&&v.length>{{ caption_limit }});
-    $('htmlhint').style.display = mode.value==='html'?'block':'none';
-    const d=new Date(); $('pv-time').textContent=d.toTimeString().slice(0,5);
-  }
-  function est(){
-    const a=+$('mind').value||0, b=+$('maxd').value||0; $('pv-n').textContent=n;
-    $('pv-est').textContent = n>1 ? '~'+fmtDur((a+b)/2*(n-1)) : '—';
-  }
-  txt.addEventListener('input',text); mode.addEventListener('change',text);
-  file.addEventListener('change',()=>{media();text();});
-  if($('rmmedia')) $('rmmedia').addEventListener('change',()=>{media();text();});
-  ['mind','maxd'].forEach(i=>$(i).addEventListener('input',est));
-  document.addEventListener('gcount',e=>{n=e.detail;est();});
-  media(); text(); est();
+const $=id=>document.getElementById(id), MAXV={{ max_variants }}, CAP={{ caption_limit }};
+const box=$('variants'); let vs=[], seq=0, active=0, libTarget=null, libSel=new Set();
+const isVid=n=>/\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(n);
+function add(d){
+  d=d||{}; vs.push({i:++seq, text:d.text||'', mode:d.parse_mode||'none', keep:(d.media||[]).slice(), files:[]});
+  render(); active=vs.length-1; preview();
+}
+function card(v,n){
+  const el=document.createElement('div'); el.className='vcard'; el.dataset.i=v.i;
+  el.innerHTML='<div class="vhead"><div class="vn"><i>V'+n+'</i> Variant '+n+'</div><div style="display:flex;gap:6px;align-items:center">'
+   +'<select data-f="mode" style="width:auto"><option value="none">Oddiy matn</option><option value="html">HTML format</option></select>'
+   +(vs.length>1?'<button type="button" class="btn ghost sm" data-act="del" title="O\'chirish"><svg class="ic" viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>':'')+'</div></div>'
+   +'<textarea data-f="text" name="v'+v.i+'_text" placeholder="Variant matni... spintax: {salom|assalom}"></textarea><div class="counter" data-c></div>'
+   +'<input type="hidden" name="v'+v.i+'_mode" data-f="modeh"><input type="hidden" name="v'+v.i+'_keep" data-f="keep">'
+   +'<div class="thumbs" data-th></div>'
+   +'<div class="actions" style="margin-top:10px"><label class="btn sec sm" style="margin:0;cursor:pointer"><svg class="ic" viewBox="0 0 24 24"><use href="#i-upload"/></svg> Fayl yuklash<input type="file" name="v'+v.i+'_files" data-f="files" multiple accept="image/*,video/*" hidden></label>'
+   +'<button type="button" class="btn sec sm" data-act="lib"><svg class="ic" viewBox="0 0 24 24"><use href="#i-image"/></svg> Kutubxonadan</button></div>';
+  el.querySelector('[data-f=text]').value=v.text;
+  el.querySelector('[data-f=mode]').value=v.mode;
+  return el;
+}
+function render(){
+  box.innerHTML=''; vs.forEach((v,k)=>{const el=card(v,k+1); box.appendChild(el); thumbs(v,el); sync(v,el);});
+  $('addV').disabled=vs.length>=MAXV; $('v_order').value=vs.map(v=>v.i).join(',');
+  $('pv-v').textContent=vs.length; tabs();
+}
+function sync(v,el){
+  el.querySelector('[data-f=keep]').value=v.keep.join(',');
+  el.querySelector('[data-f=modeh]').value=v.mode;
+  const c=el.querySelector('[data-c]'), hasM=v.keep.length+v.files.length>0;
+  c.textContent=v.text.length+' belgi'+(hasM&&v.text.length>CAP?' · media bilan '+CAP+' dan oshdi: alohida xabar bo\'ladi':''); c.classList.toggle('over',hasM&&v.text.length>CAP);
+}
+function thumbs(v,el){
+  const th=el.querySelector('[data-th]'); th.innerHTML='';
+  const mk=(src,vid,rm)=>{const d=document.createElement('div'); d.className='thumb';
+    d.innerHTML=(vid?'<video src="'+src+'#t=0.1" preload="metadata" muted></video>':'<img src="'+src+'" alt="">')+'<button type="button" title="Olib tashlash"><svg class="ic" viewBox="0 0 24 24"><use href="#i-x"/></svg></button>';
+    d.querySelector('button').onclick=rm; th.appendChild(d);};
+  v.keep.forEach((n,k)=>mk('/media/'+encodeURIComponent(n),isVid(n),()=>{v.keep.splice(k,1);thumbs(v,el);sync(v,el);preview();}));
+  v.files.forEach((f,k)=>mk(URL.createObjectURL(f),f.type.startsWith('video'),()=>{v.files.splice(k,1);setFiles(v,el);thumbs(v,el);sync(v,el);preview();}));
+}
+function setFiles(v,el){const dt=new DataTransfer(); v.files.forEach(f=>dt.items.add(f)); el.querySelector('[data-f=files]').files=dt.files;}
+box.addEventListener('input',e=>{
+  const el=e.target.closest('.vcard'); if(!el) return; const v=vs.find(x=>x.i==el.dataset.i), f=e.target.dataset.f;
+  if(f==='text') v.text=e.target.value; if(f==='mode') v.mode=e.target.value; sync(v,el); active=vs.indexOf(v); preview(); tabs();
+});
+box.addEventListener('change',e=>{
+  if(e.target.dataset.f!=='files') return; const el=e.target.closest('.vcard'), v=vs.find(x=>x.i==el.dataset.i);
+  v.files=v.files.concat([...e.target.files]); setFiles(v,el); thumbs(v,el); sync(v,el); active=vs.indexOf(v); preview();
+});
+box.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(!b) return; const el=b.closest('.vcard'), v=vs.find(x=>x.i==el.dataset.i);
+  if(b.dataset.act==='del'){ vs.splice(vs.indexOf(v),1); active=0; render(); preview(); }
+  else if(b.dataset.act==='lib'){ libTarget=v; libSel=new Set(); openLib(); }
+});
+$('addV').onclick=()=>add();
+function tabs(){
+  const t=$('ptabs'); t.innerHTML=''; if(vs.length<2){t.style.display='none';return;} t.style.display='flex';
+  vs.forEach((v,k)=>{const b=document.createElement('button'); b.type='button'; b.textContent='V'+(k+1); b.className=k===active?'on':''; b.onclick=()=>{active=k;tabs();preview();}; t.appendChild(b);});
+}
+function preview(){
+  const v=vs[Math.min(active,vs.length-1)]; if(!v) return; const m=$('pv-media'); m.innerHTML='';
+  const items=[]; v.keep.forEach(n=>items.push({s:'/media/'+encodeURIComponent(n),v:isVid(n)})); v.files.forEach(f=>items.push({s:URL.createObjectURL(f),v:f.type.startsWith('video')}));
+  const show=items.slice(0,4); m.className='media'+(show.length>=4?' n4':show.length===2||show.length===3?' n2':'');
+  show.forEach(it=>{m.insertAdjacentHTML('beforeend', it.v?'<video src="'+it.s+'" controls preload="metadata"></video>':'<img src="'+it.s+'" alt="">');});
+  const txt=v.text.replace(/\{([^{}|]+(?:\|[^{}]*)+)\}/g,(a,b)=>b.split('|')[0]).replace(/\{guruh\}/g,'Namuna guruh').replace(/\{username\}/g,'namuna_guruh');
+  $('pv-text').innerHTML=txt?fmtHtml(txt,v.mode):(items.length?'':'<span class="mut">Post matni shu yerda ko\'rinadi...</span>');
+  $('pv-time').textContent=new Date().toTimeString().slice(0,5); est();
+}
+let n=0; function est(){const a=+$('mind').value||0,b=+$('maxd').value||0; $('pv-n').textContent=n; $('pv-est').textContent=n>1?'~'+fmtDur((a+b)/2*(n-1)):'—';}
+['mind','maxd'].forEach(i=>$(i).addEventListener('input',est)); document.addEventListener('gcount',e=>{n=e.detail;est();});
+// kutubxona
+async function openLib(){
+  $('mlib').classList.add('open'); const g=$('mgrid'); g.innerHTML='<div class="mut">Yuklanmoqda...</div>';
+  const items=await (await fetch('/api/media')).json(); g.innerHTML='';
+  if(!items.length){g.innerHTML='<div class="empty" style="grid-column:1/-1">Kutubxona bo\'sh</div>';return;}
+  items.forEach(m=>{const d=document.createElement('div'); d.className='mitem';
+    d.innerHTML='<div class="pic">'+(m.kind==='video'?'<video src="/media/'+encodeURIComponent(m.name)+'#t=0.1" preload="metadata" muted></video>':'<img src="/media/'+encodeURIComponent(m.name)+'" loading="lazy">')+'</div><div class="cap">'+esc(m.original)+'</div>';
+    d.onclick=()=>{libSel.has(m.name)?libSel.delete(m.name):libSel.add(m.name); d.classList.toggle('sel');}; g.appendChild(d);});
+}
+$('mclose').onclick=()=>$('mlib').classList.remove('open');
+$('mok').onclick=()=>{ if(libTarget){ libSel.forEach(n=>{ if(!libTarget.keep.includes(n)) libTarget.keep.push(n); }); const k=vs.indexOf(libTarget); active=k; render(); preview(); } $('mlib').classList.remove('open'); };
+// takrorlash
+function rec(){const r=$('rec').value; $('rectime').style.display=r==='none'?'none':''; $('recdays').style.display=r==='weekly'?'flex':'none';}
+$('rec').onchange=rec; rec();
+function utm(){$('utmrow').style.display=$('utm_on').checked?'':'none';} $('utm_on').onchange=utm; utm();
+// boshlash
+const init=JSON.parse($('init').textContent||'[]'); (init.length?init:[{}]).forEach(d=>{vs.push({i:++seq,text:d.text||'',mode:d.parse_mode||'none',keep:(d.media||[]).slice(),files:[]});});
+render(); preview();
+$('cform').addEventListener('submit',()=>{$('v_order').value=vs.map(v=>v.i).join(',');});
 })();
 </script>
 {% endblock %}

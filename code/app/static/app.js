@@ -27,6 +27,15 @@
     });
   }
 
+  // Ochiladigan menyular (akkaunt tanlagich)
+  document.querySelectorAll('.dd > [data-dd]').forEach(btn => btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const dd = btn.parentElement, was = dd.classList.contains('open');
+    document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open'));
+    if (!was) dd.classList.add('open');
+  }));
+  document.addEventListener('click', e => { if (!e.target.closest('.dd')) document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')); });
+
   // Fayl tashlash zonalari
   document.querySelectorAll('[data-drop]').forEach(zone => {
     const input = zone.querySelector('input[type=file]');
@@ -59,7 +68,7 @@
     const search = document.getElementById('gsearch');
     if (search) search.addEventListener('input', () => {
       const v = search.value.trim().toLowerCase();
-      rows.forEach(r => r.classList.toggle('hide', !r.dataset.title.includes(v)));
+      rows.forEach(r => r.classList.toggle('hide', !(r.dataset.title + ' ' + (r.dataset.tags || '')).includes(v)));
     });
     const on = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
     on('selAll', () => { rows.forEach(r => { const c = r.querySelector('input'); if (!r.classList.contains('hide') && !c.disabled) c.checked = true; }); upd(); });

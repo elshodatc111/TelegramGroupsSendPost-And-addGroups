@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}A'zo bo'lishni sozlash{% endblock %}
 {% block content %}
 <div class="page-h"><div><h1>Faylni tekshirish</h1><p class="sub">{{ b.filename }} · Qaysi ustundagi ro'yxat kerakligini tanlang</p></div></div>
-{% if not st.authorized %}<div class="note">{{ ic('alert') }}<div>Telegram akkaunt ulanmagan. <a href="/settings"><b>Sozlamalar</b></a> da ulang.</div></div>{% endif %}
+{% if not st.authorized %}<div class="note">{{ ic('alert') }}<div>Telegram akkaunt ulanmagan. <a href="/accounts"><b>Akkauntlar</b></a> bo'limida ulang.</div></div>{% endif %}
 <form method="post" action="/join/{{ b.id }}/start" id="sform">
 <div class="cols">
  <div>

@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block title %}Inbox{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Inbox</h1><p class="sub">Postlarga javoblar, eslatmalar va shaxsiy xabarlar ({{ cur.name if cur }})</p></div>
+  <form method="post" action="/inbox/read-all"><button class="btn sec">{{ ic('check') }} Hammasini o'qilgan qilish</button></form></div>
+<div class="seg" style="margin-bottom:14px">{% for k, l in [('all','Hammasi'),('unread','O\'qilmagan'),('private','Shaxsiy'),('reply','Javoblar'),('mention','Eslatmalar')] %}<a href="/inbox?f={{ k }}" style="text-decoration:none"><label style="cursor:pointer;{{ 'background:var(--pri);color:#fff' if f == k }}">{{ l }}{% if k=='unread' and counts.unread %} ({{ counts.unread }}){% endif %}</label></a>{% endfor %}</div>
+<div class="cols">
+<div class="card" style="padding:0">
+{% for m in rows %}<div class="mail {{ 'unread' if not m.is_read }}"><span class="ava" style="width:38px;height:38px;border-radius:50%;background:var(--pri-soft);color:var(--pri);display:grid;place-items:center;font-weight:700;flex:none">{{ (m.sender_name or '?')[:1]|upper }}</span>
+  <div class="body"><div class="who"><b>{{ m.sender_name or 'Noma\'lum' }}</b><span class="badge {{ 'b-running' if m.kind=='private' else 'b-scheduled' }}">{{ {'private':'Shaxsiy','reply':'Javob','mention':'Eslatma'}.get(m.kind, m.kind) }}</span>{% if m.chat_title %}<span class="mut small">{{ m.chat_title }}</span>{% endif %}<span class="mut tiny">{{ (m.date or '')[:16] }}</span>{% if m.replied %}<span class="badge b-good">Javob berilgan</span>{% endif %}</div>
+   <div class="txt">{{ m.text }}</div>
+   <details><summary>Javob yozish</summary><form method="post" action="/inbox/{{ m.id }}/reply" style="margin-top:8px"><textarea name="text" style="min-height:70px" id="t{{ m.id }}" required></textarea>
+    <div class="actions" style="margin-top:8px"><button class="btn sm">{{ ic('send') }} Yuborish</button>{% for c in canned %}<button type="button" class="btn sec sm" onclick="document.getElementById('t{{ m.id }}').value={{ c.text|tojson|forceescape }}">{{ c.title }}</button>{% endfor %}</div></form></details>
+   {% if not m.is_read %}<form method="post" action="/inbox/{{ m.id }}/read" style="margin-top:6px"><button class="btn ghost sm">O'qilgan</button></form>{% endif %}</div></div>
+{% else %}<div class="empty">{{ ic('inbox') }}<div>Xabarlar yo'q</div></div>{% endfor %}</div>
+<aside class="sticky"><div class="card"><div class="card-h"><h2>Tayyor javoblar</h2></div>
+  {% for c in canned %}<div style="padding:8px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between"><b>{{ c.title }}</b><form method="post" action="/inbox/canned/{{ c.id }}/delete" style="margin:0"><button class="btn ghost sm" style="padding:2px 6px">{{ ic('trash') }}</button></form></div><div class="mut small">{{ c.text[:120] }}</div></div>
+  {% else %}<div class="mut small">Hali yo'q</div>{% endfor %}
+  <form method="post" action="/inbox/canned" style="margin-top:12px"><input type="text" name="title" placeholder="Sarlavha" required><textarea name="text" placeholder="Javob matni" style="min-height:70px;margin-top:8px" required></textarea><button class="btn blue sm" style="margin-top:8px">{{ ic('plus') }} Qo'shish</button></form></div></aside>
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}{% block title %}A'zo bo'lish #{{ b.id }}{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>A'zo bo'lish #{{ b.id }} <span class="badge b-{{ b.status }}" id="st" style="vertical-align:middle">{{ BATCH[b.status] }}</span></h1>
+  <p class="sub" id="sub">{{ b.filename }}</p></div><div class="actions" id="acts"></div></div>
+<div id="warn" class="note" style="display:none"></div>
+<div class="grid g4" style="margin-bottom:12px">
+  <div class="stat btn-like sel" data-f="all"><div class="k">Jami</div><div class="v" id="c_total">0</div></div>
+  <div class="stat ok btn-like" data-f="ok"><div class="k">{{ ic('check') }} Ulandi</div><div class="v" id="c_ok">0</div></div>
+  <div class="stat bad btn-like" data-f="bad"><div class="k">{{ ic('x') }} Ulanmadi</div><div class="v" id="c_bad">0</div></div>
+  <div class="stat warn btn-like" data-f="pending"><div class="k">{{ ic('clock') }} Kutilmoqda</div><div class="v" id="c_pend">0</div></div>
+</div>
+<div class="grid g3" style="margin-bottom:18px">
+  <div class="stat" style="padding:12px 16px"><div class="k">Yangi a'zo bo'lindi</div><div class="v" style="font-size:20px" id="c_joined">0</div></div>
+  <div class="stat" style="padding:12px 16px"><div class="k">Allaqachon a'zo edi</div><div class="v" style="font-size:20px" id="c_already">0</div></div>
+  <div class="stat btn-like" data-f="requested" style="padding:12px 16px"><div class="k">So'rov yuborildi (admin tasdiqlashi kerak)</div><div class="v" style="font-size:20px" id="c_req">0</div></div>
+</div>
+<div class="card"><div class="bar"><i id="bar" style="width:0"></i></div></div>
+<div class="card" style="padding:0">
+  <div class="card-h" style="padding:16px 20px 0"><h2>{{ ic('table') }} Batafsil hisobot</h2>
+    <input type="search" id="q" placeholder="Qidirish..." style="max-width:240px"></div>
+  <div class="tbl-wrap" style="border:0;max-height:560px"><table><thead><tr><th>#</th><th>Username / havola</th><th>Guruh nomi</th><th>Holat</th><th>Izoh</th><th>Vaqt</th></tr></thead><tbody id="rows"></tbody></table></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const ID={{ b.id }}, LBL={{ JOIN|tojson }};
+let rev='', filter='all', targets=[];
+const OK=['joined','already'], PEND=['pending'];
+const btn=(a,l,c,ic,cm)=>`<form method="post" action="/join/${ID}/${a}" ${cm?`onsubmit="return confirm('${cm}')"`:''}><button class="btn ${c}"><svg class="ic"><use href="#i-${ic}"/></svg> ${l}</button></form>`;
+function match(t){
+  if(filter==='ok') return OK.includes(t.status);
+  if(filter==='bad') return !OK.includes(t.status)&&t.status!=='requested'&&t.status!=='pending';
+  if(filter==='pending') return t.status==='pending';
+  if(filter==='requested') return t.status==='requested';
+  return true;
+}
+function draw(){
+  const q=document.getElementById('q').value.trim().toLowerCase();
+  rows.innerHTML=targets.map((t,i)=>({t,i})).filter(({t})=>match(t)&&(!q||(t.ref+' '+(t.title||'')).toLowerCase().includes(q)))
+    .map(({t,i})=>`<tr><td class="mut">${i+1}</td><td>${esc(t.ref)}</td><td>${esc(t.title||'')}</td><td><span class="badge b-${t.status}">${LBL[t.status]||t.status}</span></td><td class="small mut">${esc(t.detail||'')}</td><td class="small mut nowrap">${esc((t.tried_at||'').slice(5,16))}</td></tr>`).join('')
+    ||'<tr><td colspan="6" class="empty">Bu bo\'limda yozuv yo\'q</td></tr>';
+}
+document.querySelectorAll('[data-f]').forEach(el=>el.addEventListener('click',()=>{
+  filter=el.dataset.f; document.querySelectorAll('[data-f]').forEach(e=>e.classList.toggle('sel',e===el)); draw();}));
+document.getElementById('q').addEventListener('input',draw);
+async function tick(){
+  try{
+    const r=await fetch('/api/join/'+ID+'?rev='+encodeURIComponent(rev)); if(!r.ok) return; const d=await r.json(), b=d.b, c=d.counts;
+    st.textContent=d.status_label; st.className='badge b-'+b.status; st.style.verticalAlign='middle';
+    c_total.textContent=c.total; c_ok.textContent=c.ok; c_bad.textContent=c.failed; c_pend.textContent=c.pending;
+    c_joined.textContent=c.joined; c_already.textContent=c.already; c_req.textContent=c.requested;
+    bar.style.width=(c.total?(c.total-c.pending)*100/c.total:0)+'%';
+    let sub=b.filename+' · '+b.daily_limit+' ta/kun · '+b.min_delay+'–'+b.max_delay+'s';
+    if(b.status==='running'&&b.next_at){const s=(parseDt(b.next_at)-parseDt(d.server_now))/1000; sub+=' · keyingisigacha ~'+Math.max(0,Math.round(s))+'s';}
+    sub_.textContent=sub;
+    const w=document.getElementById('warn'); let wt='';
+    if(b.status==='waiting') wt='Kutilmoqda: '+(b.error||'')+' Davom etish vaqti: '+(b.resume_at||'').slice(0,16)+'. Dastur va kompyuter yoniq turishi kerak.';
+    else if(b.error&&b.status!=='done') wt=b.error;
+    w.style.display=wt?'flex':'none'; w.textContent=wt;
+    let a='';
+    if(['queued','running','waiting'].includes(b.status)) a+=btn('cancel',"To'xtatish",'bad','stop',"To'xtatilsinmi?");
+    if(['cancelled','interrupted','failed','waiting'].includes(b.status)&&c.pending>0) a+=btn('resume','Davom ettirish','','play');
+    if(!['running','queued'].includes(b.status)&&c.failed>0) a+=btn('retry','Xatolarni qayta urinish','sec','refresh');
+    a+=`<a class="btn sec" href="/join/${ID}/export.xlsx">${'<svg class="ic"><use href="#i-download"/></svg>'} Excel'ga yuklab olish</a>`;
+    if(!['running','queued'].includes(b.status)) a+=btn('delete',"O'chirish",'ghost','trash',"Hisobot o'chirilsinmi?");
+    acts.innerHTML=a;
+    if(d.targets){targets=d.targets; rev=d.rev; draw();} else rev=d.rev;
+  }catch(e){}
+}
+const sub_=document.getElementById('sub');
+tick(); setInterval(tick,2500);
+</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Excel orqali a'zo bo'lish{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Excel orqali a'zo bo'lish</h1><p class="sub">Username yoki t.me havolalari yozilgan Excel faylni yuklang, dastur xavfsiz tezlikda barcha guruh/kanallarga a'zo bo'ladi</p></div></div>
+{% if not st.authorized %}<div class="note">{{ ic('alert') }}<div>Telegram akkaunt ulanmagan. <a href="/settings"><b>Sozlamalar</b></a> da ulang.</div></div>{% endif %}
+<div class="card">
+  <form method="post" action="/join/upload" enctype="multipart/form-data">
+    <label class="drop" data-drop style="padding:26px"><input type="file" name="file" accept=".xlsx,.xlsm,.csv,.txt" hidden required onchange="this.form.querySelector('button').disabled=false">
+      <span class="di">{{ ic('table') }}</span><span><b>Excel faylni tanlang</b> yoki shu yerga tashlang<br><span class="mut small" data-name>.xlsx, .csv yoki .txt · @username, t.me/username yoki t.me/+taklif_havolasi</span></span></label>
+    <div class="actions" style="margin-top:14px"><button class="btn lg" disabled>{{ ic('upload') }} Yuklash va tekshirish</button></div>
+  </form>
+  <div class="note info" style="margin:18px 0 0">{{ ic('alert') }}<div>Telegram tez-tez a'zo bo'lishni cheklaydi. Shuning uchun dastur standart holda <b>kuniga ~{{ default_daily }} ta</b> guruhga, <b>{{ default_min }}–{{ default_max }} soniya</b> oraliqda a'zo bo'ladi. Limit to'lsa, o'zi to'xtab ertasi kuni davom etadi (dastur va kompyuter yoniq bo'lishi kerak).</div></div>
+</div>
+<div class="card" style="padding:0"><div class="card-h" style="padding:16px 20px 0"><h2>{{ ic('clock') }} Hisobotlar</h2></div>
+{% if batches %}<div class="tbl-wrap" style="border:0"><table><thead><tr><th>#</th><th>Fayl</th><th>Holat</th><th>Ulandi</th><th>Ulanmadi</th><th>Jami</th><th>Sana</th></tr></thead><tbody>
+{% for b in batches %}<tr onclick="location='/join/{{ b.id }}'" style="cursor:pointer"><td><a href="/join/{{ b.id }}">{{ b.id }}</a></td><td>{{ b.filename }}</td>
+  <td><span class="badge b-{{ b.status }}">{{ BATCH[b.status] }}</span></td>
+  <td style="color:var(--ok);font-weight:600">{{ b.ok + b.requested }}</td><td style="color:var(--bad);font-weight:600">{{ b.failed }}</td><td>{{ b.total }}</td><td class="mut small nowrap">{{ b.created_at[:16] }}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">{{ ic('user-plus') }}<div>Hali a'zo bo'lish boshlanmagan</div></div>{% endif %}</div>
+{% endblock %}

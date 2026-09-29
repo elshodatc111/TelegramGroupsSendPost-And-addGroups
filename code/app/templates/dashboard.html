@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% block title %}Bosh sahifa{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Xush kelibsiz</h1><p class="sub">Telegram guruhlarga post yuborish va guruhlarga a'zo bo'lish paneli</p></div>
+  <a class="btn lg" href="/compose">{{ ic('edit') }} Yangi post</a></div>
+{% if not st.authorized %}<div class="note">{{ ic('alert') }}<div>Telegram akkaunt ulanmagan. <a href="/settings"><b>Sozlamalar</b></a> bo'limida ulang.</div></div>{% endif %}
+<div class="grid g4" style="margin-bottom:18px">
+  <div class="stat pri"><div class="k">{{ ic('users') }} Guruhlar</div><div class="v">{{ stats.groups }}</div></div>
+  <div class="stat ok"><div class="k">{{ ic('send') }} Yuborilgan xabarlar</div><div class="v">{{ stats.sent }}</div></div>
+  <div class="stat"><div class="k">{{ ic('clock') }} Yuborishlar</div><div class="v">{{ stats.jobs }}</div></div>
+  <div class="stat ok"><div class="k">{{ ic('user-plus') }} A'zo bo'lingan</div><div class="v">{{ stats.joined }}</div></div>
+</div>
+<div class="grid g3" style="margin-bottom:18px">
+  <a class="qa" href="/compose"><div class="qi">{{ ic('edit') }}</div><div><b>Post yaratish</b><small>Matn, rasm yoki video</small></div></a>
+  <a class="qa" href="/join"><div class="qi">{{ ic('table') }}</div><div><b>Excel orqali a'zo bo'lish</b><small>Username ro'yxatini yuklang</small></div></a>
+  <a class="qa" href="/groups"><div class="qi">{{ ic('users') }}</div><div><b>Guruhlar</b><small>Ro'yxat va toifalar</small></div></a>
+</div>
+<div class="grid g2">
+  <div class="card"><div class="card-h"><h2>{{ ic('clock') }} So'nggi yuborishlar</h2><a href="/jobs" class="small">Hammasi</a></div>
+    {% for j in jobs %}<a href="/jobs/{{ j.id }}" style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--bd);color:var(--tx);text-decoration:none">
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ (j.text or '(matnsiz)')[:48] }}</span>
+      <span class="badge b-{{ j.status }}">{{ STATUS[j.status] }} {{ j.done }}/{{ j.total }}</span></a>
+    {% else %}<div class="empty">Hali yuborishlar yo'q</div>{% endfor %}</div>
+  <div class="card"><div class="card-h"><h2>{{ ic('user-plus') }} So'nggi a'zo bo'lishlar</h2><a href="/join" class="small">Hammasi</a></div>
+    {% for b in batches %}<a href="/join/{{ b.id }}" style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--bd);color:var(--tx);text-decoration:none">
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.filename }}</span>
+      <span class="badge b-{{ b.status }}">{{ b.ok + b.requested }}/{{ b.total }} ulandi</span></a>
+    {% else %}<div class="empty">Hali a'zo bo'lish boshlanmagan</div>{% endfor %}</div>
+</div>
+{% endblock %}

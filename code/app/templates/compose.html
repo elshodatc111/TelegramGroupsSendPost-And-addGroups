@@ -1,49 +1,93 @@
 {% extends "base.html" %}{% block title %}Post yaratish{% endblock %}
 {% block content %}
-<h1>Yangi post</h1>
-{% if not st.authorized %}<div class="warn">Telegram akkaunt ulanmagan. Post tayyorlashingiz mumkin, lekin yuborish uchun <a href="/settings">Sozlamalar</a> da ulang.</div>{% endif %}
-<form method="post" action="/compose/preview" enctype="multipart/form-data">
-  <input type="hidden" name="replace_job" value="{{ form.replace_job }}">
+<div class="page-h"><div><h1>Yangi post</h1><p class="sub">Matn, rasm yoki video tayyorlang, guruhlarni tanlang va oldindan ko'ring</p></div></div>
+{% if not st.authorized %}<div class="note">{{ ic('alert') }}<div>Telegram akkaunt ulanmagan. Post tayyorlashingiz mumkin, lekin yuborish uchun <a href="/settings"><b>Sozlamalar</b></a> da ulang.</div></div>{% endif %}
+<form method="post" action="/compose/preview" enctype="multipart/form-data" id="cform"
+      data-media="{{ '/media/' ~ form.media_path if form.media_path }}" data-mtype="{{ form.media_type }}">
+<input type="hidden" name="replace_job" value="{{ form.replace_job }}">
+<div class="cols">
+ <div>
   <div class="card">
-    <h2>1. Post mazmuni</h2>
-    <label>Matn</label>
-    <textarea name="text" placeholder="Post matni...">{{ form.text }}</textarea>
-    <div class="row">
-      <div><label>Format</label><select name="parse_mode">
-        <option value="none" {{ 'selected' if form.parse_mode=='none' }}>Oddiy matn</option>
-        <option value="html" {{ 'selected' if form.parse_mode=='html' }}>HTML (&lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt; &lt;code&gt; &lt;a href="..."&gt;)</option></select></div>
-      <div><label>Rasm yoki video (ixtiyoriy)</label><input type="file" name="media" accept="image/*,video/*"></div>
-    </div>
-    {% if form.media_path %}
-      <input type="hidden" name="keep_media" value="{{ form.media_path }}"><input type="hidden" name="keep_media_type" value="{{ form.media_type }}">
-      <p class="mut small">Joriy fayl: {{ 'rasm' if form.media_type=='image' else 'video' }} ({{ form.media_path }}). Yangi fayl tanlasangiz almashtiriladi.</p>
-    {% endif %}
-    <p class="mut small">Rasm/video ostidagi matn {{ caption_limit }} belgigacha bo'lishi mumkin; uzunroq bo'lsa alohida xabar bo'lib yuboriladi.</p>
+    <div class="card-h"><h2><span class="step">1</span> Post mazmuni</h2>
+      <select name="parse_mode" id="parse_mode" style="width:auto"><option value="none" {{ 'selected' if form.parse_mode=='none' }}>Oddiy matn</option><option value="html" {{ 'selected' if form.parse_mode=='html' }}>HTML format</option></select></div>
+    <textarea name="text" id="text" placeholder="Post matnini shu yerga yozing...">{{ form.text }}</textarea>
+    <div class="counter" id="ccount">0 belgi</div>
+    <div class="hint" id="htmlhint" style="display:none">HTML teglar: &lt;b&gt;qalin&lt;/b&gt; &lt;i&gt;kursiv&lt;/i&gt; &lt;u&gt;tagiga chizilgan&lt;/u&gt; &lt;s&gt;o'chirilgan&lt;/s&gt; &lt;code&gt;kod&lt;/code&gt; &lt;a href="https://..."&gt;havola&lt;/a&gt;</div>
+    <label class="l">Rasm yoki video <span class="mut">(ixtiyoriy)</span></label>
+    <label class="drop" data-drop><input type="file" name="media" id="media" accept="image/*,video/*" hidden>
+      <span class="di">{{ ic('upload') }}</span><span><b>Fayl tanlang</b> yoki shu yerga tashlang<br><span class="mut small" data-name>Rasm (jpg, png, webp) yoki video (mp4 tavsiya etiladi)</span></span></label>
+    {% if form.media_path %}<input type="hidden" name="keep_media" value="{{ form.media_path }}"><input type="hidden" name="keep_media_type" value="{{ form.media_type }}">
+    <label class="grow" style="padding:8px 0;margin-top:6px"><input type="checkbox" name="remove_media" value="1" id="rmmedia"> <span class="small">Joriy {{ 'rasm' if form.media_type=='image' else 'video' }}ni olib tashlash</span></label>{% endif %}
+    <div class="hint">Rasm/video ostidagi matn {{ caption_limit }} belgigacha bo'lishi mumkin; uzunroq bo'lsa alohida xabar bo'lib yuboriladi.</div>
   </div>
   <div class="card">
-    <h2>2. Guruhlarni tanlash</h2>
-    {% if lists %}<div class="chips"><span class="mut small">Ro'yxatlar:</span>{% for l in lists %}<button type="button" class="chip" data-ids='{{ l.ids|tojson }}'>{{ l.name }} ({{ l.ids|length }})</button>{% endfor %}</div>{% endif %}
-    <div class="tools"><input type="text" id="gsearch" placeholder="Qidirish...">
-      <button type="button" class="btn sec sm" id="selAll">Ko'rinayotganlarni tanlash</button>
-      <button type="button" class="btn sec sm" id="selNone">Tozalash</button><span class="mut small">Tanlangan: <b id="gcount">0</b></span></div>
+    <div class="card-h"><h2><span class="step">2</span> Guruhlarni tanlash</h2><span class="badge">Tanlangan: <b id="gcount">0</b></span></div>
+    {% if lists %}<div class="chips" style="margin-bottom:10px"><span class="mut small" style="align-self:center">Ro'yxatlar:</span>{% for l in lists %}<button type="button" class="chip" data-ids='{{ l.ids|tojson }}'>{{ l.name }} <span class="mut">({{ l.ids|length }})</span></button>{% endfor %}</div>{% endif %}
+    <div class="tools"><input type="search" id="gsearch" placeholder="Guruh nomi bo'yicha qidirish...">
+      <button type="button" class="btn sec sm" id="selAll">Ko'rinayotganlarni tanlash</button><button type="button" class="btn sec sm" id="selNone">Tozalash</button></div>
     <div class="glist" id="glist">
       {% for g in groups %}<label class="grow {{ '' if g.can_post else 'off' }}" data-title="{{ g.title|lower }}">
         <input type="checkbox" name="tg_ids" value="{{ g.tg_id }}" {{ 'checked' if g.tg_id in form.selected }} {{ '' if g.can_post else 'disabled' }}>
-        <span>{{ g.title }} <span class="mut small">· {{ {'channel':'kanal','supergroup':'superguruh','group':'guruh'}[g.kind] }}{% if g.members %} · {{ g.members }} a'zo{% endif %}{% if not g.can_post %} · yozish taqiqlangan{% endif %}</span></span></label>
-      {% else %}<p style="padding:12px" class="mut">Guruhlar yo'q. Avval <a href="/groups">Guruhlar</a> sahifasida yangilang.</p>{% endfor %}
+        <span class="ava">{{ (g.title or '?')[:1]|upper }}</span>
+        <span class="t"><b>{{ g.title }}</b><span class="mut tiny">{{ {'channel':'kanal','supergroup':'superguruh','group':'guruh'}[g.kind] }}{% if g.members %} · {{ g.members }} a'zo{% endif %}{% if not g.can_post %} · yozish taqiqlangan{% endif %}</span></span></label>
+      {% else %}<div class="empty">{{ ic('users') }}<div>Guruhlar yo'q. Avval <a href="/groups">Guruhlar</a> sahifasida yangilang.</div></div>{% endfor %}
     </div>
   </div>
   <div class="card">
-    <h2>3. Interval va vaqt</h2>
+    <div class="card-h"><h2><span class="step">3</span> Interval va vaqt</h2></div>
     <div class="row">
-      <div><label>Guruhlar orasida min (soniya)</label><input type="number" name="min_delay" value="{{ form.min_delay }}" min="3"></div>
-      <div><label>Guruhlar orasida max (soniya)</label><input type="number" name="max_delay" value="{{ form.max_delay }}" min="3"></div>
-      <div><label>Rejalashtirish (ixtiyoriy)</label><input type="datetime-local" name="scheduled_at" value="{{ form.scheduled_at }}"></div>
+      <div><label class="l">Guruhlar orasida min (soniya)</label><input type="number" name="min_delay" id="mind" value="{{ form.min_delay }}" min="3"></div>
+      <div><label class="l">Guruhlar orasida max (soniya)</label><input type="number" name="max_delay" id="maxd" value="{{ form.max_delay }}" min="3"></div>
+      <div><label class="l">Rejalashtirish <span class="mut">(ixtiyoriy)</span></label><input type="datetime-local" name="scheduled_at" value="{{ form.scheduled_at }}"></div>
     </div>
-    <p class="mut small">Har bir guruh orasida min–max oralig'ida tasodifiy kutiladi. Bo'sh qoldirilsa, tasdiqlagandan keyin darhol yuboriladi.</p>
-    <label>Shablon sifatida saqlash (ixtiyoriy nom)</label>
+    <div class="hint">Har bir guruh orasida min–max oralig'ida tasodifiy kutiladi. Vaqt bo'sh bo'lsa, tasdiqlagandan keyin darhol yuboriladi.</div>
+    <label class="l">Shablon sifatida saqlash <span class="mut">(ixtiyoriy nom)</span></label>
     <input type="text" name="template_name" value="{{ form.template_name }}" placeholder="Masalan: Aksiya e'loni">
   </div>
-  <button class="btn">Oldindan ko'rish →</button>
+  <button class="btn lg">{{ ic('eye') }} Oldindan ko'rish</button>
+ </div>
+ <aside class="sticky">
+  <div class="card">
+    <div class="card-h"><h2>{{ ic('eye') }} Jonli ko'rinish</h2></div>
+    <div class="tgview"><div class="bubble"><div class="media" id="pv-media"></div><div class="t" id="pv-text"></div><div class="meta" id="pv-time"></div></div></div>
+    <dl class="kv" style="margin:14px 0 0"><dt>Guruhlar</dt><dd id="pv-n">0</dd><dt>Taxminiy davomiylik</dt><dd id="pv-est">—</dd></dl>
+  </div>
+ </aside>
+</div>
 </form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const form=$('cform'), txt=$('text'), mode=$('parse_mode'), file=$('media');
+  let n=0, objUrl=null;
+  function media(){
+    const box=$('pv-media'); box.innerHTML='';
+    const f=file.files[0], rm=$('rmmedia') && $('rmmedia').checked;
+    if(f){ if(objUrl) URL.revokeObjectURL(objUrl); objUrl=URL.createObjectURL(f);
+      box.innerHTML = f.type.startsWith('video')? '<video src="'+objUrl+'" controls preload="metadata"></video>' : '<img src="'+objUrl+'" alt="">'; }
+    else if(form.dataset.media && !rm){
+      box.innerHTML = form.dataset.mtype==='video'? '<video src="'+form.dataset.media+'" controls preload="metadata"></video>' : '<img src="'+form.dataset.media+'" alt="">'; }
+  }
+  function text(){
+    const v=txt.value; $('pv-text').innerHTML=v?fmtHtml(v,mode.value):($('pv-media').firstChild?'':'<span class="mut">Post matni shu yerda ko\'rinadi...</span>');
+    const c=$('ccount'), hasM=!!($('pv-media').firstChild);
+    c.textContent=v.length+' belgi'+(hasM&&v.length>{{ caption_limit }}?' · media bilan {{ caption_limit }} dan oshdi: alohida xabar bo\'ladi':'');
+    c.classList.toggle('over', hasM&&v.length>{{ caption_limit }});
+    $('htmlhint').style.display = mode.value==='html'?'block':'none';
+    const d=new Date(); $('pv-time').textContent=d.toTimeString().slice(0,5);
+  }
+  function est(){
+    const a=+$('mind').value||0, b=+$('maxd').value||0; $('pv-n').textContent=n;
+    $('pv-est').textContent = n>1 ? '~'+fmtDur((a+b)/2*(n-1)) : '—';
+  }
+  txt.addEventListener('input',text); mode.addEventListener('change',text);
+  file.addEventListener('change',()=>{media();text();});
+  if($('rmmedia')) $('rmmedia').addEventListener('change',()=>{media();text();});
+  ['mind','maxd'].forEach(i=>$(i).addEventListener('input',est));
+  document.addEventListener('gcount',e=>{n=e.detail;est();});
+  media(); text(); est();
+})();
+</script>
 {% endblock %}

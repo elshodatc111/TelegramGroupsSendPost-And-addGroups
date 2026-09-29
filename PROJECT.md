@@ -13,6 +13,13 @@
 - Qo'shimcha: jonli progress+to'xtatish/davom, rejalashtirish, guruh ro'yxatlari, shablonlar, tarix
 - Faqat 127.0.0.1 da tinglaydi (parolsiz, local foydalanish)
 
+## v2 (Excel a'zo bo'lish + dizayn)
+- Yangi modullar: excel_import.py (parse/eksport), joiner.py (a'zo bo'lish navbati), web.py (umumiy web yordamchilar)
+- A'zo bo'lish: default 60-180s, kuniga 40 (24 soatlik oyna), FloodWait>5daq bo'lsa 'waiting' + avtomatik davom; ChannelsTooMuch bo'lsa to'xtaydi
+- Video: hachoir metadata (DocumentAttributeVideo), bir marta yuklab boshqa guruhlarga qayta ishlatish (media cache), yuklash progressi
+- Loglar: data\logs\app.log; global xato sahifasi
+- Dizayn: yon panel, qorong'u/yorug' rejim, jonli ko'rinish, dashboard
+
 ## Holat
 v1 tayyor (smoke-test o'tgan, Telegram'siz mock bilan). Haqiqiy akkaunt bilan birinchi sinov foydalanuvchi tomonidan.
 

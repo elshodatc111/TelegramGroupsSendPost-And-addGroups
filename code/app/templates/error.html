@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}Xatolik{% endblock %}
+{% block content %}
+<div class="card empty">{{ ic('alert') }}<h1 style="font-size:20px">Kutilmagan xatolik yuz berdi</h1>
+<p class="mut">Xato tafsilotlari <b>data\logs\app.log</b> fayliga yozildi.</p>
+<div class="note" style="justify-content:center;text-align:left">{{ detail }}</div>
+<div class="actions" style="justify-content:center;margin-top:14px"><a class="btn" href="javascript:history.back()">Orqaga</a><a class="btn sec" href="/">Bosh sahifa</a></div></div>
+{% endblock %}

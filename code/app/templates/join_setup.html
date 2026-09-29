@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% block title %}A'zo bo'lishni sozlash{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Faylni tekshirish</h1><p class="sub">{{ b.filename }} · Qaysi ustundagi ro'yxat kerakligini tanlang</p></div></div>
+{% if not st.authorized %}<div class="note">{{ ic('alert') }}<div>Telegram akkaunt ulanmagan. <a href="/settings"><b>Sozlamalar</b></a> da ulang.</div></div>{% endif %}
+<form method="post" action="/join/{{ b.id }}/start" id="sform">
+<div class="cols">
+ <div>
+  <div class="card"><div class="card-h"><h2><span class="step">1</span> Topilgan ustunlar</h2></div>
+    {% for c in columns %}<label class="colopt"><input type="checkbox" name="cols" value="{{ loop.index0 }}" data-n="{{ c['items']|length }}" {{ 'checked' if loop.index0 == best }}>
+      <span><b>{{ c.label }}</b> <span class="badge b-joined">{{ c['items']|length }} ta</span>
+      <span class="sample">{% for it in c['items'][:4] %}{{ it.ref }}{{ ', ' if not loop.last }}{% endfor %}{% if c['items']|length > 4 %} ...{% endif %}</span></span></label>{% endfor %}
+    <div class="hint">Takroriy usernamelar avtomatik olib tashlanadi.</div></div>
+  <div class="card"><div class="card-h"><h2><span class="step">2</span> Tezlik (spamdan saqlanish)</h2></div>
+    <div class="row">
+      <div><label class="l">Interval min (soniya)</label><input type="number" name="min_delay" id="mind" value="{{ min_delay }}" min="{{ floor }}"></div>
+      <div><label class="l">Interval max (soniya)</label><input type="number" name="max_delay" id="maxd" value="{{ max_delay }}" min="{{ floor }}"></div>
+      <div><label class="l">Kunlik limit (ta)</label><input type="number" name="daily_limit" id="daily" value="{{ daily }}" min="1" max="500"></div></div>
+    <div class="hint">Xavfsiz sozlama: 60–180 soniya, kuniga ~40 ta. Limit to'lsa, dastur 24 soatlik oyna bo'yicha avtomatik kutib davom etadi.</div>
+    <div id="riskwarn" class="note" style="display:none;margin-top:12px">{{ ic('alert') }}<div>Bu sozlama tez: akkaunt vaqtincha cheklanishi (FloodWait) yoki bloklanishi xavfi ortadi.</div></div></div>
+ </div>
+ <aside class="sticky"><div class="card"><div class="card-h"><h2>Xulosa</h2></div>
+   <dl class="kv"><dt>Tanlangan</dt><dd id="t-n">0</dd><dt>Taxminiy muddat</dt><dd id="t-est">—</dd></dl>
+   <div class="actions" style="margin-top:18px"><button class="btn ok lg" {{ '' if st.authorized else 'disabled' }}>{{ ic('play') }} A'zo bo'lishni boshlash</button></div>
+   <p class="hint">Jarayon fonda ishlaydi. Hisobot sahifasida jonli kuzatasiz.</p></div></aside>
+</div></form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const $=id=>document.getElementById(id), cbs=[...document.querySelectorAll('input[name=cols]')];
+  function upd(){
+    const n=cbs.filter(c=>c.checked).reduce((a,c)=>a+ +c.dataset.n,0);
+    const a=+$('mind').value||0, b=+$('maxd').value||0, d=+$('daily').value||1;
+    $('t-n').textContent=n+' ta';
+    const perDay=Math.min(d, Math.floor(86400/Math.max(1,(a+b)/2)));
+    const days=Math.ceil(n/perDay);
+    $('t-est').textContent = n ? (days<=1? '~'+fmtDur(n*(a+b)/2) : '~'+days+' kun ('+perDay+' ta/kun)') : '—';
+    $('riskwarn').style.display = (a<40 || d>80) ? 'flex':'none';
+  }
+  [...cbs,$('mind'),$('maxd'),$('daily')].forEach(e=>e.addEventListener('input',upd));
+  upd();
+})();
+</script>
+{% endblock %}

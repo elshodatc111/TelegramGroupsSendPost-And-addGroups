@@ -26,6 +26,12 @@ C:\TelegramGroupPost\
 5. **Post yaratish** → matn (+ rasm/video) → guruhlarni tanlash → interval → **Oldindan ko'rish** → **Tasdiqlash**.
 6. **Yuborishlar** sahifasida jonli progress, to'xtatish/davom ettirish va tarix.
 
+## Excel orqali guruhlarga a'zo bo'lish
+**A'zo bo'lish** bo'limida .xlsx/.csv/.txt fayl yuklanadi (`@username`, `t.me/username`, `t.me/+taklif` formatlari). Dastur ustunlarni o'zi topadi, siz tanlaysiz,
+so'ng xavfsiz tezlikda (standart 60-180s, kuniga ~40 ta) a'zo bo'ladi. Limit to'lsa avtomatik kutib davom etadi.
+Hisobot: Ulandi / Allaqachon a'zo / So'rov yuborildi / Ulanmadi (sababi bilan), filtr, qidiruv, Excel'ga eksport, xatolarni qayta urinish.
+Xatolar `data\logs\app.log` fayliga yoziladi.
+
 ## Imkoniyatlar
 - Post turlari: matn, matn+rasm, matn+video (HTML format ixtiyoriy)
 - Guruh tanlash, qidiruv, saqlangan ro'yxatlar (toifalar)

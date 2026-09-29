@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from telethon import errors
 
 from . import db
+from .config import log
 
 
 class Sender:
@@ -79,6 +80,7 @@ class Sender:
                 db.ex("UPDATE jobs SET status='interrupted' WHERE id=? AND status='running'", (job_id,))
                 raise
             except Exception as e:
+                log.exception("Job #%s xatosi", job_id)
                 db.ex("UPDATE jobs SET status='failed', error=? WHERE id=? AND status='running'",
                       (f"{type(e).__name__}: {e}", job_id))
             finally:
@@ -90,6 +92,7 @@ class Sender:
         job_id = job["id"]
         targets = db.q("SELECT * FROM job_targets WHERE job_id=? AND status='pending' ORDER BY id",
                        (job_id,))
+        self.tg.clear_media_cache()
         first = True
         for t in targets:
             if self._status(job_id) != "running":
@@ -106,20 +109,32 @@ class Sender:
     async def _send_one(self, job, t) -> bool:
         """False: job to'xtatildi."""
         job_id = job["id"]
+        last = {"pct": -10}
+
+        async def progress(sent, total):
+            if not total:
+                return
+            pct = int(sent * 100 / total)
+            if pct - last["pct"] >= 10 or pct == 100:
+                last["pct"] = pct
+                db.ex("UPDATE job_targets SET error=? WHERE id=?", (f"Yuklanmoqda: {pct}%", t["id"]))
+
         for _ in range(3):
+            db.ex("UPDATE job_targets SET status='sending', error=NULL WHERE id=?", (t["id"],))
             try:
                 await self.tg.send(t["tg_id"], job["text"] or "", job["parse_mode"],
-                                   job["media_path"], job["media_type"])
+                                   job["media_path"], job["media_type"], progress)
                 db.ex("UPDATE job_targets SET status='sent', error=NULL, sent_at=? WHERE id=?",
                       (db.now(), t["id"]))
                 return True
             except (errors.FloodWaitError, errors.SlowModeWaitError) as e:
                 wait = int(getattr(e, "seconds", 30)) + 2
-                db.ex("UPDATE job_targets SET error=? WHERE id=?",
+                db.ex("UPDATE job_targets SET status='pending', error=? WHERE id=?",
                       (f"Telegram {wait}s kutishni so'radi, kutilmoqda...", t["id"]))
                 if not await self._sleep(job_id, wait):
                     return False
             except Exception as e:
+                log.exception("Yuborishda xato: job=%s guruh=%s", job_id, t["title"])
                 db.ex("UPDATE job_targets SET status='failed', error=?, sent_at=? WHERE id=?",
                       (f"{type(e).__name__}: {e}"[:300], db.now(), t["id"]))
                 return True

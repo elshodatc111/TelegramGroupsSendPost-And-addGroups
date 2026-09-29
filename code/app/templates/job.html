@@ -1,45 +1,49 @@
 {% extends "base.html" %}{% block title %}Yuborish #{{ job.id }}{% endblock %}
 {% block content %}
-<h1>Yuborish #{{ job.id }} <span class="badge" id="st">{{ STATUS[job.status] }}</span></h1>
-<div class="card">
-  <div class="bubble" style="margin-bottom:14px">
-    {% if job.media_path %}{% if job.media_type=='video' %}<video src="/media/{{ job.media_path }}" controls preload="metadata"></video>{% else %}<img src="/media/{{ job.media_path }}" alt="">{% endif %}{% endif %}
-    <div class="t">{{ job.text|render_text(job.parse_mode) }}</div>
-  </div>
-  <div class="bar"><i id="bar" style="width:0"></i></div>
-  <p><b id="cnt">0/0</b> <span class="mut" id="info"></span></p>
-  <div id="jerr" class="warn" style="display:none"></div>
-  <div class="actions" id="acts"></div>
+<div class="page-h"><div><h1>Yuborish #{{ job.id }} <span class="badge b-{{ job.status }}" id="st" style="vertical-align:middle">{{ STATUS[job.status] }}</span></h1>
+  <p class="sub" id="info">&nbsp;</p></div><div class="actions" id="acts"></div></div>
+<div class="grid g4" style="margin-bottom:18px">
+  <div class="stat"><div class="k">Jami</div><div class="v" id="s_total">{{ job.total }}</div></div>
+  <div class="stat ok"><div class="k">Yuborildi</div><div class="v" id="s_ok">0</div></div>
+  <div class="stat bad"><div class="k">Xato</div><div class="v" id="s_bad">0</div></div>
+  <div class="stat warn"><div class="k">Qoldi</div><div class="v" id="s_left">0</div></div>
 </div>
-<div class="card"><h2>Guruhlar bo'yicha natija</h2>
-  <table><thead><tr><th>#</th><th>Guruh</th><th>Holat</th><th>Izoh</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="cols">
+ <div>
+  <div class="card"><div class="bar"><i id="bar" style="width:0"></i></div><div id="jerr" class="note" style="display:none;margin:12px 0 0"></div></div>
+  <div class="card" style="padding:0"><div class="card-h" style="padding:16px 20px 0"><h2>Guruhlar bo'yicha natija</h2></div>
+    <div class="tbl-wrap" style="border:0;max-height:520px"><table><thead><tr><th>#</th><th>Guruh</th><th>Holat</th><th>Izoh</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+ </div>
+ <aside class="sticky"><div class="card"><div class="card-h"><h2>Post</h2></div><div class="tgview"><div class="bubble">
+    {% if job.media_path %}<div class="media">{% if job.media_type=='video' %}<video src="/media/{{ job.media_path }}" controls preload="metadata"></video>{% else %}<img src="/media/{{ job.media_path }}" alt="">{% endif %}</div>{% endif %}
+    <div class="t">{{ job.text|render_text(job.parse_mode) }}</div></div></div></div></aside>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
-const ID={{ job.id }};
-const LBL={{ STATUS|tojson }};
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function btn(action,label,cls,confirmMsg){
-  return `<form method="post" action="/jobs/${ID}/${action}" ${confirmMsg?`onsubmit="return confirm('${confirmMsg}')"`:''}><button class="btn ${cls}">${label}</button></form>`;
-}
+const ID={{ job.id }}, LBL={{ STATUS|tojson }};
+const btn=(a,l,c,ic,cm)=>`<form method="post" action="/jobs/${ID}/${a}" ${cm?`onsubmit="return confirm('${cm}')"`:''}><button class="btn ${c}"><svg class="ic"><use href="#i-${ic}"/></svg> ${l}</button></form>`;
 async function tick(){
   try{
-    const r=await fetch('/api/jobs/'+ID); if(!r.ok) return; const d=await r.json(); const j=d.job;
-    document.getElementById('st').textContent=d.status_label; document.getElementById('st').className='badge '+j.status;
-    document.getElementById('cnt').textContent=`${j.done+j.failed}/${j.total}`;
-    document.getElementById('bar').style.width=(j.total?(j.done+j.failed)*100/j.total:0)+'%';
-    let info=`${j.done} yuborildi`+(j.failed?`, ${j.failed} xato`:'');
-    if(j.status==='running'&&j.next_at){const s=Math.max(0,Math.round((new Date(j.next_at.replace(' ','T'))-new Date(d.server_now.replace(' ','T')))/1000));info+=` · keyingisigacha ~${s}s`;}
-    if(j.status==='scheduled') info+=` · ${j.scheduled_at} da boshlanadi`;
-    document.getElementById('info').textContent=info;
-    const e=document.getElementById('jerr'); e.style.display=j.error?'block':'none'; e.textContent=j.error||'';
+    const r=await fetch('/api/jobs/'+ID); if(!r.ok) return; const d=await r.json(), j=d.job;
+    const st=document.getElementById('st'); st.textContent=d.status_label; st.className='badge b-'+j.status; st.style.verticalAlign='middle';
+    const done=j.done+j.failed;
+    s_ok.textContent=j.done; s_bad.textContent=j.failed; s_left.textContent=d.pending; s_total.textContent=j.total;
+    bar.style.width=(j.total?done*100/j.total:0)+'%';
+    let info='';
+    if(j.status==='running'&&j.next_at){const s=(parseDt(j.next_at)-parseDt(d.server_now))/1000; info='Keyingi guruhgacha ~'+Math.max(0,Math.round(s))+' soniya';}
+    else if(j.status==='scheduled') info=j.scheduled_at.slice(0,16)+' da boshlanadi';
+    else if(j.status==='done') info='Yuborish tugadi';
+    document.getElementById('info').innerHTML=info||'&nbsp;';
+    const e=document.getElementById('jerr'); e.style.display=j.error?'flex':'none'; e.textContent=j.error||'';
     let a='';
-    if(['queued','scheduled','running'].includes(j.status)) a+=btn('cancel','To\'xtatish','bad','Yuborish to\'xtatilsinmi?');
-    if(['cancelled','interrupted','failed'].includes(j.status)&&d.pending>0) a+=btn('resume','Davom ettirish','');
-    if(!['running','queued'].includes(j.status)) a+=btn('delete','O\'chirish','sec','Tarixdan o\'chirilsinmi?');
+    if(['queued','scheduled','running'].includes(j.status)) a+=btn('cancel',"To'xtatish",'bad','stop',"Yuborish to'xtatilsinmi?");
+    if(['cancelled','interrupted','failed'].includes(j.status)&&d.pending>0) a+=btn('resume','Davom ettirish','','play');
+    if(!['running','queued'].includes(j.status)&&j.failed>0) a+=btn('retry','Xatolarni qayta yuborish','sec','refresh');
     a+=`<a class="btn sec" href="/compose?job=${ID}">Nusxa olib yangi post</a>`;
+    if(!['running','queued'].includes(j.status)) a+=btn('delete',"O'chirish",'ghost','trash',"Tarixdan o'chirilsinmi?");
     document.getElementById('acts').innerHTML=a;
-    document.getElementById('rows').innerHTML=d.targets.map((t,i)=>`<tr><td>${i+1}</td><td>${esc(t.title)}</td><td><span class="badge ${t.status}">${LBL[t.status]}</span></td><td class="small mut">${esc(t.error||t.sent_at||'')}</td></tr>`).join('');
+    rows.innerHTML=d.targets.map((t,i)=>`<tr><td class="mut">${i+1}</td><td>${esc(t.title)}</td><td><span class="badge b-${t.status}">${LBL[t.status]||t.status}</span></td><td class="small mut">${esc(t.error||(t.sent_at||''))}</td></tr>`).join('');
   }catch(e){}
 }
 tick(); setInterval(tick,2000);

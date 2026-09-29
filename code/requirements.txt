@@ -4,3 +4,4 @@ jinja2>=3.1
 python-multipart>=0.0.9
 telethon>=1.36
 hachoir>=3.2
+openpyxl>=3.1

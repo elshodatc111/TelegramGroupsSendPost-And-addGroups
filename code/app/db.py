@@ -44,6 +44,19 @@ CREATE TABLE IF NOT EXISTS job_targets(
     FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_targets_job ON job_targets(job_id);
+CREATE TABLE IF NOT EXISTS join_batches(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, status TEXT DEFAULT 'draft',
+    min_delay INTEGER, max_delay INTEGER, daily_limit INTEGER,
+    created_at TEXT, started_at TEXT, finished_at TEXT, next_at TEXT, resume_at TEXT, error TEXT,
+    total INTEGER DEFAULT 0, raw TEXT
+);
+CREATE TABLE IF NOT EXISTS join_targets(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id INTEGER NOT NULL,
+    ref TEXT, kind TEXT, key TEXT,
+    status TEXT DEFAULT 'pending', detail TEXT, title TEXT, tried_at TEXT,
+    FOREIGN KEY(batch_id) REFERENCES join_batches(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_jt_batch ON join_targets(batch_id);
 """
 
 

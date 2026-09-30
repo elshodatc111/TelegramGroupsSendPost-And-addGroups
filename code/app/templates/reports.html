@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Kunlik hisobot{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Kunlik hisobot</h1><p class="sub">Har kun uchun Excel: yuborilgan postlar, ko'rishlar, a'zo bo'lish va guruhdan chiqishlar</p></div></div>
+<div class="card"><form method="get" action="/reports/daily.xlsx" class="tools" style="margin:0"><label class="l" style="margin:0">Sana</label><input type="date" name="date" value="{{ today }}" style="max-width:200px"><button class="btn">{{ ic('download') }} Excel yuklab olish</button></form>
+ <div class="hint">Kechagi kun hisoboti har kuni avtomatik saqlanadi (quyida).</div></div>
+<div class="card" style="padding:0"><div class="card-h" style="padding:16px 20px 0"><h2>Saqlangan hisobotlar</h2></div>
+{% if files %}<div class="tbl-wrap" style="border:0"><table><tbody>{% for f in files %}<tr><td>{{ f }}</td><td style="text-align:right"><a class="btn sec sm" href="/reports/file/{{ f }}">{{ ic('download') }} Yuklab olish</a></td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">{{ ic('file') }}<div>Hali avtomatik saqlangan hisobot yo'q</div></div>{% endif %}</div>
+{% endblock %}

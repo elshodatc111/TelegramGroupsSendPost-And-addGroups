@@ -17,6 +17,8 @@
       {% if job.utm_on %}<dt>UTM</dt><dd>{{ job.utm_source }} / {{ job.utm_campaign }}</dd>{% endif %}
       {% if camp and camp.recurrence != 'none' %}<dt>Takrorlash</dt><dd>{{ 'Har kuni' if camp.recurrence == 'daily' else 'Haftalik' }}, {{ camp.rec_time }}</dd>{% endif %}</dl>
   </div>
+  {% if extras %}<div class="card"><div class="card-h"><h2>{{ ic('shield') }} Qo'shimcha akkauntlar (parallel)</h2></div>
+    <div class="tbl-wrap" style="border:0"><table><tbody>{% for e in extras %}<tr><td><b>{{ e.name }}</b></td><td>{{ e.tg_ids|length }} ta guruhga</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
   <div class="card">
     <form method="post" action="/preview/{{ job.id }}/confirm">
       <label class="l" style="margin-top:0">Yuborish vaqti <span class="mut">(bo'sh = hoziroq)</span></label>

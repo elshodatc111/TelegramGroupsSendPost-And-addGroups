@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}Guruhlar tahlili{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Guruhlar tahlili</h1><p class="sub">Har bir guruh: a'zolar soni, post ko'rishlari va ball · jami {{ rows|length }} guruh, {{ total_members }} a'zo</p></div>
+  <div class="actions"><a class="btn sec" href="/groups/leave">{{ ic('log-out') }} Guruhdan chiqish</a><a class="btn blue" href="/groups/export.xlsx">{{ ic('download') }} Excel</a></div></div>
+<div class="seg" style="margin-bottom:14px">{% for k, l in [('score','Ball'),('views','Ko\'rish'),('members','A\'zolar'),('title','Nom')] %}<a href="/group-stats?sort={{ k }}" style="text-decoration:none"><label style="cursor:pointer;{{ 'background:var(--pri);color:#fff' if sort == k }}">{{ l }} bo'yicha</label></a>{% endfor %}</div>
+<div class="card" style="padding:0">{% if rows %}<div class="tbl-wrap" style="border:0"><table><thead><tr><th>Guruh</th><th>A'zolar</th><th>7 kun</th><th>30 kun</th><th>Dinamika</th><th>Postlar</th><th>O'rt. ko'rish</th><th>Ko'rish %</th><th>Ball</th></tr></thead><tbody>
+{% for g in rows %}<tr onclick="location='/group-stats/{{ g.tg_id }}'" style="cursor:pointer"><td><a href="/group-stats/{{ g.tg_id }}"><b>{{ g.title }}</b></a>{% if g.username %}<div class="mut tiny">@{{ g.username }}</div>{% endif %}</td>
+ <td><b>{{ g.members if g.members is not none else '—' }}</b></td>
+ <td>{% if g.d7 is not none %}<span style="color:{{ 'var(--blue)' if g.d7 >= 0 else 'var(--pri)' }}">{{ '%+d' % g.d7 }}</span>{% else %}—{% endif %}</td>
+ <td>{% if g.d30 is not none %}<span style="color:{{ 'var(--blue)' if g.d30 >= 0 else 'var(--pri)' }}">{{ '%+d' % g.d30 }}</span>{% else %}—{% endif %}</td>
+ <td>{{ spark(g.spark) }}</td><td>{{ g.sent }}{% if g.failed or g.deleted %} <span class="mut tiny">({{ g.failed }} xato, {{ g.deleted }} o'chirilgan)</span>{% endif %}</td>
+ <td>{{ g.avg_views if g.avg_views is not none else '—' }}</td><td>{{ (g.rate ~ '%') if g.rate is not none else '—' }}</td>
+ <td>{% if g.score is not none %}<span class="badge b-{{ g.level }}">{{ g.score }}</span>{% else %}<span class="mut tiny">ma'lumot yo'q</span>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>{% else %}<div class="empty">{{ ic('users') }}<div>Guruhlar yo'q</div></div>{% endif %}</div>
+<div class="hint">Ball: ko'rishlar (a'zolarga nisbatan), reaksiya/javoblar va o'chirilgan yoki yuborilmagan postlar asosida hisoblanadi. Ko'rishlar soni uchun Statistika sahifasida "Yangilash"ni bosing (yoki dastur soatiga bir marta o'zi yangilaydi).</div>
+{% endblock %}

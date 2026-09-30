@@ -1,5 +1,6 @@
 """SQLite: sxema, migratsiya va yordamchi funksiyalar."""
 import contextlib
+from contextvars import ContextVar
 import json
 import sqlite3
 from datetime import datetime
@@ -103,6 +104,35 @@ CREATE TABLE IF NOT EXISTS inbox(
     UNIQUE(account_id, chat_id, msg_id)
 );
 CREATE TABLE IF NOT EXISTS canned_replies(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, text TEXT);
+CREATE TABLE IF NOT EXISTS users(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, name TEXT, picture TEXT,
+    role TEXT DEFAULT 'user', status TEXT DEFAULT 'active', created_at TEXT, last_login TEXT
+);
+CREATE TABLE IF NOT EXISTS user_settings(
+    user_id INTEGER NOT NULL, key TEXT NOT NULL, value TEXT, PRIMARY KEY(user_id, key)
+);
+CREATE TABLE IF NOT EXISTS warmup(
+    account_id INTEGER PRIMARY KEY, active INTEGER DEFAULT 0, start_date TEXT, plan_json TEXT
+);
+CREATE TABLE IF NOT EXISTS autojoin(
+    account_id INTEGER PRIMARY KEY, active INTEGER DEFAULT 0, daily_target INTEGER DEFAULT 20,
+    min_members INTEGER DEFAULT 500, min_per_day INTEGER DEFAULT 10, min_uz INTEGER DEFAULT 40,
+    ad_wait_days INTEGER DEFAULT 2, min_delay INTEGER DEFAULT 120, max_delay INTEGER DEFAULT 300,
+    manual_all INTEGER DEFAULT 0, keywords_json TEXT, block_extra TEXT, last_search TEXT, kw_ptr INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS disc_candidates(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, username TEXT NOT NULL, title TEXT, about TEXT,
+    members INTEGER, per_day REAL, uz INTEGER, category TEXT, keyword TEXT, score REAL, status TEXT, reason TEXT,
+    batch_id INTEGER, found_at TEXT, joined_at TEXT, ad_at TEXT, tg_id INTEGER, UNIQUE(account_id, username)
+);
+CREATE TABLE IF NOT EXISTS audit_cfg(
+    account_id INTEGER PRIMARY KEY, auto INTEGER DEFAULT 0, min_members INTEGER DEFAULT 100, check_ads INTEGER DEFAULT 1,
+    check_post INTEGER DEFAULT 1, mute_all INTEGER DEFAULT 1, max_leave INTEGER DEFAULT 10,
+    min_delay INTEGER DEFAULT 25, max_delay INTEGER DEFAULT 60, last_scan TEXT);
+CREATE TABLE IF NOT EXISTS leave_log(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, tg_id INTEGER, title TEXT,
+    reason TEXT, auto INTEGER DEFAULT 0, ts TEXT
+);
 CREATE TABLE IF NOT EXISTS media_items(
     name TEXT PRIMARY KEY, original TEXT, kind TEXT, size INTEGER, created_at TEXT
 );
@@ -144,17 +174,39 @@ def many(sql, seq):
         c.commit()
 
 
+# Foydalanuvchiga xos sozlamalar (boshqalari umumiy: secret, parol)
+USER_KEYS = {"api_id", "api_hash", "default_min", "default_max", "join_min", "join_max", "join_daily",
+             "leave_on", "leave_bad", "leave_low", "leave_min_posts", "leave_min_views"}
+cur_uid: ContextVar[int] = ContextVar("cur_uid", default=1)
+
+
+def uget(uid, key, default=None):
+    r = one("SELECT value FROM user_settings WHERE user_id=? AND key=?", (uid, key))
+    return r["value"] if r else default
+
+
+def uset(uid, key, value):
+    ex("INSERT INTO user_settings(user_id,key,value) VALUES(?,?,?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value",
+       (uid, key, str(value)))
+
+
 def get_setting(key, default=None):
+    if key in USER_KEYS:
+        return uget(cur_uid.get(), key, default)
     r = one("SELECT value FROM settings WHERE key=?", (key,))
     return r["value"] if r else default
 
 
 def set_setting(key, value):
+    if key in USER_KEYS:
+        return uset(cur_uid.get(), key, value)
     ex("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
        (key, str(value)))
 
 
 def del_setting(key):
+    if key in USER_KEYS:
+        return ex("DELETE FROM user_settings WHERE user_id=? AND key=?", (cur_uid.get(), key))
     ex("DELETE FROM settings WHERE key=?", (key,))
 
 
@@ -195,12 +247,26 @@ def init():
             ("job_targets", "reactions", "INTEGER"), ("job_targets", "replies", "INTEGER"),
             ("job_targets", "deleted", "INTEGER DEFAULT 0"), ("job_targets", "stat_at", "TEXT"),
             ("join_batches", "account_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("accounts", "user_id", "INTEGER"), ("media_items", "user_id", "INTEGER"),
+            ("canned_replies", "user_id", "INTEGER"), ("autojoin", "ban_json", "TEXT"), ("groups", "muted", "INTEGER DEFAULT 0"), ("groups", "verdict", "TEXT"), ("groups", "verdict_reason", "TEXT"), ("groups", "audited_at", "TEXT"), ("jobs", "extra_json", "TEXT"),
         ]:
             _add(c, table, col, ddl)
         c.commit()
+        # foydalanuvchilar: birinchisi lokal administrator (eski ma'lumotlar unga tegishli)
+        if not c.execute("SELECT 1 FROM users LIMIT 1").fetchone():
+            c.execute("INSERT INTO users(id,email,name,role,status,created_at) VALUES(1,NULL,'Lokal foydalanuvchi','admin','active',?)", (now(),))
+        c.execute("UPDATE accounts SET user_id=1 WHERE user_id IS NULL")
+        c.execute("UPDATE media_items SET user_id=1 WHERE user_id IS NULL")
+        c.execute("UPDATE canned_replies SET user_id=1 WHERE user_id IS NULL")
+        for k in USER_KEYS:
+            r = c.execute("SELECT value FROM settings WHERE key=?", (k,)).fetchone()
+            if r:
+                c.execute("INSERT OR IGNORE INTO user_settings(user_id,key,value) VALUES(1,?,?)", (k, r[0]))
+                c.execute("DELETE FROM settings WHERE key=?", (k,))
+        c.commit()
         # birinchi akkaunt: eski session faylidan
         if not c.execute("SELECT 1 FROM accounts LIMIT 1").fetchone() and (SESSION_DIR / "account.session").exists():
-            c.execute("INSERT INTO accounts(id,name,session,created_at) VALUES(1,'Asosiy akkaunt','account',?)", (now(),))
+            c.execute("INSERT INTO accounts(id,name,session,created_at,user_id) VALUES(1,'Asosiy akkaunt','account',?,1)", (now(),))
         # eski joblar uchun variantlar
         for j in c.execute("SELECT * FROM jobs WHERE id NOT IN (SELECT job_id FROM job_variants)").fetchall():
             media = json.dumps([j["media_path"]]) if j["media_path"] else "[]"

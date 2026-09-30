@@ -4,7 +4,7 @@ import asyncio
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from . import db, jobops
+from . import analytics, db, jobops
 from .reports import export_pdf, export_xlsx, stats_data
 from .web import acc_id, go, need_account, page
 
@@ -23,7 +23,7 @@ async def stats_page(request: Request, days: int = 30):
     aid = acc_id(request)
     if not aid:
         return page(request, "stats.html", d=None, days=30)
-    return page(request, "stats.html", d=stats_data(aid, _days(days)), days=_days(days))
+    return page(request, "stats.html", d=stats_data(aid, _days(days)), days=_days(days), bt=analytics.best_time(aid))
 
 
 @router.post("/stats/refresh")

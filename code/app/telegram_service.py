@@ -1,13 +1,15 @@
 """Bitta Telegram akkaunt bilan ishlash (Telethon, user account / MTProto)."""
+import asyncio
 import json
 import re
 from datetime import datetime
 
 from telethon import TelegramClient, errors, events
 from telethon.tl.functions.channels import GetFullChannelRequest, JoinChannelRequest
+from telethon.tl.functions.account import GetNotifySettingsRequest, UpdateNotifySettingsRequest
 from telethon.tl.functions.contacts import SearchRequest
 from telethon.tl.functions.messages import CheckChatInviteRequest, GetFullChatRequest, ImportChatInviteRequest
-from telethon.tl.types import Channel, Chat, ChatInviteAlready, DocumentAttributeVideo, User
+from telethon.tl.types import (Channel, Chat, ChatInviteAlready, DocumentAttributeVideo, InputNotifyPeer, InputPeerNotifySettings, User)
 
 from . import db
 from .config import CAPTION_LIMIT, MEDIA_DIR, SESSION_DIR, log
@@ -48,8 +50,21 @@ def video_attributes(path: str):
         return None
 
 
-def ads_prohibited(about: str) -> bool:
-    return bool(about) and any(p.search(about) for p in _ADS_PATTERNS)
+def ads_prohibited(*texts: str) -> bool:
+    """Tavsif / mahkamlangan xabar / qoida matnida reklama taqiqi borligini aniqlaydi."""
+    return any(t and any(p.search(t) for p in _ADS_PATTERNS) for t in texts)
+
+
+async def _pinned_text(c, e, fc) -> str:
+    """Guruhning mahkamlangan (pinned) xabari matni: qoidalar ko'pincha shu yerda yoziladi."""
+    pid = getattr(fc, "pinned_msg_id", None)
+    if not pid:
+        return ""
+    try:
+        m = await c.get_messages(e, ids=pid)
+        return (getattr(m, "message", "") or "")[:1500]
+    except Exception:
+        return ""
 
 
 class TelegramService:
@@ -64,9 +79,14 @@ class TelegramService:
         self.info: dict | None = None
         self._media_cache: dict = {}
 
+    def _api(self):
+        r = db.one("SELECT user_id FROM accounts WHERE id=?", (self.account_id,))
+        uid = (r["user_id"] if r else None) or 1
+        return db.uget(uid, "api_id"), db.uget(uid, "api_hash")
+
     # ---------- ulanish ----------
     async def _get_client(self) -> TelegramClient:
-        api_id, api_hash = db.get_setting("api_id"), db.get_setting("api_hash")
+        api_id, api_hash = self._api()
         if not api_id or not api_hash:
             raise RuntimeError("API ID va API HASH hali kiritilmagan (Sozlamalar)")
         creds = (api_id, api_hash)
@@ -85,7 +105,7 @@ class TelegramService:
             await self.client.disconnect()
 
     async def status(self) -> dict:
-        if not (db.get_setting("api_id") and db.get_setting("api_hash")):
+        if not all(self._api()):
             self.info = None
             return {"configured": False, "authorized": False}
         try:
@@ -193,7 +213,8 @@ class TelegramService:
                 else:
                     kind = "supergroup"
                     br = e.default_banned_rights
-                    can = bool(e.creator or e.admin_rights or not (br and br.send_messages))
+                    mine = getattr(e, "banned_rights", None)
+                    can = bool(e.creator or e.admin_rights or not ((br and br.send_messages) or (mine and mine.send_messages)))
             elif isinstance(e, Chat):
                 if getattr(e, "deactivated", False) or getattr(e, "left", False):
                     continue
@@ -221,30 +242,109 @@ class TelegramService:
         """Guruh qoidalari: tavsif, sekin rejim, media/havola cheklovlari, reklama taqiqi."""
         c = await self._get_client()
         e = await c.get_entity(tg_id)
-        about, slow = "", 0
+        about, slow, members, pinned = "", 0, None, ""
         rights = getattr(e, "default_banned_rights", None)
         if isinstance(e, Channel):
             full = await c(GetFullChannelRequest(e))
             about = full.full_chat.about or ""
+            pinned = await _pinned_text(c, e, full.full_chat)
             slow = getattr(full.full_chat, "slowmode_seconds", 0) or 0
+            members = getattr(full.full_chat, "participants_count", None)
         elif isinstance(e, Chat):
             full = await c(GetFullChatRequest(e.id))
             about = full.full_chat.about or ""
+            members = len(getattr(full.full_chat.participants, "participants", []) or []) or None
         no_media = bool(rights and (getattr(rights, "send_media", False) or
                                     (getattr(rights, "send_photos", False) and getattr(rights, "send_videos", False))))
         no_links = bool(rights and getattr(rights, "embed_links", False))
-        return {"about": about[:600], "slowmode": slow, "no_media": int(no_media), "no_links": int(no_links),
-                "ads_flag": int(ads_prohibited(about))}
+        return {"members": members, "about": about[:600], "slowmode": slow, "no_media": int(no_media), "no_links": int(no_links),
+                "ads_flag": int(ads_prohibited(about, pinned))}
 
-    async def search_public(self, q: str) -> list[dict]:
+    async def search_public(self, q: str, strict: bool = False, min_members: int = 0, check_ads: bool = False,
+                            stats: dict | None = None) -> list[dict]:
+        """Ommaviy guruh/kanallarni qidiradi. strict=True: kanallar, yozib bo'lmaydigan, a'zosi kam va reklama taqiqlangan
+        guruhlar natijadan chiqarib tashlanadi (stats['hidden'] da sabablar bo'yicha soni)."""
         c = await self._get_client()
         r = await c(SearchRequest(q=q, limit=40))
-        out = []
+        out, hidden = [], {}
+
+        def hide(why):
+            hidden[why] = hidden.get(why, 0) + 1
+
+        deep = 0
         for ch in r.chats:
-            if isinstance(ch, Channel) and ch.username:
-                out.append({"username": ch.username, "title": ch.title, "members": getattr(ch, "participants_count", None),
-                            "kind": "channel" if ch.broadcast else "group", "joined": not getattr(ch, "left", True)})
+            if not (isinstance(ch, Channel) and ch.username):
+                continue
+            cnt = getattr(ch, "participants_count", None)
+            if strict:
+                if ch.broadcast:
+                    hide("kanal (reklama yozib bo'lmaydi)")
+                    continue
+                br = ch.default_banned_rights
+                if br and br.send_messages:
+                    hide("yozish taqiqlangan")
+                    continue
+                if cnt is not None and cnt < min_members:
+                    hide(f"a'zolar {min_members} dan kam")
+                    continue
+                if check_ads and deep < 30:
+                    deep += 1
+                    try:
+                        full = await c(GetFullChannelRequest(ch))
+                        fc = full.full_chat
+                        cnt = getattr(fc, "participants_count", cnt)
+                        if cnt is not None and cnt < min_members:
+                            hide(f"a'zolar {min_members} dan kam")
+                            continue
+                        if ads_prohibited(fc.about or "", await _pinned_text(c, ch, fc)):
+                            hide("reklama taqiqlangan")
+                            continue
+                    except errors.FloodWaitError:
+                        check_ads = False
+                    except Exception:
+                        pass
+                    await asyncio.sleep(0.3)
+            out.append({"username": ch.username, "title": ch.title, "members": cnt,
+                        "kind": "channel" if ch.broadcast else "group", "joined": not getattr(ch, "left", True)})
+        if stats is not None:
+            stats["hidden"] = hidden
         return out
+
+    async def check_target(self, kind: str, key: str, min_members: int = 0, check_ads: bool = True) -> dict:
+        """A'zo bo'lishdan oldin: reklama yuborish mumkin bo'lgan guruhmi? {'ok': bool, 'reason': str}"""
+        c = await self._get_client()
+        if kind == "invite":
+            info = await c(CheckChatInviteRequest(key))
+            if isinstance(info, ChatInviteAlready):
+                return {"ok": True, "reason": ""}
+            if getattr(info, "broadcast", False):
+                return {"ok": False, "reason": "Kanal: reklama yozib bo'lmaydi"}
+            cnt = getattr(info, "participants_count", None)
+            if cnt is not None and cnt < min_members:
+                return {"ok": False, "reason": f"A'zolar kam ({cnt} < {min_members})"}
+            if check_ads and ads_prohibited(getattr(info, "about", "") or ""):
+                return {"ok": False, "reason": "Guruhda reklama taqiqlangan"}
+            return {"ok": True, "reason": ""}
+        e = await c.get_entity(key)
+        if isinstance(e, User):
+            return {"ok": True, "reason": ""}      # NotAGroup keyin join() da aniqlanadi
+        if not isinstance(e, Channel):
+            return {"ok": True, "reason": ""}
+        if e.left is False:
+            return {"ok": True, "reason": ""}      # allaqachon a'zo
+        if e.broadcast:
+            return {"ok": False, "reason": "Kanal: reklama yozib bo'lmaydi"}
+        br = e.default_banned_rights
+        if br and br.send_messages:
+            return {"ok": False, "reason": "Guruhda a'zolar xabar yoza olmaydi"}
+        full = await c(GetFullChannelRequest(e))
+        fc = full.full_chat
+        cnt = getattr(fc, "participants_count", None)
+        if cnt is not None and cnt < min_members:
+            return {"ok": False, "reason": f"A'zolar kam ({cnt} < {min_members})"}
+        if check_ads and ads_prohibited(fc.about or "", await _pinned_text(c, e, fc)):
+            return {"ok": False, "reason": "Guruhda reklama taqiqlangan"}
+        return {"ok": True, "reason": ""}
 
     # ---------- a'zo bo'lish ----------
     async def join(self, kind: str, key: str) -> tuple[str, str | None]:
@@ -345,3 +445,48 @@ class TelegramService:
             out.append({"id": mid, "deleted": False, "views": m.views or 0, "forwards": m.forwards or 0,
                         "reactions": react, "replies": repl})
         return out
+
+    async def leave(self, tg_id: int):
+        """Guruh/kanaldan chiqadi."""
+        c = await self._get_client()
+        await c.delete_dialog(tg_id)
+
+    async def mute(self, tg_id: int) -> str:
+        """Guruh bildirishnomalarini butunlay o'chiradi (qo'lda unmute qilmaguncha). 'already' yoki 'muted' qaytaradi."""
+        c = await self._get_client()
+        peer = InputNotifyPeer(peer=await c.get_input_entity(tg_id))
+        cur = await c(GetNotifySettingsRequest(peer=peer))
+        until = getattr(cur, "mute_until", None)
+        if until is not None and getattr(until, "timestamp", None):
+            until = int(until.timestamp())
+        if until and until > 2_000_000_000:
+            return "already"
+        await c(UpdateNotifySettingsRequest(peer=peer, settings=InputPeerNotifySettings(
+            mute_until=2_147_483_647, show_previews=False, silent=True)))
+        return "muted"
+
+    async def inspect_public(self, username: str) -> dict:
+        """Ommaviy guruhni a'zo bo'lmasdan tekshiradi: tavsif, a'zolar, faollik, matn namunalari."""
+        c = await self._get_client()
+        e = await c.get_entity(username)
+        if not isinstance(e, Channel):
+            return {"skip": "Guruh emas"}
+        if e.broadcast:
+            return {"skip": "Kanal (reklama yozib bo'lmaydi)"}
+        full = await c(GetFullChannelRequest(e))
+        fc = full.full_chat
+        now = datetime.now(e.date.tzinfo) if getattr(e, "date", None) else datetime.now()
+        texts, week = [], 0
+        async for m in c.iter_messages(e, limit=100):
+            if getattr(m, "message", None):
+                texts.append(m.message[:240])
+                if m.date and (datetime.now(m.date.tzinfo) - m.date).days < 7:
+                    week += 1
+        br = e.default_banned_rights
+        pinned = await _pinned_text(c, e, fc)
+        return {"title": e.title, "about": fc.about or "", "pinned": pinned, "ads_flag": ads_prohibited(fc.about or "", pinned),
+                "members": getattr(fc, "participants_count", None),
+                "slowmode": getattr(fc, "slowmode_seconds", 0) or 0, "per_day": round(week / 7, 1), "texts": texts[:60],
+                "sample_count": len(texts), "scam": bool(getattr(e, "scam", False) or getattr(e, "fake", False)),
+                "restricted": bool(getattr(e, "restricted", False)), "join_request": bool(getattr(e, "join_request", False)),
+                "can_send": not (br and br.send_messages), "joined": not getattr(e, "left", True), "tg_id": int("-100" + str(e.id))}

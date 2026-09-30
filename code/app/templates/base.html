@@ -18,15 +18,20 @@
     <a href="/compose" class="{{ 'active' if p.startswith('/compose') or p.startswith('/preview') }}">{{ ic('edit') }} Post yaratish</a>
     <a href="/campaigns" class="{{ 'active' if p.startswith('/campaigns') }}">{{ ic('repeat') }} Kampaniyalar</a>
     <a href="/jobs" class="{{ 'active' if p.startswith('/jobs') }}">{{ ic('clock') }} Yuborishlar</a>
+    <a href="/calendar" class="{{ 'active' if p.startswith('/calendar') or p.startswith('/reports') }}">{{ ic('clock') }} Kalendar</a>
     <a href="/media-library" class="{{ 'active' if p.startswith('/media-library') }}">{{ ic('image') }} Media kutubxona</a>
     <div class="nav-sec">Guruhlar</div>
     <a href="/groups" class="{{ 'active' if p.startswith('/groups') }}">{{ ic('users') }} Mening guruhlarim</a>
     <a href="/join" class="{{ 'active' if p.startswith('/join') }}">{{ ic('user-plus') }} Excel orqali a'zo bo'lish</a>
+    <a href="/group-stats" class="{{ 'active' if p.startswith('/group-stats') or p.startswith('/groups/leave') }}">{{ ic('bar-chart') }} Guruhlar tahlili</a>
+    <a href="/audit" class="{{ 'active' if p.startswith('/audit') }}">{{ ic('log-out') }} Guruh auditi</a>
     <a href="/discover" class="{{ 'active' if p.startswith('/discover') }}">{{ ic('search') }} Guruh qidirish</a>
+    <a href="/autojoin" class="{{ 'active' if p.startswith('/autojoin') }}">{{ ic('refresh') }} Avto-topish</a>
     <div class="nav-sec">Tahlil</div>
     <a href="/stats" class="{{ 'active' if p.startswith('/stats') }}">{{ ic('bar-chart') }} Statistika</a>
     <a href="/inbox" class="{{ 'active' if p.startswith('/inbox') }}">{{ ic('inbox') }} Inbox {% if unread %}<span class="cnt">{{ unread }}</span>{% endif %}</a>
     <div class="nav-sec">Tizim</div>
+    <a href="/warmup" class="{{ 'active' if p.startswith('/warmup') }}">{{ ic('layers') }} Isitish rejasi</a>
     <a href="/accounts" class="{{ 'active' if p.startswith('/accounts') }}">{{ ic('shield') }} Akkauntlar</a>
     <a href="/settings" class="{{ 'active' if p.startswith('/settings') }}">{{ ic('settings') }} Sozlamalar</a>
   </nav>

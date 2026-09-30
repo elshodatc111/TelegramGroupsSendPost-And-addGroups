@@ -3,6 +3,10 @@
 <div class="page-h"><div><h1>Mening guruhlarim</h1><p class="sub">{{ groups|length }} ta guruh/kanal · teglar, qora ro'yxat va qoidalarni tekshirish</p></div>
   <div class="actions"><form method="post" action="/groups/rules/start"><button class="btn sec">{{ ic('shield') }} Qoidalarni tekshirish</button></form>
   <form method="post" action="/groups/sync"><button class="btn">{{ ic('refresh') }} Yangilash</button></form></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('table') }} Excel</h2></div><div class="tools" style="margin:0">
+  <a class="btn blue sm" href="/groups/export.xlsx">{{ ic('download') }} Guruhlarni eksport</a>
+  <form method="post" action="/groups/import" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;margin:0;flex-wrap:wrap"><input type="file" name="file" accept=".xlsx" required style="max-width:280px"><button class="btn sec sm">{{ ic('upload') }} Import (teg, ro'yxat, qora ro'yxat)</button></form></div>
+  <div class="hint">Import guruhlarga qo'shilmaydi: faqat akkaunt a'zo bo'lgan guruhlarga teg, ro'yxat va qora ro'yxatni qo'llaydi. Yangi guruhlarga a'zo bo'lish uchun "Excel orqali a'zo bo'lish"dan foydalaning.</div></div>
 <div id="rp" class="card" style="display:none"><div class="card-h"><h2>{{ ic('shield') }} Guruh qoidalari tekshirilmoqda</h2><span class="mut small" id="rpn"></span></div><div class="bar blue"><i id="rpb" style="width:0"></i></div></div>
 {% if groups %}
 <form method="post" action="/groups/tags" id="gf">

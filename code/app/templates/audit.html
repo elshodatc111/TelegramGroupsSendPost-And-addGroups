@@ -1,0 +1,64 @@
+{% extends "base.html" %}{% block title %}Guruh auditi{% endblock %}
+{% block content %}
+<div class="aj-head">
+  <div><div class="aj-eyebrow">Tozalash · Nazorat</div><h1>Guruh auditi</h1>
+    <p class="sub" style="color:var(--mut);margin:6px 0 0;max-width:660px">A'zo bo'lingan guruhlarni tekshiradi: a'zolar soni kam yoki reklama yuborib bo'lmaydigan guruhlardan chiqadi, qolgan barcha guruhlarning bildirishnomalarini o'chiradi (mute).</p></div>
+  <form method="post" action="/audit/toggle" class="aj-master">
+    <label class="sw"><input type="checkbox" {% if cfg.auto %}checked{% endif %} onchange="this.form.submit()"><i></i></label>
+    <div><b>{{ 'Avtomatik audit yoqilgan' if cfg.auto else 'Avtomatik audit o\'chiq' }}</b><span>{% if not connected %}Akkaunt ulanmagan{% elif cfg.auto %}Har 12 soatda tahlil, kuniga {{ cfg.max_leave }} tagacha chiqish{% else %}Faqat qo'lda ishlaydi{% endif %}</span></div>
+  </form>
+</div>
+
+<section class="aj-hero" style="grid-template-columns:1fr">
+  <div class="aj-funnel" style="grid-template-columns:repeat(5,1fr)">
+    <div class="st"><b>{{ n.total }}</b><span>Jami guruh</span></div>
+    <div class="st"><b>{{ n.keep }}</b><span>Mos (qoladi)</span></div>
+    <div class="st"><b style="color:var(--pri)">{{ n.leave }}</b><span>Chiqiladi</span></div>
+    <div class="st"><b>{{ n.muted }}<span style="font-size:16px;color:var(--mut)"> / {{ n.total }}</span></b><span>Mute qilingan</span></div>
+    <div class="st"><b>{{ n.protected }}</b><span>Himoyalangan</span></div>
+  </div>
+</section>
+
+{% if n.unaudited %}<div class="note">{{ ic('alert') }}<div>{{ n.unaudited }} ta guruh hali tekshirilmagan. «Tahlil qilish» tugmasini bosing.</div></div>{% endif %}
+
+<div class="card"><div class="card-h"><h2>{{ ic('play') }} Amallar</h2><span class="mut small" id="prog">{% if running %}Amal ketmoqda...{% endif %}</span></div>
+  <div class="aj-act">
+    <form method="post" action="/audit/scan"><button class="btn blue" {% if running or not connected %}disabled{% endif %}>{{ ic('search') }} 1. Tahlil qilish</button></form>
+    <form method="post" action="/audit/leave" onsubmit="return confirm('{{ pending }} ta guruhdan chiqilsinmi? Bugun chegara: {{ cfg.max_leave }} ta. Bu amalni qaytarib bo\'lmaydi.')"><button class="btn bad" {% if running or not connected or not pending %}disabled{% endif %}>{{ ic('log-out') }} 2. Chiqish ({{ pending }})</button></form>
+    <form method="post" action="/audit/mute"><button class="btn ok" {% if running or not connected %}disabled{% endif %}>{{ ic('lock') }} 3. Hammasini mute qilish</button></form>
+    <form method="post" action="/audit/all" onsubmit="return confirm('Tahlil qilinadi, mos kelmagan guruh va kanallardan chiqiladi (bugungi chegara: {{ cfg.max_leave }} ta), qolganlari mute qilinadi. Davom etilsinmi?')"><button class="btn" {% if running or not connected %}disabled{% endif %}>{{ ic('play') }} Hammasini bajarish</button></form>
+    <form method="post" action="/audit/scan"><input type="hidden" name="full" value="1"><button class="btn ghost" {% if running or not connected %}disabled{% endif %}>To'liq qayta tekshirish</button></form>
+  </div>
+  <div class="aj-prog"><i id="pbar" style="width:{{ 100 if running else 0 }}%"></i></div>
+  <div class="hint" style="margin-top:12px">Bugun chiqildi: <b>{{ left_today }}</b> / {{ cfg.max_leave }}. Chiqilgan guruh qora ro'yxatga tushadi (qayta a'zo bo'linmaydi). Mute: xabarlar keladi, lekin siz o'zingiz ochib ko'rmaguningizcha ovoz/bildirishnoma bo'lmaydi; Telegram'da istalgan guruhni qayta yoqish mumkin.</div></div>
+
+<form method="post" action="/audit/save" class="card"><div class="card-h"><h2>{{ ic('settings') }} Qoidalar</h2></div>
+  <div class="aj-set">
+    <div><label class="l">Min. obunachi soni</label><input type="number" name="min_members" value="{{ cfg.min_members }}" min="0"></div>
+    <div><label class="l">Kuniga ko'pi bilan chiqish</label><input type="number" name="max_leave" value="{{ cfg.max_leave }}" min="1" max="200"></div>
+    <div><label class="l">Chiqish oralig'i, min (soniya)</label><input type="number" name="min_delay" value="{{ cfg.min_delay }}" min="10"></div>
+    <div><label class="l">Chiqish oralig'i, max (soniya)</label><input type="number" name="max_delay" value="{{ cfg.max_delay }}" min="10"></div>
+  </div>
+  <div class="aj-row" style="margin-top:12px"><div><b>Reklama taqiqlangan guruhdan chiqish</b><span>Guruh tavsifida «reklama taqiqlanadi» kabi qoida bo'lsa.</span></div><label class="sw"><input type="checkbox" name="check_ads" {% if cfg.check_ads %}checked{% endif %}><i></i></label></div>
+  <div class="aj-row"><div><b>Yozib bo'lmaydigan guruhdan chiqish</b><span>Guruhda a'zolar yoza olmasa yoki sizga yozish cheklangan bo'lsa.</span></div><label class="sw"><input type="checkbox" name="check_post" {% if cfg.check_post %}checked{% endif %}><i></i></label></div>
+  <div class="aj-row"><div><b>Qolgan guruhlarni avtomatik mute qilish</b><span>Avtomatik rejimda yangi a'zo bo'lingan guruhlar ham bildirishnomasiz bo'ladi.</span></div><label class="sw"><input type="checkbox" name="mute_all" {% if cfg.mute_all %}checked{% endif %}><i></i></label></div>
+  <div class="actions" style="margin-top:14px"><button class="btn">{{ ic('check') }} Saqlash</button></div></form>
+
+<div class="card" style="padding:0"><div class="card-h" style="padding:16px 20px 0"><h2>{{ ic('users') }} Guruhlar</h2>
+  <div class="chips"><a class="chip {{ 'on' if not v }}" href="/audit">Hammasi · {{ n.total }}</a><a class="chip {{ 'on' if v == 'leave' }}" href="/audit?v=leave">Chiqiladi · {{ n.leave }}</a><a class="chip {{ 'on' if v == 'keep' }}" href="/audit?v=keep">Qoladi · {{ n.keep }}</a><a class="chip {{ 'on' if v == 'unknown' }}" href="/audit?v=unknown">Noma'lum · {{ n.unknown + n.unaudited }}</a><a class="chip {{ 'on' if v == 'protected' }}" href="/audit?v=protected">Himoyalangan · {{ n.protected }}</a><a class="chip {{ 'on' if v == 'unmuted' }}" href="/audit?v=unmuted">Mute emas · {{ n.total - n.muted }}</a></div></div>
+{% if rows %}<form method="post" action="/audit/leave" onsubmit="return confirm('Belgilangan guruhlardan chiqilsinmi?')"><input type="hidden" name="sel" value="1"><div class="tbl-wrap" style="border:0"><table class="aj-tbl"><thead><tr><th style="width:32px"></th><th>Guruh</th><th>A'zolar</th><th>Yozish</th><th>Reklama</th><th>Mute</th><th>Hukm</th><th></th></tr></thead><tbody>
+{% for g in rows %}<tr><td>{% if g.verdict == 'leave' and g.tg_id not in prot %}<input type="checkbox" name="tg_ids" value="{{ g.tg_id }}">{% endif %}</td>
+  <td class="aj-name"><b>{{ g.title }}</b><span>{% if g.username %}@{{ g.username }} · {% endif %}{{ g.verdict_reason or '' }}</span></td>
+  <td>{{ '{:,}'.format(g.members).replace(',', ' ') if g.members is not none else '—' }}</td>
+  <td>{% if g.can_post %}<span class="badge b-good">Bor</span>{% else %}<span class="badge b-failed">Yo'q</span>{% endif %}</td>
+  <td>{% if g.ads_flag %}<span class="badge b-failed">Taqiq</span>{% elif g.checked_at %}<span class="badge b-good">Mumkin</span>{% else %}<span class="badge">—</span>{% endif %}</td>
+  <td>{% if g.muted %}<span class="badge b-good">Mute</span>{% else %}<span class="badge">Yo'q</span>{% endif %}</td>
+  <td>{% if g.tg_id in prot %}<span class="badge b-running">Himoyalangan</span>{% elif g.verdict == 'leave' %}<span class="badge b-failed">Chiqiladi</span>{% elif g.verdict == 'keep' %}<span class="badge b-good">Qoladi</span>{% else %}<span class="badge b-waiting">Noma'lum</span>{% endif %}</td>
+  <td><button class="btn sm ghost" formaction="/audit/protect/{{ g.tg_id }}{{ '?v=' ~ v if v }}" formnovalidate title="Himoyalash: bu guruhdan hech qachon avtomatik chiqilmaydi">{{ 'Himoyani olish' if g.tg_id in prot else 'Himoyalash' }}</button></td></tr>{% endfor %}
+</tbody></table></div>
+<div class="actions" style="padding:14px 20px"><button class="btn bad sm" {% if running %}disabled{% endif %}>Belgilanganlardan chiqish</button><span class="mut small">Belgilab chiqishda kunlik chegara qo'llanmaydi, lekin kechikishlar saqlanadi.</span></div></form>
+{% else %}<div class="empty" style="padding:40px">Bu bo'limda guruh yo'q. «Tahlil qilish» ni bosing.</div>{% endif %}</div>
+
+{% if logs %}<div class="card"><div class="card-h"><h2>{{ ic('clock') }} Audit tarixi</h2></div><ul class="aj-feed">{% for l in logs %}<li><div class="aj-av">{{ l.title[:1]|upper if l.title else '?' }}</div><div class="m"><b>{{ l.title }}</b><span>{{ l.reason[6:] }}</span></div><span class="mut small">{{ l.ts }}{% if l.auto %} · avto{% endif %}</span></li>{% endfor %}</ul></div>{% endif %}
+<script>{% if running %}(function poll(){fetch('/api/audit/progress').then(function(r){return r.json()}).then(function(p){var e=document.getElementById('prog');if(p.running){e.textContent=(p.msg||'Amal ketmoqda')+(p.total?': '+p.done+'/'+p.total:'');var b=document.getElementById('pbar');if(b&&p.total)b.style.width=Math.max(5,p.done*100/p.total)+'%';setTimeout(poll,2500)}else{location.reload()}}).catch(function(){})})();{% endif %}</script>
+{% endblock %}

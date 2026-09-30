@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, jobops
+from . import auditor, dailyreport, db, discovery, jobops, leaver
 from .config import CODE_DIR, MEDIA_DIR, log
 from .core import joiner, manager, sender
 from .web import acc_id, page
@@ -54,7 +54,7 @@ def scan_media():
             ext = f.suffix.lower()
             kind = "image" if ext in IMG_EXT else "video" if ext in VID_EXT else None
             if kind:
-                db.ex("INSERT OR IGNORE INTO media_items(name,original,kind,size,created_at) VALUES(?,?,?,?,?)",
+                db.ex("INSERT OR IGNORE INTO media_items(name,original,kind,size,created_at,user_id) VALUES(?,?,?,?,?,1)",
                       (f.name, f.name, kind, f.stat().st_size, db.now()))
 
 
@@ -71,7 +71,8 @@ async def lifespan(app: FastAPI):
     db.ex("UPDATE join_batches SET status='interrupted', next_at=NULL WHERE status IN ('running','queued')")
     sender.begin_scheduler()
     joiner.begin_scheduler()
-    bg = [asyncio.create_task(manager.start_all()), asyncio.create_task(jobops.auto_refresh_loop())]
+    bg = [asyncio.create_task(manager.start_all()), asyncio.create_task(jobops.auto_refresh_loop()),
+          asyncio.create_task(leaver.loop()), asyncio.create_task(dailyreport.loop()), asyncio.create_task(discovery.loop()), asyncio.create_task(auditor.loop())]
     log.info("Dastur ishga tushdi")
     yield
     for t in bg:
@@ -86,12 +87,18 @@ app.mount("/static", StaticFiles(directory=CODE_DIR / "app" / "static"), name="s
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 
+PUBLIC = ("/static", "/login", "/logout")
+
+
 @app.middleware("http")
 async def guard(request: Request, call_next):
     path = request.url.path
-    if db.get_setting("password_hash") and not path.startswith("/static") and path != "/login":
+    if db.get_setting("password_hash") and not path.startswith(PUBLIC):
         if not hmac.compare_digest(request.cookies.get("tgp_auth", ""), auth_token()):
             return RedirectResponse(f"/login?next={quote(path)}", status_code=303)
+    user = db.one("SELECT * FROM users WHERE id=1")
+    request.state.user = user
+    db.cur_uid.set(1)
     ids = [r["id"] for r in db.q("SELECT id FROM accounts ORDER BY id")]
     try:
         cid = int(request.cookies.get("acc", "0"))
@@ -107,7 +114,7 @@ async def on_error(request: Request, exc: Exception):
     return page(request, "error.html", status_code=500, detail=f"{type(exc).__name__}: {exc}")
 
 
-from . import r_account, r_groups, r_inbox, r_join, r_posts, r_stats  # noqa: E402
+from . import r_account, r_groups, r_inbox, r_join, r_posts, r_stats, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit  # noqa: E402
 
-for r in (r_account, r_posts, r_groups, r_join, r_stats, r_inbox):
+for r in (r_account, r_posts, r_groups, r_join, r_stats, r_inbox, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit):
     app.include_router(r.router)

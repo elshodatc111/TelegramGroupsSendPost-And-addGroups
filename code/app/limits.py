@@ -1,4 +1,5 @@
 """Akkaunt xavfsizligi: ish vaqti oynasi, kunlik limit, salomatlik, qora ro'yxat."""
+import json
 from datetime import datetime, timedelta
 
 from . import db
@@ -77,8 +78,73 @@ def daily_gate(account_id: int):
     return free, f"Akkauntning kunlik yuborish limiti ({limit}) to'ldi. Avtomatik davom etadi."
 
 
+# ---------------- isitish (warm-up) rejasi ----------------
+DEFAULT_PLAN = [  # (kun, postlar, a'zo bo'lishlar)
+    (1, 3, 2), (2, 5, 3), (3, 8, 5), (4, 12, 7), (5, 16, 9), (6, 20, 12), (7, 25, 15),
+    (8, 30, 18), (9, 36, 21), (10, 42, 24), (11, 50, 27), (12, 58, 30), (13, 66, 34), (14, 75, 38)]
+
+
+def default_plan() -> list[dict]:
+    return [{"day": d, "posts": p, "joins": j} for d, p, j in DEFAULT_PLAN]
+
+
+def get_warmup(account_id: int):
+    r = db.one("SELECT * FROM warmup WHERE account_id=?", (account_id,))
+    if not r:
+        return None
+    d = dict(r)
+    d["plan"] = json.loads(r["plan_json"] or "[]") or default_plan()
+    return d
+
+
+def warm_today(account_id: int):
+    """Faol isitish rejasi bo'yicha bugungi limitlar; reja tugagan yoki o'chiq bo'lsa None."""
+    w = get_warmup(account_id)
+    if not w or not w["active"] or not w["start_date"]:
+        return None
+    day = (datetime.now().date() - datetime.strptime(w["start_date"], "%Y-%m-%d").date()).days + 1
+    if day < 1:
+        return None
+    if day > len(w["plan"]):
+        db.ex("UPDATE warmup SET active=0 WHERE account_id=?", (account_id,))
+        return None
+    p = w["plan"][day - 1]
+    return {"day": day, "of": len(w["plan"]), "posts": int(p["posts"]), "joins": int(p["joins"])}
+
+
+def _midnight():
+    return (datetime.now() + timedelta(days=1)).replace(hour=0, minute=1, second=0, microsecond=0)
+
+
+def _today_start():
+    return datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).strftime(FMT)
+
+
+def warm_post_gate(account_id: int):
+    w = warm_today(account_id)
+    if not w:
+        return None
+    n = db.one("SELECT COUNT(*) c FROM account_events WHERE account_id=? AND kind='sent' AND ts>=?",
+               (account_id, _today_start()))["c"]
+    if n >= w["posts"]:
+        return _midnight(), f"Isitish rejasi: {w['day']}-kun post limiti ({w['posts']}) to'ldi. Ertaga davom etadi."
+    return None
+
+
+def warm_join_gate(account_id: int):
+    w = warm_today(account_id)
+    if not w:
+        return None
+    n = db.one("SELECT COUNT(*) c FROM join_targets jt JOIN join_batches jb ON jb.id=jt.batch_id "
+               "WHERE jb.account_id=? AND jt.status IN ('joined','requested') AND jt.tried_at>=?",
+               (account_id, _today_start()))["c"]
+    if n >= w["joins"]:
+        return _midnight(), f"Isitish rejasi: {w['day']}-kun a'zo bo'lish limiti ({w['joins']}) to'ldi. Ertaga davom etadi."
+    return None
+
+
 def gate(account_id: int):
-    return work_gate(account_id) or daily_gate(account_id)
+    return work_gate(account_id) or warm_post_gate(account_id) or daily_gate(account_id)
 
 
 # ---------------- qora ro'yxat ----------------

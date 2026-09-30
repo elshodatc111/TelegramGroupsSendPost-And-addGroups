@@ -88,7 +88,21 @@ def render_text(text: str, mode: str = "none") -> Markup:
     return Markup(esc.replace("\n", "<br>"))
 
 
+def spark(values, w=90, h=26, cls="") -> Markup:
+    """Kichik chiziqli grafik (SVG)."""
+    vals = [v for v in (values or []) if v is not None]
+    if len(vals) < 2:
+        return Markup('<span class="mut tiny">—</span>')
+    lo, hi = min(vals), max(vals)
+    rng = (hi - lo) or 1
+    pts = " ".join(f"{i * (w - 2) / (len(vals) - 1) + 1:.1f},{h - 2 - (v - lo) / rng * (h - 4):.1f}" for i, v in enumerate(vals))
+    up = vals[-1] >= vals[0]
+    return Markup(f'<svg class="spark {cls}" width="{w}" height="{h}" viewBox="0 0 {w} {h}"><polyline fill="none" '
+                  f'stroke="{"var(--blue)" if up else "var(--pri)"}" stroke-width="2" stroke-linejoin="round" points="{pts}"/></svg>')
+
+
 templates.env.filters["render_text"] = render_text
+templates.env.globals["spark"] = spark
 templates.env.globals.update(STATUS=STATUS_LABELS, JOIN=JOIN_LABELS, BATCH=BATCH_LABELS, ICONS=ICONS, ic=ic)
 
 
@@ -110,14 +124,15 @@ def page(request: Request, name: str, status_code: int = 200, **ctx):
         ctx["msg"] = n
         db.del_setting("machine_notice")
     ctx.setdefault("err", request.query_params.get("err"))
+    user = getattr(request.state, "user", None)
     try:
-        accounts = manager.list()
+        accounts = manager.list(user["id"]) if user else []
     except Exception:
         accounts = []
     aid = acc_id(request)
     cur = next((a for a in accounts if a["id"] == aid), None)
     ctx.update(accounts=accounts, cur=cur, unread=cur["unread"] if cur else 0,
-               auth_on=bool(db.get_setting("password_hash")))
+               auth_on=bool(db.get_setting("password_hash")), user=user)
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
 

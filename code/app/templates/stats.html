@@ -19,6 +19,12 @@
   <text x="{{ x + 12 }}" y="186" text-anchor="middle">{{ r.d[8:] }}.{{ r.d[5:7] }}</text>{% endfor %}</svg>
 <div class="legend"><span><i style="background:var(--pri)"></i>Yuborilgan postlar</span></div>
 {% else %}<div class="empty">Bu davrda ma'lumot yo'q</div>{% endif %}</div>
+<div class="card"><div class="card-h"><h2>{{ ic('clock') }} Eng yaxshi yuborish vaqti</h2><span class="mut small">{{ bt.samples }} ta o'lchangan post asosida</span></div>
+{% if bt.top %}<div class="grid g3" style="margin-bottom:14px">{% for t in bt.top[:3] %}<div class="qa" style="cursor:default"><div class="qi">{{ ic('eye') }}</div><div><b>{{ t.weekday }}, {{ '%02d' % t.hour }}:00</b><small>o'rtacha {{ t.avg }} ko'rish ({{ t.n }} post)</small><a class="small" href="/compose?date={{ t.when }}">Shu vaqtga rejalashtirish</a></div></div>{% endfor %}</div>
+<div style="overflow:auto"><table style="border-collapse:separate;border-spacing:2px;font-size:10px"><thead><tr><th></th>{% for h in range(24) %}<th style="padding:0 2px;font-weight:500" class="mut">{{ h }}</th>{% endfor %}</tr></thead><tbody>
+{% for w in range(7) %}<tr><td class="mut small" style="padding-right:8px;white-space:nowrap">{{ bt.wd[w][:3] }}</td>{% for h in range(24) %}{% set c = bt.grid[w][h] %}<td title="{{ bt.wd[w] }} {{ h }}:00 · {{ c.n }} post · o'rt. {{ c.avg }} ko'rish" style="width:22px;height:20px;border-radius:4px;background:{{ 'color-mix(in srgb, var(--pri) ' ~ ((c.avg / bt.max * 100)|round|int if bt.max else 0) ~ '%, var(--surface2))' if c.n else 'var(--surface2)' }}"></td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+<div class="hint">Rang qanchalik to'q bo'lsa, shu soatda yuborilgan postlar shunchalik ko'p ko'rilgan. Aniqroq natija uchun postlarni turli soatlarda yuboring va "Yangilash"ni bosib ko'rishlarni yig'ing.</div>
+{% else %}<div class="empty">Hali ko'rishlar yig'ilmagan. Post yuboring va "Yangilash" tugmasini bosing.</div>{% endif %}</div>
 {% if d.variants %}<div class="card" style="padding:0"><div class="card-h" style="padding:16px 20px 0"><h2>{{ ic('layers') }} Variantlar taqqoslash (A/B)</h2></div>
  <div class="tbl-wrap" style="border:0"><table><thead><tr><th>Kampaniya</th><th>Variant</th><th>Yuborildi</th><th>O'rtacha ko'rish</th><th>Reaksiya</th><th>Javob</th></tr></thead><tbody>
  {% for v in d.variants %}<tr><td>{{ v.name }}</td><td><span class="badge">V{{ v.variant }}</span></td><td>{{ v.sent }}</td><td><b>{{ v.avg_views or 0 }}</b></td><td>{{ v.reactions }}</td><td>{{ v.replies }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}

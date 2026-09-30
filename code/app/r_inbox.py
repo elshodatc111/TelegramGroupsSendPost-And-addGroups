@@ -22,7 +22,7 @@ async def inbox_page(request: Request, f: str = "all"):
     if aid:
         counts = {"all": db.one("SELECT COUNT(*) c FROM inbox WHERE account_id=?", (aid,))["c"],
                   "unread": db.one("SELECT COUNT(*) c FROM inbox WHERE account_id=? AND is_read=0", (aid,))["c"]}
-    canned = db.q("SELECT * FROM canned_replies ORDER BY id")
+    canned = db.q("SELECT * FROM canned_replies WHERE user_id=? ORDER BY id", (db.cur_uid.get(),))
     return page(request, "inbox.html", rows=rows, f=f, counts=counts, canned=canned)
 
 
@@ -60,7 +60,7 @@ async def reply(request: Request, mid: int, text: str = Form(...)):
 async def canned_add(title: str = Form(...), text: str = Form(...)):
     if not title.strip() or not text.strip():
         return go("/inbox", err="Sarlavha va matnni kiriting")
-    db.ex("INSERT INTO canned_replies(title,text) VALUES(?,?)", (title.strip(), text.strip()))
+    db.ex("INSERT INTO canned_replies(title,text,user_id) VALUES(?,?,?)", (title.strip(), text.strip(), db.cur_uid.get()))
     return go("/inbox", msg="Tayyor javob qo'shildi")
 
 

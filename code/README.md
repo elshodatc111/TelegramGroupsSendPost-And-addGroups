@@ -56,3 +56,6 @@ Telegram bot orqali bildirishnoma · alembic migratsiyalari.
 - Bir nechta akkaunt (tepada tanlagich), post variantlari (ketma-ket tarqatish), kampaniyalar va takrorlash, statistika (Excel/PDF), inbox, teglar/qora ro'yxat, guruh qidirish, media kutubxona, parol himoyasi.
 - Kutubxonalar `requirements.txt` da (yangi: reportlab). `run.bat` ularni avtomatik o'rnatadi.
 - Sozlamalar sahifasida API ID/HASH kiriting, so'ng Akkauntlar bo'limida akkaunt qo'shing.
+
+## v4 yangiliklari
+- Isitish rejasi, eng yaxshi vaqt, guruhlar tahlili va ballari, avtomatik chiqish, kalendar, kunlik Excel hisobot, guruhlarni Excel'dan import/eksport, bir nechta akkauntdan parallel yuborish.

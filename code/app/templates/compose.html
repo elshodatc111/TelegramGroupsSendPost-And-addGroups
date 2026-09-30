@@ -48,6 +48,12 @@
       {% for d in ['Du','Se','Chor','Pay','Ju','Sha','Yak'] %}<label class="chip" style="cursor:pointer"><input type="checkbox" name="rec_days" value="{{ loop.index0 }}" {{ 'checked' if loop.index0 in form.rec_days }} style="width:14px;height:14px;margin-right:6px">{{ d }}</label>{% endfor %}</div>
     <div class="hint">Takrorlanuvchi kampaniya har safar variantlarni oldingi yuborishdan davom ettirib yuboradi. Ish vaqti va kunlik limit akkaunt sozlamalaridan olinadi.</div>
   </div>
+  {% if others %}<div class="card">
+    <div class="card-h"><h2>{{ ic('shield') }} Bir nechta akkauntdan yuborish <span class="mut small">(ixtiyoriy)</span></h2></div>
+    <div class="chips">{% for a in others %}<label class="chip" style="cursor:pointer"><input type="checkbox" name="acc_ids" value="{{ a.id }}" {{ 'checked' if a.id in form.acc_ids }} style="width:14px;height:14px;margin-right:6px">{{ a.name }}</label>{% endfor %}</div>
+    <div class="seg" style="margin-top:12px"><label><input type="radio" name="acc_mode" value="same" {{ 'checked' if form.acc_mode != 'all' }}>Tanlangan guruhlarning a'zo bo'lganlariga</label><label><input type="radio" name="acc_mode" value="all" {{ 'checked' if form.acc_mode == 'all' }}>Akkauntning barcha guruhlariga</label></div>
+    <div class="hint">Har akkaunt o'z guruhlariga, o'z tezligida parallel yuboradi. Bir guruhga ikki akkauntdan borib qolsa, bittasi o'tkazib yuboriladi. Variantlar har akkaunt uchun alohida aylanadi.</div>
+  </div>{% endif %}
   <div class="card">
     <div class="card-h"><h2><span class="step">4</span> UTM kuzatuv <span class="mut small">(ixtiyoriy)</span></h2></div>
     <label class="grow" style="padding:0;margin:0 0 10px"><input type="checkbox" name="utm_on" value="1" id="utm_on" {{ 'checked' if form.utm_on }}> <span>Havolalarga UTM belgilari qo'shish (t.me havolalariga tegilmaydi)</span></label>

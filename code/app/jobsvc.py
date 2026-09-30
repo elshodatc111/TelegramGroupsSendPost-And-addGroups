@@ -192,3 +192,48 @@ def run_campaign(cid: int) -> int | None:
     confirm_job(job_id)
     db.ex("UPDATE campaigns SET last_run=? WHERE id=?", (db.now(), cid))
     return job_id
+
+
+# ---------------- bir nechta akkauntdan parallel yuborish ----------------
+def extra_plan(job) -> list[dict]:
+    """Qo'shimcha akkauntlar: har biri o'z guruhlariga yuboradi; bir guruh ikki marta tanlanmaydi."""
+    try:
+        ex = json.loads(job["extra_json"] or "null")
+    except Exception:
+        ex = None
+    if not ex or not ex.get("accounts"):
+        return []
+    owner = db.one("SELECT user_id FROM accounts WHERE id=?", (job["account_id"],))
+    used = {t["tg_id"] for t in db.q("SELECT tg_id FROM job_targets WHERE job_id=? AND status='pending'", (job["id"],))}
+    primary = {t["tg_id"] for t in db.q("SELECT tg_id FROM job_targets WHERE job_id=?", (job["id"],))}
+    out = []
+    for aid in ex["accounts"]:
+        a = db.one("SELECT * FROM accounts WHERE id=? AND user_id=?", (aid, owner["user_id"] if owner else -1))
+        if not a or a["id"] == job["account_id"]:
+            continue
+        mine = {g["tg_id"] for g in db.q("SELECT tg_id FROM groups WHERE account_id=? AND can_post=1", (a["id"],))}
+        ids = [i for i in (mine if ex.get("mode") == "all" else mine & primary) if i not in used]
+        ids.sort()
+        used |= set(ids)
+        out.append({"account_id": a["id"], "name": a["name"], "tg_ids": ids})
+    return out
+
+
+def launch_extras(job_id: int, when: str | None) -> list[int]:
+    """Asosiy yuborish tasdiqlangach, qo'shimcha akkauntlar uchun nusxa joblar yaratadi va ishga tushiradi."""
+    job = db.one("SELECT * FROM jobs WHERE id=?", (job_id,))
+    variants = [{"text": v["text"] or "", "parse_mode": v["parse_mode"], "media": media_of(v), "media_type": v["media_type"]}
+                for v in variants_of(job_id)]
+    ids = []
+    for p in extra_plan(job):
+        if not p["tg_ids"]:
+            continue
+        jid, stats = create_draft(p["account_id"], variants, p["tg_ids"], min_delay=job["min_delay"], max_delay=job["max_delay"],
+                                  name=job["name"] or "", utm_on=job["utm_on"], utm_source=job["utm_source"] or "",
+                                  utm_campaign=job["utm_campaign"] or "", skip_ads=1)
+        if not stats["total"]:
+            db.ex("DELETE FROM jobs WHERE id=?", (jid,))
+            continue
+        confirm_job(jid, when)
+        ids.append(jid)
+    return ids

@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}Kalendar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Kalendar</h1><p class="sub">Rejalashtirilgan va o'tgan yuborishlar. Rejalashtirilganini boshqa kunga sudrab ko'chiring.</p></div>
+  <div class="actions"><a class="btn sec" href="/calendar?month={{ prev }}">&larr;</a><b style="min-width:150px;text-align:center;align-self:center">{{ title }}</b><a class="btn sec" href="/calendar?month={{ next }}">&rarr;</a><a class="btn" href="/reports">{{ ic('file') }} Kunlik hisobot</a></div></div>
+<div class="card" style="padding:8px;overflow:auto"><table class="calt" style="width:100%;table-layout:fixed;border-collapse:separate;border-spacing:4px;min-width:760px">
+<thead><tr>{% for d in ['Du','Se','Chor','Pay','Ju','Sha','Yak'] %}<th style="text-align:center;padding:6px" class="mut">{{ d }}</th>{% endfor %}</tr></thead><tbody>
+{% for w in weeks %}<tr>{% for c in w %}<td class="cday{{ ' out' if not c.in }}{{ ' tod' if c.today }}" data-date="{{ c.date }}" style="vertical-align:top;height:112px;border:1px solid var(--bd);border-radius:10px;padding:6px;background:{{ 'var(--surface)' if c.in else 'var(--surface2)' }};{{ 'outline:2px solid var(--pri)' if c.today }}">
+ <div style="display:flex;justify-content:space-between;align-items:center"><b class="small {{ 'mut' if not c.in }}">{{ c.day }}</b>{% if c.date >= today %}<a href="/compose?date={{ c.date }}T10:00" title="Shu kunga post" class="mut" style="text-decoration:none;font-size:18px;line-height:1">+</a>{% endif %}</div>
+ {% for e in c.events[:4] %}<a href="{{ '/jobs/' ~ e.id if e.kind == 'job' else '/campaigns' }}" {% if e.drag %}draggable="true" data-job="{{ e.id }}"{% endif %} class="badge b-{{ e.status }}" style="display:block;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none;{{ 'cursor:grab' if e.drag }}" title="{{ e.title }} · {{ e.info }}">{{ e.time }} {{ e.title }}</a>{% endfor %}
+ {% if c.events|length > 4 %}<div class="mut tiny">+{{ c.events|length - 4 }} yana</div>{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+<div class="legend"><span><i style="background:var(--blue)"></i>Rejalashtirilgan / takrorlanuvchi</span><span><i style="background:var(--pri)"></i>Xato</span></div>
+{% endblock %}
+{% block scripts %}<script>
+let drag=null;
+document.querySelectorAll('[data-job]').forEach(a=>{a.addEventListener('dragstart',e=>{drag=a.dataset.job;e.dataTransfer.setData('text/plain',drag);});});
+document.querySelectorAll('.cday').forEach(td=>{
+  td.addEventListener('dragover',e=>{if(drag){e.preventDefault();td.style.background='var(--pri-soft)';}});
+  td.addEventListener('dragleave',()=>{td.style.background='';});
+  td.addEventListener('drop',async e=>{e.preventDefault();td.style.background='';if(!drag)return;
+    const r=await fetch('/jobs/'+drag+'/reschedule',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'date='+td.dataset.date});
+    const j=await r.json(); if(j.ok) location.reload(); else alert(j.error);});
+});
+</script>{% endblock %}

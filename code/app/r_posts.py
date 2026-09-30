@@ -1,6 +1,7 @@
 """Bosh sahifa, post yaratish (variantlar), oldindan ko'rish, yuborishlar, kampaniyalar, media kutubxonasi."""
 import asyncio
 import json
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -44,8 +45,8 @@ async def save_upload(f) -> tuple[str, str]:
                 (MEDIA_DIR / name).unlink(missing_ok=True)
                 raise ValueError(f"Fayl juda katta (maksimum {MAX_UPLOAD_MB} MB)")
             out.write(chunk)
-    db.ex("INSERT OR IGNORE INTO media_items(name,original,kind,size,created_at) VALUES(?,?,?,?,?)",
-          (name, f.filename, kind, size, db.now()))
+    db.ex("INSERT OR IGNORE INTO media_items(name,original,kind,size,created_at,user_id) VALUES(?,?,?,?,?,?)",
+          (name, f.filename, kind, size, db.now(), db.cur_uid.get()))
     return name, kind
 
 
@@ -71,15 +72,17 @@ def default_form(**over):
     form = {"variants": [{"text": "", "parse_mode": "none", "media": []}], "selected": [],
             "min_delay": int(db.get_setting("default_min", 20)), "max_delay": int(db.get_setting("default_max", 60)),
             "scheduled_at": "", "name": "", "utm_on": 0, "utm_source": "telegram", "utm_campaign": "", "skip_ads": 1,
-            "recurrence": "none", "rec_time": "10:00", "rec_days": [], "replace_job": 0}
+            "recurrence": "none", "rec_time": "10:00", "rec_days": [], "replace_job": 0, "acc_ids": [], "acc_mode": "same"}
     form.update(over)
     return form
 
 
 def compose_ctx(request, aid, form, **extra):
     groups, lists, tags = groups_context(aid)
+    uid = request.state.user["id"]
+    others = [a for a in manager.list(uid) if a["id"] != aid and a["connected"]]
     return dict(groups=groups, lists=lists, tags=tags, form=form, caption_limit=CAPTION_LIMIT,
-                max_variants=MAX_VARIANTS, **extra)
+                max_variants=MAX_VARIANTS, others=others, **extra)
 
 
 # ---------------- bosh sahifa ----------------
@@ -104,11 +107,13 @@ async def dashboard(request: Request):
 
 # ---------------- post yaratish ----------------
 @router.get("/compose")
-async def compose_page(request: Request, job: int = 0, campaign: int = 0):
+async def compose_page(request: Request, job: int = 0, campaign: int = 0, date: str = ""):
     if (r := need_account(request)):
         return r
     aid = acc_id(request)
     form = default_form()
+    if re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d", date or ""):
+        form["scheduled_at"] = date
     if campaign:
         c = db.one("SELECT * FROM campaigns WHERE id=? AND account_id=?", (campaign, aid))
         if c:
@@ -127,6 +132,11 @@ async def compose_page(request: Request, job: int = 0, campaign: int = 0):
                         selected=[t["tg_id"] for t in db.q("SELECT tg_id FROM job_targets WHERE job_id=?", (job,))],
                         utm_on=j["utm_on"], utm_source=j["utm_source"] or "telegram", utm_campaign=j["utm_campaign"] or "",
                         replace_job=job if j["status"] == "draft" else 0)
+            try:
+                ex = json.loads(j["extra_json"] or "null") or {}
+                form.update(acc_ids=ex.get("accounts", []), acc_mode=ex.get("mode", "same"))
+            except Exception:
+                pass
     return page(request, "compose.html", **compose_ctx(request, aid, form))
 
 
@@ -186,7 +196,8 @@ async def compose_preview(request: Request):
                         utm_on=int(bool(f.get("utm_on"))), utm_source=(f.get("utm_source") or "telegram").strip(),
                         utm_campaign=(f.get("utm_campaign") or "").strip(), skip_ads=int(bool(f.get("skip_ads"))),
                         recurrence=rec, rec_time=f.get("rec_time") or "10:00", rec_days=rec_days,
-                        replace_job=geti("replace_job", 0))
+                        replace_job=geti("replace_job", 0), acc_ids=[int(x) for x in f.getlist("acc_ids") if str(x).isdigit()],
+                        acc_mode="all" if f.get("acc_mode") == "all" else "same")
 
     def fail(msg):
         return page(request, "compose.html", **compose_ctx(request, aid, form), err=msg)
@@ -228,6 +239,8 @@ async def compose_preview(request: Request):
         aid, variants, tg_ids, min_delay=mn, max_delay=mx, scheduled_at=(sched.replace("T", " ") + ":00") if sched else None,
         campaign_id=cid, name=name, utm_on=form["utm_on"], utm_source=form["utm_source"], utm_campaign=utm_campaign,
         skip_ads=form["skip_ads"])
+    if form["acc_ids"]:
+        db.ex("UPDATE jobs SET extra_json=? WHERE id=?", (json.dumps({"accounts": form["acc_ids"], "mode": form["acc_mode"]}), job_id))
     if not stats["total"]:
         db.ex("DELETE FROM jobs WHERE id=?", (job_id,))
         return fail("Yuboriladigan guruh qolmadi (hammasi qora ro'yxatda, reklama taqiqlangan yoki topilmadi)")
@@ -280,10 +293,11 @@ async def preview(request: Request, job_id: int):
     if h["level"] != "good":
         warns.append(f"Akkaunt holati: {h['label']} (24 soatda {h['flood']} ta FloodWait). Yuborish avtomatik sekinlashtiriladi.")
     camp = db.one("SELECT * FROM campaigns WHERE id=?", (job["campaign_id"],)) if job["campaign_id"] else None
+    extras = jobsvc.extra_plan(job)
     ptr = jobsvc.get_ptr(jobsvc.job_ptr_key(job)) % max(1, len(vs))
     svc_st = await manager.get(job["account_id"]).status()
     return page(request, "preview.html", job=job, targets=targets, previews=previews, est_sec=est_sec, warns=warns,
-                skipped=skipped, camp=camp, ptr=ptr + 1, nvars=len(vs), n=n, authorized=svc_st.get("authorized"),
+                skipped=skipped, camp=camp, extras=extras, ptr=ptr + 1, nvars=len(vs), n=n, authorized=svc_st.get("authorized"),
                 when=(job["scheduled_at"] or "").replace(" ", "T")[:16])
 
 
@@ -300,12 +314,16 @@ async def confirm(job_id: int, when: str = Form("")):
         except ValueError:
             return go(f"/preview/{job_id}", err="Vaqt formati noto'g'ri")
     res = jobsvc.confirm_job(job_id, when)
+    extra_ids = jobsvc.launch_extras(job_id, when)
+    for eid in extra_ids:
+        if res != "scheduled":
+            sender.start(eid)
     if job["campaign_id"]:
         jobsvc.activate_campaign(job["campaign_id"])
     if res == "scheduled":
-        return go(f"/jobs/{job_id}", msg=f"Yuborish {when.replace('T', ' ')} ga rejalashtirildi")
+        return go(f"/jobs/{job_id}", msg=f"Yuborish {when.replace('T', ' ')} ga rejalashtirildi" + (f" ({len(extra_ids)} ta qo'shimcha akkaunt ham)" if extra_ids else ""))
     sender.start(job_id)
-    return go(f"/jobs/{job_id}", msg="Yuborish boshlandi")
+    return go(f"/jobs/{job_id}", msg="Yuborish boshlandi" + (f" (+ {len(extra_ids)} ta qo'shimcha akkauntdan parallel)" if extra_ids else ""))
 
 
 @router.post("/preview/{job_id}/discard")
@@ -473,7 +491,7 @@ async def campaign_delete(cid: int):
 @router.get("/media-library")
 async def media_page(request: Request):
     items = []
-    for m in db.q("SELECT * FROM media_items ORDER BY created_at DESC"):
+    for m in db.q("SELECT * FROM media_items WHERE user_id=? ORDER BY created_at DESC", (db.cur_uid.get(),)):
         d = dict(m)
         d["used"] = bool(db.one("SELECT 1 FROM job_variants WHERE media_json LIKE ? UNION SELECT 1 FROM campaign_variants "
                                 "WHERE media_json LIKE ?", (f'%"{m["name"]}"%', f'%"{m["name"]}"%')))
@@ -484,7 +502,7 @@ async def media_page(request: Request):
 @router.get("/api/media")
 async def media_api():
     return [{"name": m["name"], "kind": m["kind"], "original": m["original"], "size": m["size"]}
-            for m in db.q("SELECT * FROM media_items ORDER BY created_at DESC LIMIT 300") if (MEDIA_DIR / m["name"]).exists()]
+            for m in db.q("SELECT * FROM media_items WHERE user_id=? ORDER BY created_at DESC LIMIT 300", (db.cur_uid.get(),)) if (MEDIA_DIR / m["name"]).exists()]
 
 
 @router.post("/media-library/upload")

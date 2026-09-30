@@ -188,3 +188,122 @@ async def discover_join(request: Request, usernames: list[str] = Form(default=[]
     bid = db.ex("INSERT INTO join_batches(account_id,filename,status,created_at,raw) VALUES(?,?,?,?,?)",
                 (aid, f"Qidiruv: {q}", "draft", db.now(), json.dumps(cols, ensure_ascii=False)))
     return go(f"/join/{bid}/setup")
+
+
+# ---------------- Excel: eksport va import ----------------
+def _xlsx_bytes(aid: int) -> bytes:
+    import io
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    from .analytics import group_scores
+    tags: dict[int, list[str]] = {}
+    for r in db.q("SELECT tg_id, tag FROM group_tags WHERE account_id=? ORDER BY tag", (aid,)):
+        tags.setdefault(r["tg_id"], []).append(r["tag"])
+    lists: dict[int, list[str]] = {}
+    for r in db.q("SELECT i.tg_id, l.name FROM group_list_items i JOIN group_lists l ON l.id=i.list_id WHERE l.account_id=?", (aid,)):
+        lists.setdefault(r["tg_id"], []).append(r["name"])
+    bl = {r["tg_id"]: r["reason"] for r in db.q("SELECT tg_id, reason FROM blacklist WHERE account_id=?", (aid,))}
+    ok = {r["tg_id"]: r["ads_ok"] for r in db.q("SELECT tg_id, ads_ok FROM groups WHERE account_id=?", (aid,))}
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Guruhlar"
+    head = ["tg_id", "Nomi", "Username", "Turi", "A'zolar", "Teglar", "Ro'yxatlar", "Qora ro'yxat", "Qora ro'yxat sababi",
+            "Reklama ruxsati", "Postlar", "O'rt. ko'rish", "Ball"]
+    ws.append(head)
+    for c in ws[1]:
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor="DC2626")
+        c.alignment = Alignment(vertical="center")
+    for g in group_scores(aid, 365):
+        ws.append([g["tg_id"], g["title"], g["username"] or "", g["kind"], g["members"], ", ".join(tags.get(g["tg_id"], [])),
+                   ", ".join(lists.get(g["tg_id"], [])), "Ha" if g["tg_id"] in bl else "", bl.get(g["tg_id"], ""),
+                   "Ha" if ok.get(g["tg_id"]) else "", g["sent"], g["avg_views"], g["score"]])
+    for col, w in zip("ABCDEFGHIJKLM", [16, 36, 22, 12, 10, 26, 26, 12, 30, 14, 9, 12, 8]):
+        ws.column_dimensions[col].width = w
+    ws.freeze_panes = "A2"
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+@router.get("/groups/export.xlsx")
+async def groups_export(request: Request):
+    from fastapi.responses import Response
+    if (r := need_account(request)):
+        return r
+    return Response(_xlsx_bytes(acc_id(request)),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": 'attachment; filename="guruhlar.xlsx"'})
+
+
+@router.post("/groups/import")
+async def groups_import(request: Request):
+    """Excel'dagi teglar, ro'yxatlar, qora ro'yxat va reklama ruxsatini mavjud guruhlarga qo'llaydi."""
+    import io
+
+    from openpyxl import load_workbook
+    if (r := need_account(request)):
+        return r
+    aid = acc_id(request)
+    form = await request.form()
+    up = form.get("file")
+    if not up or not getattr(up, "filename", "").lower().endswith(".xlsx"):
+        return go("/groups", err="Faqat .xlsx fayl yuklang (guruhlar.xlsx ko'rinishida)")
+    try:
+        ws = load_workbook(io.BytesIO(await up.read()), read_only=True, data_only=True).active
+        rows = list(ws.iter_rows(values_only=True))
+    except Exception as e:
+        return go("/groups", err=f"Faylni o'qib bo'lmadi: {e}")
+    if not rows:
+        return go("/groups", err="Fayl bo'sh")
+    head = [str(h or "").strip().lower() for h in rows[0]]
+
+    def col(*names):
+        for n in names:
+            if n in head:
+                return head.index(n)
+        return None
+    c_id, c_user = col("tg_id"), col("username")
+    c_tags, c_lists = col("teglar"), col("ro'yxatlar")
+    c_bl, c_reason, c_ads = col("qora ro'yxat"), col("qora ro'yxat sababi"), col("reklama ruxsati")
+    if c_id is None and c_user is None:
+        return go("/groups", err="Faylda 'tg_id' yoki 'Username' ustuni topilmadi")
+    by_id = {g["tg_id"]: g for g in db.q("SELECT tg_id,title,username FROM groups WHERE account_id=?", (aid,))}
+    by_user = {(g["username"] or "").lower(): g for g in by_id.values() if g["username"]}
+    hit = miss = 0
+    list_ids = {l["name"]: l["id"] for l in db.q("SELECT id,name FROM group_lists WHERE account_id=?", (aid,))}
+    for row in rows[1:]:
+        g = None
+        if c_id is not None and row[c_id] not in (None, ""):
+            try:
+                g = by_id.get(int(row[c_id]))
+            except (TypeError, ValueError):
+                g = None
+        if g is None and c_user is not None and row[c_user]:
+            g = by_user.get(str(row[c_user]).strip().lstrip("@").lower())
+        if g is None:
+            miss += 1
+            continue
+        hit += 1
+        tg = g["tg_id"]
+        if c_tags is not None:
+            db.ex("DELETE FROM group_tags WHERE account_id=? AND tg_id=?", (aid, tg))
+            for t in str(row[c_tags] or "").replace(";", ",").split(","):
+                if t.strip():
+                    db.ex("INSERT OR IGNORE INTO group_tags(account_id,tg_id,tag) VALUES(?,?,?)", (aid, tg, t.strip().lower().lstrip("#")))
+        if c_lists is not None:
+            for name in [x.strip() for x in str(row[c_lists] or "").split(",") if x.strip()]:
+                if name not in list_ids:
+                    list_ids[name] = db.ex("INSERT INTO group_lists(account_id,name) VALUES(?,?)", (aid, name))
+                db.ex("INSERT OR IGNORE INTO group_list_items(list_id,tg_id) VALUES(?,?)", (list_ids[name], tg))
+        if c_bl is not None:
+            if str(row[c_bl] or "").strip().lower() in ("ha", "yes", "1", "true"):
+                blacklist_add(aid, tg, g["title"], str(row[c_reason] or "Excel'dan import"))
+            else:
+                db.ex("DELETE FROM blacklist WHERE account_id=? AND tg_id=?", (aid, tg))
+        if c_ads is not None:
+            db.ex("UPDATE groups SET ads_ok=? WHERE account_id=? AND tg_id=?",
+                  (1 if str(row[c_ads] or "").strip().lower() in ("ha", "yes", "1", "true") else 0, aid, tg))
+    return go("/groups", msg=f"Import tugadi: {hit} ta guruhga qo'llandi" + (f", {miss} tasi topilmadi (akkaunt a'zo emas)" if miss else ""))

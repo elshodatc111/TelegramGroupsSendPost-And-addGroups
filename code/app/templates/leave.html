@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Guruhdan chiqish{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Guruhdan chiqish</h1><p class="sub">Yaramaydigan guruhlarni aniqlash va ulardan chiqish</p></div><a class="btn sec" href="/group-stats">Guruhlar tahlili</a></div>
+<div class="card"><div class="card-h"><h2>{{ ic('settings') }} Avtomatik chiqish</h2><span class="badge {{ 'b-good' if cfg.on else '' }}">{{ 'Yoqilgan' if cfg.on else 'O\'chiq' }}</span></div>
+ <form method="post" action="/groups/leave/settings">
+  <label class="grow" style="padding:4px 0"><input type="checkbox" name="on" value="1" {{ 'checked' if cfg.on }}> <span><b>Avtomatik chiqishni yoqish</b> <span class="mut small">(dastur har 6 soatda tekshiradi, bir safar 5 tagacha guruhdan chiqadi; yuborish ketayotganda tegmaydi)</span></span></label>
+  <label class="grow" style="padding:4px 0"><input type="checkbox" name="bad" value="1" {{ 'checked' if cfg.bad }}> <span>Yozish taqiqlangan, ban bo'lgan yoki postlari o'chirilgan guruhlar</span></label>
+  <label class="grow" style="padding:4px 0"><input type="checkbox" name="low" value="1" {{ 'checked' if cfg.low }}> <span>Ko'rishlari juda past guruhlar</span></label>
+  <div class="row" style="margin-top:8px"><div><label class="l">Kamida nechta post yuborilgan bo'lsin</label><input type="number" name="min_posts" value="{{ cfg.min_posts }}" min="1"></div>
+   <div><label class="l">O'rtacha ko'rish shundan past bo'lsa chiqish</label><input type="number" name="min_views" value="{{ cfg.min_views }}" min="0"></div></div>
+  <div style="margin-top:14px"><button class="btn">Saqlash</button></div></form></div>
+<form method="post" action="/groups/leave/run" class="card" style="padding:0" onsubmit="return confirm('Belgilangan guruhlardan chiqilsinmi? Ular qora ro\'yxatga tushadi.')">
+ <div class="card-h" style="padding:16px 20px 0"><h2>{{ ic('log-out') }} Chiqish nomzodlari ({{ cands|length }})</h2><button class="btn bad sm">Belgilanganlardan chiqish</button></div>
+ {% if cands %}<div class="glist" style="border:0;border-radius:0;max-height:none">{% for c in cands %}<label class="grow"><input type="checkbox" name="tg_ids" value="{{ c.tg_id }}"><span class="t"><b>{{ c.title }}</b><span class="mut tiny">{{ c.reason }}</span></span><span class="badge {{ 'b-bad' if c.kind == 'bad' else 'b-warn' }}">{{ 'Muammoli' if c.kind == 'bad' else 'Past ko\'rish' }}</span></label>{% endfor %}</div>
+ {% else %}<div class="empty">{{ ic('check') }}<div>Hozircha nomzod yo'q</div></div>{% endif %}</form>
+{% if logs %}<div class="card" style="padding:0"><div class="card-h" style="padding:16px 20px 0"><h2>Chiqish tarixi</h2></div><div class="tbl-wrap" style="border:0"><table><thead><tr><th>Vaqt</th><th>Guruh</th><th>Sabab</th><th>Kim</th></tr></thead><tbody>
+{% for l in logs %}<tr><td class="small mut">{{ l.ts[:16] }}</td><td>{{ l.title }}</td><td class="small">{{ l.reason }}</td><td>{{ 'Avtomatik' if l.auto else 'Qo\'lda' }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+{% endblock %}

@@ -25,12 +25,14 @@ class AccountManager:
             self.services[account_id] = svc
         return svc
 
-    def rows(self):
-        return db.q("SELECT * FROM accounts ORDER BY id")
+    def rows(self, uid=None):
+        if uid is None:
+            return db.q("SELECT * FROM accounts ORDER BY id")
+        return db.q("SELECT * FROM accounts WHERE user_id=? ORDER BY id", (uid,))
 
-    def list(self) -> list[dict]:
+    def list(self, uid=None) -> list[dict]:
         out = []
-        for r in self.rows():
+        for r in self.rows(uid):
             info = self.services[r["id"]].info if r["id"] in self.services else None
             d = dict(r)
             d.update(connected=bool(info), info=info, health=health(r["id"]),
@@ -38,8 +40,8 @@ class AccountManager:
             out.append(d)
         return out
 
-    def create(self, name: str) -> int:
-        aid = db.ex("INSERT INTO accounts(name,session,created_at) VALUES(?,?,?)", (name, "tmp", db.now()))
+    def create(self, name: str, uid: int = 1) -> int:
+        aid = db.ex("INSERT INTO accounts(name,session,created_at,user_id) VALUES(?,?,?,?)", (name, "tmp", db.now(), uid))
         db.ex("UPDATE accounts SET session=? WHERE id=?", (f"acc_{aid}", aid))
         return aid
 
@@ -63,6 +65,7 @@ class AccountManager:
             "DELETE FROM groups WHERE account_id=?", "DELETE FROM group_tags WHERE account_id=?",
             "DELETE FROM group_members_log WHERE account_id=?", "DELETE FROM blacklist WHERE account_id=?",
             "DELETE FROM inbox WHERE account_id=?", "DELETE FROM account_events WHERE account_id=?",
+            "DELETE FROM warmup WHERE account_id=?", "DELETE FROM autojoin WHERE account_id=?", "DELETE FROM audit_cfg WHERE account_id=?", "DELETE FROM disc_candidates WHERE account_id=?", "DELETE FROM leave_log WHERE account_id=?",
             "DELETE FROM accounts WHERE id=?",
         ):
             db.ex(sql, (account_id,))

@@ -37,6 +37,8 @@ async def login(request: Request, password: str = Form(...), next: str = Form("/
 async def logout_app():
     resp = RedirectResponse("/login", status_code=303)
     resp.delete_cookie("tgp_auth")
+    resp.delete_cookie("tgp_user")
+    resp.delete_cookie("acc")
     return resp
 
 
@@ -56,10 +58,10 @@ async def account_switch(id: int = Form(...), next: str = Form("/")):
 
 
 @router.post("/accounts/add")
-async def account_add(name: str = Form(...), phone: str = Form(...)):
+async def account_add(request: Request, name: str = Form(...), phone: str = Form(...)):
     if not (db.get_setting("api_id") and db.get_setting("api_hash")):
         return go("/settings", err="Avval API ID va API HASH ni kiriting")
-    aid = manager.create(name.strip() or "Akkaunt")
+    aid = manager.create(name.strip() or "Akkaunt", request.state.user["id"])
     try:
         await manager.get(aid).send_code(phone.strip())
     except Exception as e:

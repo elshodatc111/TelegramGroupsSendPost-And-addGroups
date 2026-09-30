@@ -214,7 +214,7 @@ class Sender:
                 log.warning("Yuborishda xato: job=%s guruh=%s: %s", job_id, t["title"], name, exc_info=name not in FRIENDLY)
                 event(aid, "error", name)
                 if to_bl:
-                    blacklist_add(aid, t["tg_id"], t["title"], friendly)
+                    blacklist_add(aid, t["tg_id"], t["title"], "Avto: " + friendly)
                     friendly += " (qora ro'yxatga qo'shildi)"
                 db.ex("UPDATE job_targets SET status='failed', error=?, sent_at=? WHERE id=?", (friendly, db.now(), t["id"]))
                 return True

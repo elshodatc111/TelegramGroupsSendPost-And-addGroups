@@ -1,0 +1,123 @@
+{% extends "base.html" %}{% block title %}Avto-topish{% endblock %}
+{% block content %}
+<div class="aj-head">
+  <div><div class="aj-eyebrow">Guruh o'sishi · Avtomatlashtirilgan</div><h1>Avto-topish va a'zo bo'lish</h1>
+    <p class="sub" style="color:var(--mut);margin:6px 0 0;max-width:640px">O'zbek auditoriyali faol guruhlarni topadi, qonuniylik filtridan o'tkazadi, kuniga belgilangan miqdorda a'zo bo'ladi va reklamaga tayyorlaydi.</p></div>
+  <form method="post" action="/autojoin/toggle?next=/autojoin%3Ftab%3D{{ tab }}" class="aj-master">
+    <label class="sw"><input type="checkbox" {% if cfg.active %}checked{% endif %} onchange="this.form.submit()"><i></i></label>
+    <div><b>{{ 'Avtomatik rejim yoqilgan' if cfg.active else 'Avtomatik rejim o\'chiq' }}</b><span>{% if not connected %}Akkaunt ulanmagan{% elif cfg.active %}Har 20 daqiqada tekshiriladi{% else %}Faqat qo'lda ishlaydi{% endif %}</span></div>
+  </form>
+</div>
+
+<nav class="aj-tabs">
+  <a href="/autojoin?tab=overview" class="{{ 'on' if tab == 'overview' }}">{{ ic('home') }} Umumiy</a>
+  <a href="/autojoin?tab=candidates" class="{{ 'on' if tab == 'candidates' }}">{{ ic('users') }} Nomzodlar {% if total %}<span class="n">{{ total }}</span>{% endif %}</a>
+  <a href="/autojoin?tab=bans" class="{{ 'on' if tab == 'bans' }}">{{ ic('shield') }} Taqiq ro'yxati <span class="n">{{ ban_total }}</span></a>
+  <a href="/autojoin?tab=settings" class="{{ 'on' if tab == 'settings' }}">{{ ic('settings') }} Sozlamalar</a>
+</nav>
+
+{% if tab == 'overview' %}
+{% set pct = [100, (today * 100 // (limit or 1))]|min %}
+<section class="aj-hero">
+  <div class="aj-ring"><svg width="132" height="132" viewBox="0 0 132 132"><circle class="t" cx="66" cy="66" r="55"/><circle class="p" cx="66" cy="66" r="55" stroke-dasharray="345.6" stroke-dashoffset="{{ 345.6 - 345.6 * pct / 100 }}"/></svg>
+    <div><b>{{ today }}<span style="font-size:16px;color:var(--mut)"> / {{ limit }}</span></b><small>bugun a'zo bo'lindi</small></div></div>
+  <div>
+    <div class="aj-funnel">
+      {% for name, n in funnel %}<div class="st"><b>{{ n }}</b><span>{{ name }}</span></div>{% endfor %}
+    </div>
+    {% if warm %}<div class="hint" style="margin-top:12px">{{ ic('layers') }} Isitish rejasi faol: {{ warm.day }}-kun, bugungi a'zo bo'lish limiti {{ warm.joins }}.</div>{% endif %}
+  </div>
+</section>
+
+<div class="aj-legal"><div class="ico">{{ ic('shield') }}</div><div><b>Qonuniylik filtri faol</b>Diniy, da'vat, zo'ravonlik, 18+, qimor, firibgarlik, giyohvand, siyosiy va gumonli mavzudagi guruhlar avtomatik a'zo bo'linmaydi. Ro'yxat <a href="/autojoin?tab=bans">Taqiq ro'yxati</a> bo'limida to'liq tahrirlanadi ({{ ban_total }} ta so'z). Filtr kalit so'zlarga asoslangan yordamchi vosita bo'lib, huquqiy kafolat bermaydi.</div></div>
+{% if cfg.daily_target > 15 %}<div class="note">{{ ic('alert') }}<div>Kuniga {{ cfg.daily_target }} ta a'zo bo'lish Telegram'da FloodWait yoki cheklovga olib kelishi mumkin. Yangi akkaunt uchun xavfsiz miqdor 5–15.</div></div>{% endif %}
+
+<div class="aj-two">
+  <div class="card" style="margin:0"><div class="card-h"><h2>{{ ic('play') }} Boshqaruv</h2><span class="mut small" id="prog">{% if running %}Qidiruv ketmoqda...{% endif %}</span></div>
+    <div class="aj-act">
+      <form method="post" action="/autojoin/search"><button class="btn blue" {% if running or not connected %}disabled{% endif %}>{{ ic('search') }} Hozir qidirish</button></form>
+      <form method="post" action="/autojoin/join-now"><button class="btn ok" {% if not connected %}disabled{% endif %}>{{ ic('user-plus') }} Hozir a'zo bo'lish</button></form>
+      <a class="btn sec" href="/autojoin?tab=candidates&s=review">{{ counts.get('review', 0) }} ta ko'rib chiqish</a></div>
+    <div class="aj-prog"><i id="pbar" style="width:{{ 100 if running else 0 }}%"></i></div>
+    <div class="hint" style="margin-top:14px">Faqat <b>toza</b> ("Tayyor") guruhlarga avtomatik a'zo bo'linadi. "Ko'rib chiqing" holatidagilar sizning tasdig'ingizni kutadi, "Taqiqlangan"lar hech qachon a'zo bo'linmaydi.</div>
+  </div>
+  <div class="card" style="margin:0"><div class="card-h"><h2>{{ ic('clock') }} So'nggi faollik</h2></div>
+    {% if recent %}<ul class="aj-feed">{% for c in recent %}<li><div class="aj-av">{{ (c.title or c.username)[:1]|upper }}</div><div class="m"><b>{{ c.title or c.username }}</b><span>@{{ c.username }} · {{ c.members or 0 }} a'zo</span></div><span class="badge {{ STAT_CLS.get(c.status, '') }}">{{ STAT_LABEL.get(c.status, c.status) }}</span></li>{% endfor %}</ul>
+    {% else %}<div class="empty">Hozircha faollik yo'q. «Hozir qidirish» ni bosing.</div>{% endif %}</div>
+</div>
+
+<div class="card" style="margin-top:22px"><div class="card-h"><h2>{{ ic('repeat') }} Qanday ishlaydi</h2></div>
+  <div class="aj-steps" style="margin-top:8px">
+    <div class="aj-step"><b>Qidirish</b><span>Kalit so'zlar bo'yicha ommaviy guruhlar topiladi.</span></div>
+    <div class="aj-step"><b>Tekshirish</b><span>A'zolar soni, kunlik faollik va o'zbek tili ulushi o'lchanadi.</span></div>
+    <div class="aj-step"><b>Filtrlash</b><span>Taqiq ro'yxati nom, tavsif va xabarlar bo'yicha qo'llanadi.</span></div>
+    <div class="aj-step"><b>A'zo bo'lish</b><span>Toza guruhlarga kuniga {{ limit }} tagacha, tasodifiy kechikish bilan.</span></div>
+    <div class="aj-step"><b>Reklama</b><span>{{ cfg.ad_wait_days }} kundan so'ng qoidalar tekshirilib, <i>avto-tayyor</i> tegi beriladi.</span></div>
+  </div></div>
+
+{% elif tab == 'candidates' %}
+<div class="aj-filter">
+  <input type="search" id="q" placeholder="Guruh nomi yoki @username bo'yicha qidirish">
+  <div class="chips"><a class="chip {{ 'on' if not flt }}" href="/autojoin?tab=candidates">Asosiylar</a>
+  {% for s in ['review','ready','approved','queued','joined','active','noads','blocked','low','failed','rejected'] %}{% if counts.get(s) %}<a class="chip {{ 'on' if flt == s }}" href="/autojoin?tab=candidates&s={{ s }}">{{ STAT_LABEL[s] }} · {{ counts[s] }}</a>{% endif %}{% endfor %}</div>
+  <form method="post" action="/autojoin/clear" style="margin-left:auto"><button class="btn ghost sm">Mos kelmaganlarni tozalash</button></form>
+</div>
+<div class="card" style="padding:0">
+{% if rows %}<div class="tbl-wrap" style="border:0"><table class="aj-tbl"><thead><tr><th>Guruh</th><th>Kategoriya</th><th>A'zolar</th><th>Faollik/kun</th><th>O'zbek</th><th>Ball</th><th>Holat</th><th></th></tr></thead><tbody id="rows">
+{% for c in rows %}<tr data-s="{{ (c.title or '')|lower }} {{ c.username }}"><td class="aj-name"><a href="https://t.me/{{ c.username }}" target="_blank" rel="noopener"><b>{{ c.title or c.username }}</b></a><span>@{{ c.username }}{% if c.reason %} · {{ c.reason }}{% endif %}</span></td>
+  <td>{% if c.status != 'blocked' %}{{ c.category or '—' }}{% else %}—{% endif %}</td><td>{{ '{:,}'.format(c.members or 0).replace(',', ' ') }}</td><td>{{ c.per_day|round(1) if c.per_day is not none else '—' }}</td><td>{{ c.uz or 0 }}%</td>
+  <td><div class="aj-score"><div class="bar"><i style="width:{{ [100, c.score or 0]|min }}%"></i></div><em>{{ (c.score or 0)|round|int }}</em></div></td>
+  <td><span class="badge {{ STAT_CLS.get(c.status, '') }}">{{ STAT_LABEL.get(c.status, c.status) }}</span></td>
+  <td class="nowrap">{% if c.status in ('review','ready','low','rejected') %}<form method="post" action="/autojoin/c/{{ c.id }}/approve{{ '?s=' ~ flt if flt }}" style="display:inline"><button class="btn sm ok">Tasdiqlash</button></form>{% endif %}
+    {% if c.status in ('review','ready','approved') %}<form method="post" action="/autojoin/c/{{ c.id }}/reject{{ '?s=' ~ flt if flt }}" style="display:inline"><button class="btn sm ghost">Rad</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<div class="empty" style="padding:40px">Bu bo'limda nomzod yo'q. Umumiy sahifadan «Hozir qidirish» ni bosing.</div>{% endif %}</div>
+
+{% elif tab == 'bans' %}
+<div class="aj-legal"><div class="ico">{{ ic('shield') }}</div><div><b>Taqiq ro'yxati — sizning nazoratingizda</b>Har bir kategoriya bo'yicha so'z qo'shing yoki olib tashlang (har qatorda bittadan). So'z <b>boshidan</b> moslanadi: <code>islom</code> → «islomiy» ham topiladi. So'z oxiriga <code>$</code> qo'ysangiz faqat butun so'z topiladi (masalan <code>vpn$</code>). Tekshiruv guruh nomi, tavsifi va oxirgi xabarlarida amal qiladi. Saqlangach, kutilayotgan nomzodlar qayta tekshiriladi.</div></div>
+
+<div class="aj-test"><div class="card-h" style="margin-bottom:8px"><h2>{{ ic('search') }} Tekshirib ko'rish</h2><span class="mut small">Matnni kiriting — qaysi taqiq so'z ushlanishini ko'rasiz</span></div>
+  <div class="aj-filter" style="margin:0"><input type="text" id="tt" placeholder="Masalan: Kripto va forex signallar guruhi" style="max-width:none;flex:1"><button type="button" class="btn sec" id="tb">Tekshirish</button></div><div class="res" id="tr"></div></div>
+
+<form method="post" action="/autojoin/bans/save">
+  <div class="aj-bans">
+    {% for c, txt in ban_text.items() %}{% set i = loop.index0 %}<div class="aj-ban"><header><b>{{ c }}</b><span class="cnt">{{ txt.split('\n')|select|list|length }}</span></header>
+      <textarea name="ban_{{ i }}" spellcheck="false">{{ txt }}</textarea></div>{% endfor %}
+    <div class="aj-ban own"><header><b>Mening taqiq so'zlarim</b><span class="cnt">{{ cfg.block_extra|length }}</span></header>
+      <textarea name="block_extra" spellcheck="false" placeholder="Masalan:&#10;reklama sotaman&#10;obuna bo'ling">{{ cfg.block_extra_raw }}</textarea>
+      <span class="mut tiny">O'zingizga kerak bo'lgan istalgan so'zni shu yerga yozing.</span></div>
+  </div>
+  <div class="aj-savebar"><span class="mut small">Jami <b>{{ ban_total }}</b> ta taqiq so'z faol</span>
+    <div class="actions"><button class="btn ghost" name="action" value="restore" onclick="return confirm('Standart ro\'yxat tiklansin? Sizning o\'zgarishlaringiz o\'chadi.')">Standartni tiklash</button><button class="btn" name="action" value="save">{{ ic('check') }} Saqlash</button></div></div>
+</form>
+
+{% else %}
+<form method="post" action="/autojoin/save">
+  <div class="card"><div class="card-h"><h2>{{ ic('users') }} Tanlov mezonlari</h2></div>
+    <div class="aj-set">
+      <div><label class="l">Kuniga a'zo bo'lish</label><input type="number" name="daily_target" value="{{ cfg.daily_target }}" min="1" max="100"></div>
+      <div><label class="l">Min. a'zolar soni</label><input type="number" name="min_members" value="{{ cfg.min_members }}" min="0"></div>
+      <div><label class="l">Min. faollik (xabar/kun)</label><input type="number" name="min_per_day" value="{{ cfg.min_per_day }}" min="0"></div>
+      <div><label class="l">Min. o'zbek tili (%)</label><input type="number" name="min_uz" value="{{ cfg.min_uz }}" min="0" max="100"></div>
+    </div>
+    <div class="aj-row" style="margin-top:14px"><div><b>Hammasini qo'lda tasdiqlash</b><span>Yoqilsa, toza guruhlar ham avtomatik a'zo bo'linmaydi — avval siz tasdiqlaysiz.</span></div><label class="sw"><input type="checkbox" name="manual_all" {% if cfg.manual_all %}checked{% endif %}><i></i></label></div></div>
+  <div class="card"><div class="card-h"><h2>{{ ic('clock') }} Vaqt va xavfsizlik</h2></div>
+    <div class="aj-set">
+      <div><label class="l">Reklamadan oldin kutish (kun)</label><input type="number" name="ad_wait_days" value="{{ cfg.ad_wait_days }}" min="0" max="30"></div>
+      <div><label class="l">A'zo bo'lish oralig'i, min (soniya)</label><input type="number" name="min_delay" value="{{ cfg.min_delay }}" min="30"></div>
+      <div><label class="l">A'zo bo'lish oralig'i, max (soniya)</label><input type="number" name="max_delay" value="{{ cfg.max_delay }}" min="30"></div>
+    </div><div class="hint">Kunlik limit isitish rejasi va akkauntning umumiy limitlari bilan birga hisobga olinadi.</div></div>
+  <div class="card"><div class="card-h"><h2>{{ ic('search') }} Qidiruv kalit so'zlari</h2><span class="mut small">Har qatorda bittadan</span></div>
+    <div class="aj-kw">{% for c in defaults %}<div><label class="l">{{ c }}</label><textarea name="kw_{{ c }}" spellcheck="false">{{ kw_text.get(c, '') }}</textarea></div>{% endfor %}</div></div>
+  <div class="aj-savebar"><span class="mut small">O'zgarishlar keyingi qidiruvdan boshlab amal qiladi</span><button class="btn">{{ ic('check') }} Saqlash</button></div>
+</form>
+{% endif %}
+
+<script>
+(function(){
+ var q=document.getElementById('q');if(q)q.addEventListener('input',function(){var v=q.value.toLowerCase();document.querySelectorAll('#rows tr').forEach(function(r){r.style.display=r.dataset.s.indexOf(v)>-1?'':'none'})});
+ var tb=document.getElementById('tb');if(tb){var go=function(){var fd=new FormData();fd.append('text',document.getElementById('tt').value);fetch('/autojoin/bans/test',{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(a){var o=document.getElementById('tr');o.innerHTML='';if(!a.length){o.innerHTML='<span class="aj-tag okk">Taqiq so\'z topilmadi</span>';return}a.forEach(function(x){var s=document.createElement('span');s.className='aj-tag';s.textContent=x.cat+' · '+x.word;o.appendChild(s)})})};tb.onclick=go;document.getElementById('tt').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();go()}})}
+ {% if running %}(function poll(){fetch('/api/autojoin/progress').then(function(r){return r.json()}).then(function(p){var e=document.getElementById('prog');if(p.running){e.textContent='Qidiruv: '+p.done+'/'+p.total+' · yangi: '+p.new;var b=document.getElementById('pbar');if(b)b.style.width=Math.max(5,p.done*100/p.total)+'%';setTimeout(poll,3000)}else{location.reload()}}).catch(function(){})})();{% endif %}
+})();
+</script>
+{% endblock %}

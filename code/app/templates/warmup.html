@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block title %}Isitish rejasi{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Akkaunt isitish rejasi</h1><p class="sub">Yangi akkauntni spamdan asrash: kunlik post va a'zo bo'lish limiti asta-sekin oshiriladi</p></div>
+  {% if w and w.active %}<span class="badge b-good">Faol{% if today %} · {{ today.day }}/{{ today.of }}-kun{% endif %}</span>{% else %}<span class="badge">Yoqilmagan</span>{% endif %}</div>
+{% if today %}
+<div class="grid g2" style="margin-bottom:18px">
+ <div class="card" style="margin:0"><div class="card-h"><h2>{{ ic('send') }} Bugungi postlar</h2><b>{{ posts }} / {{ today.posts }}</b></div><div class="bar"><i style="width:{{ [100, posts * 100 // (today.posts or 1)]|min }}%"></i></div></div>
+ <div class="card" style="margin:0"><div class="card-h"><h2>{{ ic('user-plus') }} Bugun a'zo bo'lish</h2><b>{{ joins }} / {{ today.joins }}</b></div><div class="bar blue"><i style="width:{{ [100, joins * 100 // (today.joins or 1)]|min }}%"></i></div></div>
+</div>
+<div class="note info">{{ ic('shield') }}<div>Limitga yetganda yuborish va a'zo bo'lish <b>to'xtab</b>, ertasi kuni avtomatik davom etadi. Akkauntning umumiy kunlik limiti ham amal qiladi.</div></div>
+{% elif w and w.active %}<div class="note">{{ ic('clock') }}<div>Reja hali boshlanmagan (boshlanish sanasi kelajakda).</div></div>
+{% elif w and w.start_date and not w.active and day and day > plan|length %}<div class="note info">{{ ic('check') }}<div>Reja tugagan: endi akkauntning oddiy limitlari amal qiladi.</div></div>{% endif %}
+<form method="post" action="/warmup/save" class="card">
+  <input type="hidden" name="n" value="{{ plan|length }}">
+  <div class="card-h"><h2>{{ ic('table') }} Kunlik reja</h2><span class="mut small">Qiymatlarni o'zgartirishingiz mumkin</span></div>
+  <div class="tbl-wrap" style="border:0"><table><thead><tr><th>Kun</th><th>Post limiti</th><th>A'zo bo'lish limiti</th><th>Holat</th></tr></thead><tbody>
+  {% for p in plan %}<tr {% if day == loop.index and w and w.active %}style="background:var(--pri-soft)"{% endif %}><td><b>{{ p.day }}</b></td>
+    <td><input type="number" name="p{{ p.day }}" value="{{ p.posts }}" min="0" max="1000" style="max-width:110px"></td>
+    <td><input type="number" name="j{{ p.day }}" value="{{ p.joins }}" min="0" max="200" style="max-width:110px"></td>
+    <td>{% if w and w.active and day %}{% if day > loop.index %}<span class="badge b-good">O'tgan</span>{% elif day == loop.index %}<span class="badge b-running">Bugun</span>{% else %}<span class="badge">Kutmoqda</span>{% endif %}{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+  <div class="row" style="margin-top:14px"><div><label class="l">Boshlanish sanasi</label><input type="date" name="start_date" value="{{ start_date }}" style="max-width:220px"></div></div>
+  <div class="actions" style="margin-top:14px">
+    {% if w and w.active %}<button class="btn bad" name="action" value="stop">{{ ic('stop') }} To'xtatish</button>{% else %}<button class="btn ok" name="action" value="start">{{ ic('play') }} Rejani yoqish</button>{% endif %}
+    <button class="btn" name="action" value="save">Saqlash</button>
+    <button class="btn sec" name="action" value="add">{{ ic('plus') }} Kun qo'shish</button><button class="btn sec" name="action" value="remove">Oxirgi kunni olib tashlash</button>
+    <button class="btn ghost" name="action" value="reset">Standart reja</button></div>
+  <div class="hint">Reja kunlari boshlanish sanasidan hisoblanadi. Barcha kunlar tugagach, reja o'chadi va oddiy limitlar qaytadi. Oldingi tajriba: yangi akkauntda birinchi haftada 3 tadan 25 tagacha postdan oshirmagan ma'qul.</div>
+</form>
+{% endblock %}

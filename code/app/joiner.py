@@ -7,7 +7,7 @@ from telethon import errors
 
 from . import db
 from .config import log
-from .limits import event, slow_factor, work_gate
+from .limits import event, slow_factor, warm_join_gate, work_gate
 from .telegram_service import NotAGroup
 
 FMT = "%Y-%m-%d %H:%M:%S"
@@ -146,6 +146,10 @@ class Joiner:
             wg = work_gate(aid)
             if wg:
                 self._wait_until(bid, wg[0], wg[1])
+                return
+            wj = warm_join_gate(aid)
+            if wj:
+                self._wait_until(bid, wj[0], wj[1])
                 return
             free_at = self._daily_wait(aid, b["daily_limit"])
             if free_at:

@@ -60,7 +60,11 @@ def scan_media():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from . import machine
+    wiped = machine.check()
     db.init()
+    if wiped:
+        db.set_setting("machine_notice", "Bu boshqa kompyuter: avvalgi akkauntlar va ma'lumotlar tozalandi. Akkauntni qaytadan qo'shib faollashtiring.")
     scan_media()
     db.ex("UPDATE jobs SET status='interrupted', next_at=NULL WHERE status IN ('running','queued')")
     db.ex("UPDATE job_targets SET status='pending' WHERE status='sending'")

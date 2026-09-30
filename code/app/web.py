@@ -106,6 +106,9 @@ def acc_id(request: Request):
 def page(request: Request, name: str, status_code: int = 200, **ctx):
     from .core import manager
     ctx.setdefault("msg", request.query_params.get("msg"))
+    if not ctx["msg"] and (n := db.get_setting("machine_notice")):
+        ctx["msg"] = n
+        db.del_setting("machine_notice")
     ctx.setdefault("err", request.query_params.get("err"))
     try:
         accounts = manager.list()

@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}Kanalni tanlang{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Kanalni tanlang</h1><p class="sub">Bu sahifa bitta kanal bilan ishlaydi. Yuqoridagi tanlagichdan yoki quyidan kanalni tanlang.</p></div></div>
+{% if not ch_list %}
+<div class="card empty" style="padding:50px 20px">{{ ic('layers') }}<h2>Hali kanal biriktirilmagan</h2>
+  <p>Avval akkaunt ulang, keyin admin bo'lgan kanallaringizdan kerakligini tanlang.</p>
+  <div class="actions" style="justify-content:center"><a class="btn" href="/ch/account">Akkaunt ulash</a><a class="btn sec" href="/ch/channels?scan=1">Kanallarni biriktirish</a></div></div>
+{% else %}
+<div class="grid g3">{% for c in ch_list %}
+<form method="post" action="/ch/select" class="card" style="margin:0"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="next" value="{{ request.url.path }}">
+  <div class="card-h"><h2><span class="ava" style="width:38px;height:38px">{{ c.title[:1]|upper }}</span> {{ c.title }}</h2></div>
+  <p class="mut small">{{ c.members|num }} obunachi{% if c.username %} · @{{ c.username }}{% endif %}</p>
+  <button class="btn sm">Tanlash</button></form>{% endfor %}</div>
+{% endif %}
+{% endblock %}

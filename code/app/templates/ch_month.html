@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block title %}Oylik reja{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Oylik kontent-reja</h1><p class="sub">AI reja tuzishda statistika, eng yaxshi soatlar, raqobatchi tahlili, izohlar, havola bosilishlari va A/B natijalaridan foydalanadi. Reja postlarga <b>qoralama</b> bo'lib tushadi: tekshirib, o'zingiz «Tasdiqlash» bosasiz.</p></div></div>
+<div class="card"><form method="post" action="/ch/month/new" data-busy="AI reja tuzmoqda (1–2 daqiqa)..." class="actions" style="align-items:end;flex-wrap:wrap">
+  <div><label class="l">Oy</label><select name="month"><option value="{{ next_month }}">{{ next_month }} (keyingi)</option><option value="{{ cur_month }}">{{ cur_month }} (joriy)</option></select></div>
+  <div style="flex:1;min-width:240px"><label class="l">Izoh (ixtiyoriy)</label><input type="text" name="note" placeholder="Masalan: yangi guruh e'loniga urg'u"></div>
+  <button class="btn">{{ ic('bulb') }} Reja tuzish</button></form>
+  {% if plans %}<div class="actions" style="margin-top:10px">{% for p in plans %}<a class="chip {{ 'on' if mcur and mcur.row.id == p.id }}" href="?id={{ p.id }}">{{ p.month }} · {{ p.created_at[5:10] }}</a>{% endfor %}</div>{% endif %}</div>
+{% if mcur %}{% set b = mcur.body %}
+<div class="card"><div class="card-h"><h2>{{ b.theme }}</h2><form method="post" action="/ch/month/{{ mcur.row.id }}/delete" style="margin:0" onsubmit="return confirm('Reja o\'chirilsinmi?')"><button class="btn ghost sm">{{ ic('trash') }}</button></form></div><p>{{ b.strategy }}</p></div>
+<form method="post" action="/ch/month/{{ mcur.row.id }}/push">
+<div class="card"><div class="card-h"><h2>Postlar ({{ b['items']|length }})</h2><button class="btn sm">Tanlanganlarni rejaga (qoralama)</button></div>
+{% for it in b['items'] %}<div id="i{{ loop.index0 }}" class="row" style="gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--bd)">
+  <input type="checkbox" name="pick" value="{{ loop.index0 }}" {{ 'disabled' if it.plan_id }} style="margin-top:6px">
+  <div style="flex:1"><b>{{ it.date }} {{ it.time }}</b> · {{ it.topic }} <span class="badge">{{ it.format }}</span> <span class="badge">{{ it.goal }}</span>{% if it.plan_id %} <a class="badge b-sent" href="/ch/plan?edit={{ it.plan_id }}">Rejada</a>{% endif %}
+    <div class="small">{{ it.brief }}</div><div class="hint">{{ it.rubric }} · {{ it.why }}</div>
+    {% if it.text %}<details><summary class="small">Post matni</summary><div style="white-space:pre-wrap" class="small">{{ it.text }}</div></details>{% endif %}</div>
+  {% if not it.plan_id %}<button class="btn sm sec" formaction="/ch/month/{{ mcur.row.id }}/write" name="idx" value="{{ loop.index0 }}" formnovalidate>{{ 'Qayta yozish' if it.text else 'Matn yozish' }}</button>{% endif %}
+</div>{% endfor %}</div></form>
+{% elif not plans %}<div class="card empty">Hali reja yo'q. Kamida bir oz postlar sinxronlangan bo'lsa, reja aniqroq chiqadi.</div>{% endif %}
+{% endblock %}

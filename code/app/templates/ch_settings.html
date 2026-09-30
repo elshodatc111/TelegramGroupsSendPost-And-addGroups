@@ -1,0 +1,59 @@
+{% extends "base.html" %}{% block title %}Sozlamalar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Kanallarim sozlamalari</h1><p class="sub">Kalitlar shifrlangan holda saqlanadi va faqat shu kompyuterda ochiladi.</p></div></div>
+
+<div class="card"><div class="card-h"><h2>Telegram API</h2></div>
+<form method="post" action="/ch/settings/api"><div class="grid g2">
+  <div><label class="l">API ID</label><input type="text" name="api_id" value="{{ api_id }}" required></div>
+  <div><label class="l">API HASH {% if has_hash %}<span class="badge b-good">saqlangan</span>{% endif %}</label><input type="password" name="api_hash" placeholder="{{ 'o\'zgartirish uchun kiriting' if has_hash else '' }}" autocomplete="off"></div></div>
+  <div class="hint">my.telegram.org → API development tools. Group Post bilan umumiy.</div>
+  <div class="actions" style="margin-top:12px"><button class="btn sm">Saqlash</button></div></form></div>
+
+<div class="card"><div class="card-h"><h2>OpenAI</h2>{% if has_key %}<span class="badge b-good">Kalit ...{{ key_tail }}</span>{% else %}<span class="badge b-bad">Kalit yo'q</span>{% endif %}</div>
+<form method="post" action="/ch/settings/openai" data-busy="Tekshirilmoqda..."><label class="l">API kalit (platform.openai.com)</label>
+  <input type="password" name="key" placeholder="sk-..." autocomplete="off"><div class="hint">Bo'sh yuborsangiz kalit o'chiriladi.</div>
+  <div class="actions" style="margin-top:12px"><button class="btn sm">Saqlash va tekshirish</button>{% if has_key %}<a class="btn sm sec" href="/ch/settings?models=1">Modellarni ko'rish</a>{% endif %}</div></form>
+{% if models_err %}<div class="note red">{{ ic('alert') }}<div>{{ models_err }}</div></div>{% endif %}
+<hr style="border:0;border-top:1px solid var(--bd);margin:18px 0">
+<form method="post" action="/ch/settings/models">
+  <div class="grid g2"><div><label class="l">G'oya va ssenariy modeli</label><input type="text" name="idea_model" value="{{ idea_model }}" list="mdls"></div>
+    <div><label class="l">Tahlil va xotira modeli (arzon)</label><input type="text" name="analysis_model" value="{{ analysis_model }}" list="mdls"></div></div>
+  <datalist id="mdls">{% for m in models %}<option value="{{ m }}">{% endfor %}</datalist>
+  <div class="grid g3"><div><label class="l">Kanal uchun oylik chegara (USD, 0 = yo'q)</label><input type="number" step="0.5" min="0" name="cap" value="{{ cap }}"></div>
+    <div><label class="l">Ma'lumot yig'ish (soatda bir)</label><input type="number" min="1" max="48" name="sync_hours" value="{{ sync_hours }}"></div>
+    <div><label class="l">Reja: kechikish chegarasi (soat)</label><input type="number" min="0" max="48" name="grace" value="{{ grace }}"></div></div>
+  <label style="display:flex;gap:10px;align-items:center;margin-top:12px"><span class="sw"><input type="checkbox" name="learn_on" value="1" {{ 'checked' if learn_on }}><i></i></span> Bilim xotirasini fonda boyitib borish</label>
+  <div class="actions" style="margin-top:12px"><button class="btn sm">Saqlash</button></div></form></div>
+
+<div class="card"><div class="card-h"><h2>Audio → matn (transkripsiya)</h2></div>
+<div class="grid g3">
+  <div class="stat {{ 'ok' if stt.ffmpeg else 'bad' }}"><div class="k">ffmpeg</div><div class="v" style="font-size:20px">{{ 'Bor' if stt.ffmpeg else 'Yo\'q' }}</div></div>
+  <div class="stat {{ 'ok' if stt.fw else 'bad' }}"><div class="k">faster-whisper</div><div class="v" style="font-size:20px">{{ 'O\'rnatilgan' if stt.fw else 'Yo\'q' }}</div></div>
+  <div class="stat {{ 'ok' if stt.gpu else '' }}"><div class="k">GPU (CUDA)</div><div class="v" style="font-size:20px">{{ 'Bor' if stt.gpu else 'Yo\'q (CPU)' }}</div></div></div>
+<form method="post" action="/ch/settings/stt" style="margin-top:12px"><div class="grid g3">
+  <div><label class="l">Rejim</label><select name="stt_mode">{% for k, l in (('auto','Avto (lokal, bo\'lmasa OpenAI)'),('local','Faqat lokal (bepul)'),('openai','Faqat OpenAI (pullik)'),('off','O\'chirilgan')) %}<option value="{{ k }}" {{ 'selected' if k == stt_mode }}>{{ l }}</option>{% endfor %}</select></div>
+  <div><label class="l">Lokal model</label><select name="whisper_model">{% for m in ('large-v3','medium','small','base') %}<option {{ 'selected' if m == whisper_model }}>{{ m }}</option>{% endfor %}</select></div>
+  <div><label class="l">OpenAI modeli</label><input type="text" name="stt_openai" value="{{ stt_openai }}"></div></div>
+  <div class="hint">GTX 1660 Super (6 GB) uchun tavsiya: large-v3, int8. GPU ishlamasa avtomatik protsessorga o'tadi.</div>
+  <div class="actions" style="margin-top:12px"><button class="btn sm">Saqlash</button></form>
+  {% if is_win and not stt.ready %}<form method="post" action="/ch/settings/install-whisper"><button class="btn sm sec">Lokal Whisper'ni o'rnatish</button></form>{% endif %}</div></div>
+
+<div class="card"><div class="card-h"><h2>Kuzatuv havolasi (Cloudflare Worker)</h2>{% if cf_url and has_cf_key %}<span class="badge b-good">Ulangan</span>{% else %}<span class="badge">Sozlanmagan</span>{% endif %}</div>
+<form method="post" action="/ch/settings/worker" data-busy="Tekshirilmoqda...">
+  <div class="grid g2"><div><label class="l">Worker manzili</label><input type="text" name="url" value="{{ cf_url }}" placeholder="https://atko-go.nom.workers.dev"></div>
+    <div><label class="l">SECRET {% if has_cf_key %}<span class="badge b-good">saqlangan</span>{% endif %}</label><input type="password" name="key" autocomplete="off" placeholder="{{ 'o\'zgartirish uchun kiriting' if has_cf_key else '' }}"></div></div>
+  <div class="hint">Sozlash qo'llanmasi: <b>code\tools\CLOUDFLARE.md</b> (kod: <b>cloudflare_worker.js</b>). Manzilni bo'sh qoldirib saqlasangiz, kuzatuv o'chadi.{% if cf_last %} Oxirgi yangilanish: {{ cf_last[:16] }}.{% endif %}</div>
+  <div class="actions" style="margin-top:12px"><button class="btn sm">Saqlash va tekshirish</button></div></form>
+{% if cf_url and has_cf_key %}<form method="post" action="/ch/settings/worker-sync" style="margin-top:8px"><button class="btn sm sec">Bosishlarni hozir yangilash</button></form>{% endif %}</div>
+
+<div class="card"><div class="card-h"><h2>Narxlar (1 mln token uchun USD)</h2></div>
+<form method="post" action="/ch/settings/prices"><div class="tbl-wrap"><table class="aj-tbl mini-tbl"><thead><tr><th>Model</th><th>Kirish</th><th>Chiqish</th><th>Keshlangan</th><th>Audio/daq</th><th>O'chirish</th></tr></thead><tbody>
+{% for p in prices %}<tr><td><input type="hidden" name="model" value="{{ p.model }}"><b>{{ p.model }}</b></td>
+  <td><input type="text" name="in_{{ p.model }}" value="{{ p.in_per_m }}" style="width:80px"></td><td><input type="text" name="out_{{ p.model }}" value="{{ p.out_per_m }}" style="width:80px"></td>
+  <td><input type="text" name="cached_{{ p.model }}" value="{{ p.cached_per_m }}" style="width:80px"></td><td><input type="text" name="audio_{{ p.model }}" value="{{ p.audio_per_min }}" style="width:80px"></td>
+  <td><input type="checkbox" name="del" value="{{ p.model }}" style="width:auto"></td></tr>{% endfor %}
+<tr><td><input type="text" name="new_model" placeholder="yangi model nomi"></td><td><input type="text" name="new_in" style="width:80px"></td><td><input type="text" name="new_out" style="width:80px"></td><td><input type="text" name="new_cached" style="width:80px"></td><td><input type="text" name="new_audio" style="width:80px"></td><td></td></tr>
+</tbody></table></div>
+<div class="hint">Boshlang'ich narxlar taxminiy. Aniq narxni platform.openai.com/pricing dan tekshirib kiriting.</div>
+<div class="actions" style="margin-top:12px"><button class="btn sm">Narxlarni saqlash</button></div></form></div>
+{% endblock %}

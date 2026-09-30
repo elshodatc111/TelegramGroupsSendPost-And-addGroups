@@ -1,0 +1,7 @@
+#!/bin/sh
+# Maxfiy fayl yoki kalit commit qilinmasin
+bad=$(git diff --cached --name-only | grep -E '(^|/)(data/|dbconf\.json|\.env$)|\.(session|db|sql|sql\.gz|key|pem)$' | grep -v 'data/README.txt')
+if [ -n "$bad" ]; then echo "COMMIT TO'XTATILDI: maxfiy fayllar bor:"; echo "$bad"; exit 1; fi
+if git diff --cached -U0 | grep -E '^\+.*(api_hash\s*=\s*["'"'"'][0-9a-f]{32}|sk-[A-Za-z0-9_-]{20,})' >/dev/null; then
+  echo "COMMIT TO'XTATILDI: kod ichida API kalit topildi"; exit 1; fi
+exit 0

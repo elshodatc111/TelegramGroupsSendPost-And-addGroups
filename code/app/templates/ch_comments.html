@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block title %}Izohlar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Izohlar tahlili</h1><p class="sub">Kanalda izohlar (muhokama guruhi) yoqilgan bo'lsagina ishlaydi. Izohlar matni tahlil uchun saqlanadi, ism va username saqlanmaydi.</p></div></div>
+{% if st.checked and not st.enabled %}
+<div class="card empty">{{ ic('message') }}<h2>Bu kanalda izohlar yoqilmagan</h2><p>Kanal sozlamalarida «Muhokama» (Discussion) ga guruh ulasangiz, bu bo'lim ishga tushadi.</p>
+  <form method="post" action="/ch/comments/collect"><button class="btn sec">Qayta tekshirish</button></form></div>
+{% else %}
+<div class="card"><div class="actions"><form method="post" action="/ch/comments/collect" data-busy="Yig'ilmoqda..." style="margin:0"><button class="btn sec">Izohlarni yig'ish</button></form>
+  <form method="post" action="/ch/comments/analyze" data-busy="AI tahlil qilmoqda..." style="margin:0"><button class="btn" {{ 'disabled' if n < 5 }}>{{ ic('bulb') }} AI bilan tahlil</button></form>
+  <span class="badge">{{ n }} ta izoh saqlangan</span></div>
+  {% if not st.checked %}<div class="hint">Avval «Izohlarni yig'ish» ni bosing: dastur izohlar yoqilganini tekshiradi.</div>{% endif %}</div>
+{% if rep %}
+<div class="card"><div class="card-h"><h2>Xulosa</h2><span class="badge">{{ rep_at[:16] }}</span></div><p>{{ rep.summary }}</p>
+  {% if rep.sentiment %}<div class="hint">Kayfiyat: ijobiy {{ rep.sentiment.positive }}% · neytral {{ rep.sentiment.neutral }}% · salbiy {{ rep.sentiment.negative }}%</div>{% endif %}</div>
+<div class="grid g2">
+<div class="card" style="margin:0"><div class="card-h"><h2>Tez-tez so'raladigan savollar</h2></div>{% for q in rep.questions or [] %}<p><b>{{ q.q }}</b> <span class="mut">×{{ q.count }}</span><br><span class="small">{{ q.answer_idea }}</span></p>{% else %}<div class="empty small">—</div>{% endfor %}</div>
+<div class="card" style="margin:0"><div class="card-h"><h2>E'tirozlar / shubhalar</h2></div>{% for q in rep.objections or [] %}<p><b>{{ q.text }}</b> <span class="mut">×{{ q.count }}</span><br><span class="small">{{ q.reply_idea }}</span></p>{% else %}<div class="empty small">—</div>{% endfor %}</div></div>
+<div class="card"><div class="card-h"><h2>Izohlardan kelib chiqqan post g'oyalari</h2></div><ul>{% for i in rep.content_ideas or [] %}<li>{{ i }}</li>{% endfor %}</ul></div>
+{% endif %}{% endif %}
+{% endblock %}

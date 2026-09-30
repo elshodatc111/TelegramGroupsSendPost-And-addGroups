@@ -1,0 +1,55 @@
+{% extends "base.html" %}{% block title %}Tahlil{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Tahlil: {{ ch.title }}</h1><p class="sub">Saqlangan postlardan hisoblangan ko'rsatkichlar (AI'siz) va AI xulosasi.</p></div>
+  <div class="actions">
+    {% for d in (7, 14, 30, 60) %}<a class="chip {{ 'on' if d == days }}" href="?days={{ d }}&comp={{ comp_id }}">{{ d }} kun</a>{% endfor %}
+    <form method="post" action="/ch/sync" data-busy="Boshlanmoqda..."><input type="hidden" name="next" value="/ch/analysis"><button class="btn sec">Yangilash</button></form></div></div>
+{% if prog and prog.running %}<div class="note info">{{ ic('clock') }}<div id="prog">Ma'lumot yig'ilmoqda: {{ prog.done }}/{{ prog.total }}</div></div>
+<script>setTimeout(function poll(){fetch('/ch/sync/status').then(r=>r.json()).then(p=>{if(p.running){document.getElementById('prog').textContent="Ma'lumot yig'ilmoqda: "+p.done+"/"+p.total;setTimeout(poll,3000)}else location.reload()}).catch(()=>{})},3000)</script>{% endif %}
+{% if not ai_ok %}<div class="note">{{ ic('alert') }}<div>AI xulosa uchun <a href="/ch/settings"><b>Sozlamalar</b></a> da OpenAI kalitini kiriting.</div></div>{% endif %}
+
+<div class="card"><div class="card-h"><h2>Yonma-yon taqqoslash</h2></div>
+<div class="tbl-wrap"><table class="aj-tbl mini-tbl"><thead><tr><th>Kanal</th><th>Obunachi</th><th>7 kun</th><th>Post/kun</th><th>O'rt. ko'rish</th><th>ER %</th><th>Reaksiya</th><th>Video %</th><th>Video (s)</th><th>Havola %</th><th>Matn uzunligi</th><th>Eng yaxshi soat</th></tr></thead><tbody>
+{% for r in table %}<tr {% if r.own %}style="background:var(--pri-soft)"{% endif %}>
+  <td><b>{{ r.name }}</b>{% if r.own %} <span class="badge b-good">Siz</span>{% endif %}</td><td>{{ r.members|num }}</td>
+  <td>{% if r.growth7 is none %}—{% else %}{{ '+' if r.growth7 > 0 }}{{ r.growth7 }}{% endif %}</td>
+  <td>{{ r.per_day }}</td><td>{{ r.avg_views|num }}</td><td>{{ r.er if r.er is not none else '—' }}</td><td>{{ r.avg_reactions }}</td>
+  <td>{{ r.video_share }}</td><td>{{ r.avg_video_sec or '—' }}</td><td>{{ r.link_share }}</td><td>{{ r.avg_len }}</td>
+  <td>{% for h in r.best_hours[:2] %}{{ '%02d'|format(h.hour) }}:00{{ ', ' if not loop.last }}{% else %}—{% endfor %}</td></tr>{% endfor %}
+</tbody></table></div></div>
+
+<div class="card"><div class="card-h"><h2>Faol soatlar va eng yaxshi postlar</h2>
+  <div class="actions"><a class="chip {{ 'on' if comp_id == 0 }}" href="?days={{ days }}&comp=0">Bizning kanal</a>
+  {% for c in comps %}<a class="chip {{ 'on' if comp_id == c.id }}" href="?days={{ days }}&comp={{ c.id }}">{{ c.title }}</a>{% endfor %}</div></div>
+<div class="hint">Hafta kuni × soat bo'yicha o'rtacha ko'rishlar (to'q rang = ko'proq).</div>
+<div class="heat" style="margin:8px 0 16px"><span></span>{% for h in range(24) %}<span>{{ h }}</span>{% endfor %}
+{% for w in range(7) %}<span>{{ heat.wd[w] }}</span>{% for h in range(24) %}{% set v = heat.grid[w][h] %}<i title="{{ v|num }} ko'rish" style="opacity:{{ (0.08 + 0.92 * v / heat.max) if heat.max else 0.08 }}"></i>{% endfor %}{% endfor %}</div>
+{% if top %}<div class="tbl-wrap"><table class="aj-tbl mini-tbl"><thead><tr><th>Sana</th><th>Tur</th><th>Matn</th><th>Ko'rish</th><th>ER %</th><th>Matnga aylantirilgan</th></tr></thead><tbody>
+{% for p in top %}<tr><td>{{ p.date[:16] }}</td><td>{{ MEDIA.get(p.media or 'text', p.media) }}{% if p.duration %} · {{ p.duration }}s{% endif %}</td>
+  <td style="max-width:420px">{{ (p.text or '')[:160] }}</td><td>{{ (p.views or 0)|num }}</td><td>{{ p.err }}</td><td>{% if p.transcript %}<span class="badge b-good">Ha</span>{% else %}—{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{% if comp_id and stt != 'off' %}<form method="post" action="/ch/analysis/comp-videos/{{ comp_id }}" data-busy="Video matnga aylantirilmoqda (bir necha daqiqa)..." style="margin-top:12px"><button class="btn sm sec">{{ ic('film') }} Eng ko'p ko'rilgan 3 videoni matnga aylantirish</button></form>{% endif %}
+{% else %}<div class="empty">Ma'lumot yo'q. «Yangilash» ni bosing.</div>{% endif %}</div>
+
+<div class="card" id="report"><div class="card-h"><h2>AI tahlil hisoboti</h2>
+  <form method="post" action="/ch/analysis/report" data-busy="AI tahlil qilmoqda..."><button class="btn sm" {{ '' if ai_ok else 'disabled' }}>{{ ic('cpu') }} Hisobot tayyorlash</button></form></div>
+{% if report %}<div class="hint">{{ report_at[:16] }}</div>
+  <p>{{ report.summary }}</p>
+  {% if report.competitors %}<h3>Raqobatchilar</h3>{% for c in report.competitors %}<div class="card" style="margin:8px 0;background:var(--surface2)"><b>{{ c.name }}</b><p class="small">{{ c.strategy }}</p>
+    <div class="grid g2"><div><b class="small">Kuchli</b><ul class="small">{% for s in c.strengths or [] %}<li>{{ s }}</li>{% endfor %}</ul></div><div><b class="small">Zaif</b><ul class="small">{% for s in c.weaknesses or [] %}<li>{{ s }}</li>{% endfor %}</ul></div></div>
+    {% if c.best_formats %}<div class="hint">Formatlar: {{ c.best_formats }}</div>{% endif %}</div>{% endfor %}{% endif %}
+  <div class="grid g2"><div><h3>Nima ishlayapti</h3><ul>{% for s in report.what_works or [] %}<li>{{ s }}</li>{% endfor %}</ul></div>
+    <div><h3>Bo'sh nishalar</h3><ul>{% for s in report.gaps or [] %}<li>{{ s }}</li>{% endfor %}</ul></div></div>
+  {% if report.own_channel %}<div class="grid g2"><div><h3>Bizning kuchli tomonlar</h3><ul>{% for s in report.own_channel.strengths or [] %}<li>{{ s }}</li>{% endfor %}</ul></div>
+    <div><h3>Bizning zaif tomonlar</h3><ul>{% for s in report.own_channel.weaknesses or [] %}<li>{{ s }}</li>{% endfor %}</ul></div></div>{% endif %}
+  {% if report.actions %}<h3>Harakatlar rejasi</h3><ol>{% for a in report.actions %}<li><b>{{ a.action }}</b><div class="hint">{{ a.why }}</div></li>{% endfor %}</ol>{% endif %}
+  {% if report.content_mix %}<h3>Tavsiya etilgan kontent aralashmasi</h3><p>{{ report.content_mix }}</p>{% endif %}
+{% else %}<div class="empty">Hisobot hali tayyorlanmagan.</div>{% endif %}</div>
+
+<div class="card" id="memo"><div class="card-h"><h2>Bilim xotirasi</h2>
+  <div class="actions"><form method="post" action="/ch/analysis/learn" data-busy="Yangilanmoqda..."><button class="btn sm sec" {{ '' if ai_ok else 'disabled' }}>Hozir yangilash</button></form>
+  <form method="post" action="/ch/analysis/video-format" data-busy="O'rganilmoqda..."><button class="btn sm sec" {{ '' if ai_ok else 'disabled' }}>{{ ic('film') }} Video formatni o'rganish</button></form></div></div>
+<div class="hint">AI yangi ma'lumotlardan fonda o'zi boyitib boradi{% if mem.version %} · v{{ mem.version }} · {{ mem.updated_at[:16] }}{% endif %}. Har bir yangi g'oya shunga tayanadi.</div>
+{% if mem.memo %}<div class="memo">{{ mem.memo }}</div>{% else %}<div class="empty">Hali bo'sh.</div>{% endif %}
+{% if mem.video_summary %}<h3 style="margin-top:16px">Video format</h3><div class="memo">{{ mem.video_summary }}</div>{% endif %}</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}Auditoriya{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Auditoriya tahlili</h1><p class="sub">Faqat yig'ma raqamlar: kim faol, til, Premium ulushi. Ismlar, telefonlar va ro'yxatlar saqlanmaydi va yuklab olinmaydi. Yosh Telegram'da yo'q, uni faqat lid anketasi orqali bilish mumkin.</p></div>
+  <div class="actions"><form method="post" action="/ch/stats/refresh" style="margin:0"><input type="hidden" name="next" value="/ch/audience"><button class="btn sm">{{ ic('refresh') }} Yangilash</button></form></div></div>
+{% if aud_err %}<div class="note red">{{ ic('alert') }}<div>{{ aud_err }}</div></div>{% endif %}
+{% if a %}
+<div class="grid g4">
+  <div class="stat blue"><div class="k">Obunachilar</div><div class="v">{{ a.total|num }}</div></div>
+  <div class="stat ok"><div class="k">Faol ulush</div><div class="v">{{ a.active_pct }}%</div></div>
+  <div class="stat"><div class="k">Premium</div><div class="v">{{ a.premium_pct }}%</div></div>
+  <div class="stat"><div class="k">Tekshirilgan qism</div><div class="v">{{ a.coverage }}%</div></div>
+</div>
+<div class="card" style="margin-top:14px"><div class="card-h"><h2>Faollik bo'yicha taqsimot</h2><span class="badge">{{ a.day }}</span></div>
+  {{ hbars([("Bugun/kecha faol", a.a_online or 0), ("Shu hafta faol", a.a_week or 0), ("Shu oy faol", a.a_month or 0), ("Uzoq vaqt kirmagan", a.a_long or 0), ("Bot", a.bots or 0), ("O'chirilgan", a.deleted or 0)], a.sampled) }}
+  <div class="hint">Telegram kanal a'zolarining hammasini bermasligi mumkin: {{ a.sampled|num }} ta a'zo tekshirildi ({{ a.coverage }}%). Natija shu qism bo'yicha, foizlar taxminiy.</div></div>
+{% if trend_chart %}<div class="card"><div class="card-h"><h2>Faol ulush dinamikasi (%)</h2></div>{{ trend_chart }}</div>{% endif %}
+{% else %}<div class="card empty">Auditoriya ma'lumoti hali yig'ilmagan. «Yangilash» ni bosing (kanal akkaunti ulangan va kanalga admin bo'lishi kerak).</div>{% endif %}
+<div class="card"><div class="card-h"><h2>Telegram rasmiy statistikasi</h2>{% if off.status and off.status.ok %}<span class="badge b-good">Faol</span>{% else %}<span class="badge">500+ obunachida</span>{% endif %}</div>
+{% if off.status and not off.status.ok %}<div class="note info">{{ ic('alert') }}<div>{{ off.status.msg }}</div></div>{% endif %}
+{% if lang_chart %}<h3 style="font-size:15px">Tillar</h3>{{ lang_chart }}{% endif %}
+{% if src_chart %}<h3 style="font-size:15px">Ko'rishlar manbalari</h3>{{ src_chart }}{% endif %}
+{% if not lang_chart and not src_chart %}<div class="hint">Kanal 500 dan oshgach til, soat, manba grafiklari shu yerda avtomatik paydo bo'ladi (Telegram shartiga ko'ra). Bu bo'lim o'zi yoqiladi, sozlash kerak emas.</div>{% endif %}</div>
+{% endblock %}

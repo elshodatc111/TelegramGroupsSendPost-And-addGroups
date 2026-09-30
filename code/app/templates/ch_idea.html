@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block title %}G'oya{% endblock %}
+{% block content %}
+{% set langs = b.langs or ['uz'] %}{% set LN = {'uz':"O'zbekcha",'ru':'Ruscha'} %}
+<div class="page-h"><div><h1>{{ idea.title }}</h1><p class="sub">{{ idea.created_at[:16] }} · {{ idea.model }} · {{ ((idea.tokens_in or 0) + (idea.tokens_out or 0))|num }} token · {{ (idea.cost or 0)|usd }}</p></div>
+  <div class="actions"><a class="btn sec" href="/ch/ideas">← G'oyalar</a>
+  <form method="post" action="/ch/ideas/{{ idea.id }}/delete" onsubmit="return confirm('G\'oya o\'chirilsinmi?')"><button class="btn ghost">{{ ic('trash') }}</button></form></div></div>
+<div class="grid g2">
+<div class="card" style="margin:0"><div class="card-h"><h2>Nega aynan shu g'oya</h2></div>
+  <ul>{% for w in b.why or [] %}<li>{{ w }}</li>{% endfor %}</ul>
+  {% if b.differentiation %}<b class="small">Raqobatchilardan farqi</b><p>{{ b.differentiation }}</p>{% endif %}
+  {% if b.sales_angle %}<b class="small">Sotuvga ta'siri</b><p>{{ b.sales_angle }}</p>{% endif %}
+  <div class="hint">Format: {{ b.format or '—' }} · Tavsiya vaqt: {{ b.best_time or '—' }}</div></div>
+<div class="card" style="margin:0"><div class="card-h"><h2>Baho bering</h2></div>
+  <form method="post" action="/ch/ideas/{{ idea.id }}/status"><textarea name="feedback" rows="3" placeholder="Nima yoqdi / yoqmadi? Keyingi g'oyalar shunga qarab yaxshilanadi">{{ idea.feedback or '' }}</textarea>
+  <div class="actions" style="margin-top:10px"><button class="btn sm" name="status" value="accepted">Yoqdi</button><button class="btn sm sec" name="status" value="rejected">Yoqmadi</button><button class="btn sm ghost" name="status" value="new">Yangi</button></div></form></div>
+</div>
+{% for lg in langs %}
+<div class="card"><div class="card-h"><h2>Post ({{ LN.get(lg, lg) }})</h2><button type="button" class="btn sm sec" data-copy="#post-{{ lg }}">Nusxa olish</button></div>
+  <div class="idea-post" id="post-{{ lg }}">{{ (b.post or {}).get(lg, '') }}</div>
+  {% if b.hashtags %}<div class="hint">{{ b.hashtags|join(' ') }}</div>{% endif %}</div>
+{% endfor %}
+{% if b.video and b.video.needed %}{% set v = b.video %}
+<div class="card"><div class="card-h"><h2>{{ ic('film') }} Video ssenariy · {{ v.duration_sec }} s</h2></div>
+  {% if v.style_note %}<p class="hint">{{ v.style_note }}</p>{% endif %}
+  {% for lg in langs %}<h3>{{ LN.get(lg, lg) }}</h3>
+  <div class="scene"><div class="tm">Hook</div><div><p>{{ (v.hook or {}).get(lg, '') }}</p></div></div>
+  {% for s in v.scenes or [] %}<div class="scene"><div class="tm">{{ s.time }}</div><div><p><b>Ko'rinish:</b> {{ s.visual }}</p><p><b>Ovoz:</b> {{ (s.voiceover or {}).get(lg, '') }}</p>{% if (s.on_screen or {}).get(lg) %}<p><b>Ekranda:</b> {{ s.on_screen.get(lg) }}</p>{% endif %}</div></div>{% endfor %}
+  <div class="scene"><div class="tm">CTA</div><div><p>{{ (v.cta_line or {}).get(lg, '') }}</p></div></div>
+  <b class="small">Video tagidagi matn</b><div class="idea-post" style="margin-top:6px">{{ (v.caption or {}).get(lg, '') }}</div>{% endfor %}
+  {% if v.shooting_note %}<div class="note info" style="margin-top:12px">{{ ic('film') }}<div><b>Suratga olish:</b> {{ v.shooting_note }}</div></div>{% endif %}</div>
+{% endif %}
+<div class="card"><div class="card-h"><h2>{{ ic('clock') }} Rejaga qo'shish</h2></div>
+{% if plan %}<div class="note info">{{ ic('clock') }}<div>Rejaga qo'shilgan: <a href="/ch/plan"><b>{{ plan.status }}</b></a> {{ plan.scheduled_at or '' }}</div></div>{% endif %}
+<form method="post" action="/ch/ideas/{{ idea.id }}/plan" enctype="multipart/form-data">
+  <div class="grid g2"><div><label class="l">Post tili</label><select name="lang">{% for lg in langs %}<option value="{{ lg }}">{{ LN.get(lg, lg) }}</option>{% endfor %}</select></div>
+    <div><label class="l">Yuborish vaqti (bo'sh = qoralama)</label><input type="datetime-local" name="when" min="{{ now }}"></div></div>
+  <label class="l">Rasm / video (ixtiyoriy, 10 tagacha)</label><input type="file" name="files" multiple accept="image/*,video/*">
+  <div class="hint">Lead havolasi post oxirida allaqachon bor. Matnni «Reja» sahifasida tahrirlashingiz mumkin.</div>
+  <div class="actions" style="margin-top:12px"><button class="btn">Rejaga qo'shish</button></div></form></div>
+{% endblock %}

@@ -162,6 +162,9 @@ async def rules_progress(request: Request):
 
 
 # ---------------- yangi guruhlarni topish ----------------
+from .discovery import PRESET_SETS  # noqa: E402
+
+
 def get_cfg_min(aid):
     from .auditor import get_cfg
     return get_cfg(aid)["min_members"]
@@ -183,7 +186,37 @@ async def discover(request: Request, q: str = ""):
             hidden = st.get("hidden", {})
         except Exception as e:
             error = f"Qidirishda xato: {e}"
-    return page(request, "discover.html", q=q, results=results, error=error, hidden=hidden, min_members=get_cfg_min(aid))
+    return page(request, "discover.html", q=q, results=results, error=error, hidden=hidden, preset_sets=PRESET_SETS, min_members=get_cfg_min(aid))
+
+
+@router.post("/discover/preset-to-autojoin")
+async def preset_to_autojoin(request: Request, set: str = Form("")):
+    """Tanlangan tayyor so'zlar to'plamini Avto-topish qidiruv so'zlariga qo'shadi."""
+    if (r := need_account(request)):
+        return r
+    from . import discovery
+    if set not in discovery.PRESET_SETS:
+        return go("/discover", err="Noma'lum to'plam")
+    presets, category = discovery.PRESET_SETS[set]
+    aid = acc_id(request)
+    cfg = discovery.get_cfg(aid)
+    kws = {k: list(v) for k, v in cfg["keywords"].items()}
+    cur = kws.setdefault(category, [])
+    have = {x.lower() for x in cur}
+    add = []
+    for ws in presets.values():
+        for w in ws:
+            if w.lower() not in have:
+                have.add(w.lower())
+                add.append(w)
+    cur.extend(add)
+    db.ex("UPDATE autojoin SET keywords_json=? WHERE account_id=?", (json.dumps(kws, ensure_ascii=False), aid))
+    return go("/discover", msg=f"{len(add)} ta so'z Avto-topish qidiruviga qo'shildi ({category})")
+
+
+@router.post("/discover/korean-to-autojoin")
+async def korean_to_autojoin(request: Request):
+    return await preset_to_autojoin(request, set="Koreys tili kurslari")
 
 
 @router.post("/discover/join")

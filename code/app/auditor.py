@@ -169,7 +169,7 @@ async def run_all(aid: int) -> dict:
 
 
 async def tick():
-    for a in db.q("SELECT a.* FROM accounts a JOIN audit_cfg c ON c.account_id=a.id WHERE c.auto=1"):
+    for a in db.q("SELECT a.* FROM accounts a JOIN audit_cfg c ON c.account_id=a.id WHERE c.auto=1 AND a.workspace='posting'"):
         aid = a["id"]
         svc = manager.services.get(aid)
         if not svc or not svc.info or progress.get(aid, {}).get("running"):

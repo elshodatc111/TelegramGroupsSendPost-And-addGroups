@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% block title %}A/B sinov{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>A/B sinov</h1><p class="sub">Telegram auditoriyani ikkiga bo'la olmaydi, shuning uchun A va B postlar bir xil soatda, turli kunlarda chiqadi va farq ko'rishlar, reaksiyalar va havola bosilishi bo'yicha baholanadi. Bitta sinov yo'nalishni ko'rsatadi, isbot emas.</p></div></div>
+<div class="grid g2">
+<div class="card" style="margin:0"><div class="card-h"><h2>{{ ic('bulb') }} AI variant taklif qilsin</h2></div>
+  <form method="post" action="/ch/ab/new" data-busy="AI o'ylamoqda...">
+    <label class="l">Mening matnim (A variant, ixtiyoriy)</label><textarea name="base" rows="4" placeholder="Bo'sh qoldirsangiz AI ikkala variantni yozadi. Yozsangiz A o'zgarmaydi, AI faqat B ni taklif qiladi."></textarea>
+    <label class="l">Yoki g'oyadan</label><select name="idea_id"><option value="">—</option>{% for i in ideas %}<option value="{{ i.id }}">{{ i.title[:70] }}</option>{% endfor %}</select>
+    <label class="l">Izoh (ixtiyoriy)</label><input type="text" name="note" placeholder="Masalan: sarlavhani sinab ko'raylik">
+    <div class="actions" style="margin-top:12px"><button class="btn">Variant so'rash</button></div></form></div>
+<div class="card" style="margin:0"><div class="card-h"><h2>{{ ic('edit') }} O'z variantlarim</h2></div>
+  <form method="post" action="/ch/ab/manual"><label class="l">A variant</label><textarea name="a" rows="3" required></textarea><label class="l">B variant</label><textarea name="b" rows="3" required></textarea>
+    <div class="actions" style="margin-top:12px"><button class="btn sec">Saqlash</button></div></form></div></div>
+{% for t in tests %}
+<div class="card" style="margin-top:14px"><div class="card-h"><h2>#{{ t.id }} {{ t.title }}</h2><span class="badge {{ 'b-sent' if t.status == 'done' else 'b-running' if t.status == 'running' else '' }}">{{ {'draft': 'Qoralama', 'running': 'Davom etmoqda', 'done': 'Tugadi'}.get(t.status, t.status) }}</span></div>
+  {% if t.data.how_to_read %}<div class="hint">{{ t.data.how_to_read }}</div>{% endif %}
+  {% if t.status == 'draft' %}
+  <form method="post" action="/ch/ab/{{ t.id }}/schedule"><div class="grid g2">
+    <div><label class="l">A variant</label><textarea name="a" rows="7">{{ t.data.a }}</textarea></div>
+    <div><label class="l">B variant</label><textarea name="b" rows="7">{{ t.data.b }}</textarea></div></div>
+    <div class="actions" style="align-items:end;margin-top:10px"><div><label class="l">A chiqadigan vaqt</label><input type="datetime-local" name="when" value="{{ now }}" required></div>
+      <div><label class="l">B necha kundan keyin</label><input type="number" name="gap" value="2" min="1" max="14" style="width:90px"></div>
+      <button class="btn">Rejaga qo'shish</button></div></form>
+  <form method="post" action="/ch/ab/{{ t.id }}/delete" style="margin-top:8px"><button class="btn ghost sm">{{ ic('trash') }} O'chirish</button></form>
+  {% else %}
+  {% set e = t.eval %}
+  {% if e and e.metrics %}<div class="tbl-wrap"><table class="aj-tbl mini-tbl"><thead><tr><th></th><th>Holat</th><th>Ko'rish</th><th>Reaksiya</th><th>Forward</th><th>Havola</th></tr></thead><tbody>
+    {% for v in ('A', 'B') if e.metrics.get(v) %}{% set m = e.metrics[v] %}<tr><td><b>{{ v }}</b>{% if t.winner == v %} 🏆{% endif %}</td><td>{{ m.status }}</td><td>{{ m.views|num if m.views is not none else '—' }}</td><td>{{ m.reactions if m.reactions is not none else '—' }}</td><td>{{ m.forwards if m.forwards is not none else '—' }}</td><td>{{ m.clicks }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  <p><b>{{ e.verdict if e else 'Natija hali yo\'q' }}</b></p>
+  <form method="post" action="/ch/ab/{{ t.id }}/evaluate"><button class="btn sm sec">Natijani yangilash</button></form>{% endif %}
+</div>{% else %}<div class="card empty" style="margin-top:14px">Hali sinov yo'q.</div>{% endfor %}
+{% endblock %}

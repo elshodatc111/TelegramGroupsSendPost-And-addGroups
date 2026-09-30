@@ -23,10 +23,91 @@ DEFAULT_KEYWORDS = {
                                        "bog'cha tarbiyachilar", "abituriyent", "ota-onalar guruhi", "oliy ta'lim"],
     "Biznes": ["biznes uz", "tadbirkorlar", "tadbirkorlik", "savdo uzbekistan", "startap uz", "marketing uz", "smm uz",
                "onlayn savdo", "biznes hamjamiyat", "hamkorlik biznes"],
-    "Koreys tili": ["koreys tili", "koreya uz", "topik", "koreyada ish", "janubiy koreya o'zbeklar", "koreys tili kursi",
-                    "korea uzbek", "eps topik"],
+    "Koreys tili": ["koreys tili", "koreys tili o'rganish", "koreys tili online", "koreys tili kursi", "topik", "eps topik",
+                    "koreyada ish", "koreyada o'qish", "koreya vizasi", "janubiy koreya o'zbeklar", "koreya o'zbeklari", "kpop uzbek", "kdrama uzbek"],
+    "Hudud: Qoraqalpog'iston / Xorazm": ["Nukus", "Nukus maktab", "Nukus universitet", "Nukus talabalar", "Nukus o'quv markaz",
+                                         "Qoraqalpog'iston", "Qoraqalpog'iston talabalar", "Qoraqalpog'iston ta'lim", "Xorazm",
+                                         "Xorazm maktab", "Xorazm universitet", "Urganch", "Urganch talabalar", "Urganch o'quv markaz",
+                                         "Xiva", "Nukus koreys tili", "Xorazm koreys tili", "Qaraqalpaqstan", "Нукус", "Ургенч"],
     "Avtomatlashtirish": ["avtomatlashtirish", "crm uz", "biznes avtomatlashtirish", "1c uz", "chat bot biznes",
                           "raqamli marketing", "onlayn do'kon", "sotuv avtomatlashtirish"],
+}
+
+# Koreys tili kurslari reklamasi uchun tayyor auditoriya so'zlari (Guruh qidirish sahifasida chip sifatida chiqadi)
+KOREAN_PRESETS = {
+    "Koreys tilini o'rganish": ["koreys tili", "koreys tili o'rganish", "koreys tili online", "koreys tili kursi", "koreys tili darslari",
+                                "koreys tili offline", "koreys tili toshkent", "koreys tili boshlang'ich", "hangul", "koreys alifbosi",
+                                "koreys tili lug'at", "koreys tili o'zbek tilida", "koreys tili guruh"],
+    "TOPIK / EPS-TOPIK": ["topik", "topik 1", "topik 2", "eps topik", "eps topik imtihon", "topik tayyorgarlik", "topik uzbekistan",
+                          "koreys tili imtihon", "topik testlar", "eps topik darslik"],
+    "Koreyada ish va viza": ["koreyada ish", "koreyaga ketish", "koreya ish e'lonlari", "koreya vizasi", "e-9 viza", "koreya ishchilar",
+                             "janubiy koreya o'zbeklar", "koreya o'zbeklari", "koreyada yashash", "koreya ishga borish"],
+    "Koreyada o'qish": ["koreyada o'qish", "koreya universitetlari", "gks stipendiya", "kgsp", "koreya grant", "koreya stipendiya",
+                        "koreyaga o'qishga kirish", "koreya talabalari uzbek", "koreya til markazi"],
+    "Koreys madaniyati": ["kpop uzbek", "k-pop", "kdrama uzbek", "koreys seriallari", "koreys seriallari o'zbek tilida", "koreys madaniyati",
+                          "koreys filmlari uzbek", "bts uzbek", "koreya kosmetika", "koreys taomlari"],
+    "Ruscha / kirillcha": ["корейский язык ташкент", "корейский язык онлайн", "курсы корейского языка", "изучение корейского языка",
+                           "корейский язык для начинающих", "работа в корее", "topik узбекистан", "корея узбеки", "корейский язык узбекистан"],
+}
+
+# Ta'lim muassasalari uchun tayyor so'zlar
+EDU_PRESETS = {
+    "Universitet / OTM / institut": [
+        "universitet", "oliy ta'lim muassasasi", "OTM talabalari", "institut talabalari", "talabalar guruhi", "talabalar chat",
+        "1-kurs talabalari", "2-kurs talabalari", "3-kurs talabalari", "4-kurs talabalari", "bitiruvchi kurs", "abituriyent",
+        "abituriyentlar 2026", "DTM", "DTM test", "qabul 2026", "magistratura", "bakalavr", "kontrakt talabalar", "grant talabalar",
+        "stipendiya", "talabalar yotoqxonasi", "universitet e'lonlari", "universitet talabalari", "xalqaro universitet",
+        "pedagogika universiteti", "tibbiyot universiteti", "texnika universiteti", "iqtisodiyot universiteti", "davlat universiteti",
+        "TATU", "TDIU", "TDYU", "SamDU", "NamDU", "AndDU", "FarDU", "BuxDU", "UrDU", "QDU", "NDPI", "university uzbekistan"],
+    "Maktab": [
+        "maktab", "maktab ota-onalar", "sinf ota-onalar guruhi", "1-sinf ota-onalar", "5-sinf ota-onalar", "9-sinf ota-onalar",
+        "11-sinf bitiruvchilar", "maktab o'qituvchilari", "maktab direktorlari", "maktab e'lonlari", "ixtisoslashtirilgan maktab",
+        "prezident maktabi", "IDUM", "sinf rahbarlari", "boshlang'ich sinf o'qituvchilari", "matematika o'qituvchilari",
+        "ona tili o'qituvchilari", "ingliz tili o'qituvchilari", "maktab olimpiada", "olimpiada tayyorgarlik", "bitiruvchilar 2026",
+        "o'quvchilar guruhi", "umumiy o'rta ta'lim maktabi", "xalq ta'limi", "o'qituvchilar"],
+    "Bog'cha / MTT": [
+        "bog'cha", "bog'cha tarbiyachilar", "bog'cha ota-onalar", "maktabgacha ta'lim", "maktabgacha ta'lim tashkiloti", "MTT",
+        "MTT tarbiyachilari", "bolalar bog'chasi", "bog'cha direktorlari", "davlat bog'chasi", "xususiy bog'cha", "tarbiyachi va enagalar",
+        "maktabga tayyorlov", "bog'cha metodistlar", "ota-onalar bog'cha guruhi"],
+    "Texnikum / kollej": [
+        "texnikum", "kollej", "kasb-hunar kolleji", "politexnikum", "texnikum talabalari", "kollej talabalari", "texnikum abituriyent",
+        "pedagogika kolleji", "tibbiyot texnikumi", "iqtisodiyot texnikumi", "moliya kolleji", "agrar texnikum", "avtomobil yo'llari texnikumi",
+        "kasb-hunar maktabi", "texnikum qabul", "kollej qabul 2026", "texnikum yotoqxona", "IT kollej", "raqamli texnologiyalar texnikumi",
+        "texnikum bitiruvchilari", "kollej guruhi", "texnikum e'lonlari"],
+    "O'quv markaz / kurslar": [
+        "o'quv markaz", "ta'lim markazi", "o'quv kurslari", "repetitor", "til kurslari", "IT kurslar", "abituriyent kurslar",
+        "tayyorlov kurslari", "bilim markazi", "onlayn ta'lim", "masofaviy ta'lim", "o'qituvchilar guruhi", "ingliz tili kurslari",
+        "rus tili kurslari", "matematika kursi", "dasturlash kursi", "kasb o'rgatish kurslari", "buxgalteriya kursi", "SMM kursi"],
+}
+
+# Qoraqalpog'iston, Xorazm, Nukus tomonlari uchun qidiruv so'zlari (joy nomi x mavzu + qoraqalpoq/rus tilidagi variantlar)
+_PLACES = ["Nukus", "Qoraqalpog'iston", "Xorazm", "Urganch", "Xiva"]
+_TOPICS = ["maktab", "universitet", "talabalar", "kollej", "texnikum", "bog'cha", "o'quv markaz", "ta'lim", "mahalla", "yoshlar",
+           "ish e'lonlari", "tadbirkorlar", "onlayn savdo", "ota-onalar", "o'qituvchilar"]
+REGION_PRESETS = {
+    "Nukus": [f"Nukus {t}" for t in _TOPICS] + ["Nukus", "Nukus chat", "Nukus yangiliklari", "Nukus davlat pedagogika instituti", "Nukus filiali"],
+    "Qoraqalpog'iston": [f"Qoraqalpog'iston {t}" for t in _TOPICS] + ["Qoraqalpog'iston", "Qoraqalpog'iston yangiliklari", "Qoraqalpog'iston respublikasi",
+                                                                    "Qoraqalpoq davlat universiteti", "Qoraqalpoq talabalari", "Qoraqalpoq yoshlari"],
+    "Xorazm / Urganch / Xiva": [f"{p} {t}" for p in ("Xorazm", "Urganch", "Xiva") for t in _TOPICS[:11]] +
+                               ["Urganch davlat universiteti", "Xorazm Ma'mun akademiyasi", "Xorazm viloyati", "Urganch chat", "Xiva chat"],
+    "Tumanlar": [f"{t} {topic}" for t in ("Shovot", "Xonqa", "Bog'ot", "Qo'shko'pir", "Yangiariq", "Yangibozor", "Gurlan", "Hazorasp",
+                                         "Tuproqqal'a", "Xo'jayli", "To'rtko'l", "Beruniy", "Qo'ng'irot", "Mo'ynoq", "Chimboy", "Kegeyli",
+                                         "Shumanay", "Amudaryo", "Ellikqal'a", "Taxtako'pir", "Bo'zatov", "Qanliko'l", "Taxiatosh")
+                 for topic in ("chat", "maktab")],
+    "Qoraqalpoq tilida (lotin)": ["Qaraqalpaqstan", "Qaraqalpaq", "Nokis", "Nokis mektep", "Nokis universitet", "Qaraqalpaq tili",
+                                  "Qaraqalpaqstan janaliqlari", "mektep", "mektep oqiwshilari", "mugallimler", "bilimlendiriw",
+                                  "oqiw orayi", "oqiw orayi Nokis", "studentler", "kollej Nokis", "balalar baqshasi", "jumis Nokis",
+                                  "Qaraqalpaqstan jumis", "Qaraqalpaqstan jaslari", "koreys tili Nokis"],
+    "Ruscha / kirillcha": ["Нукус", "Нукус чат", "Нукус школа", "Нукус университет", "Нукус учебный центр", "Нукус колледж", "Нукус работа",
+                           "Каракалпакстан", "Каракалпакстан новости", "Каракалпакстан студенты", "Нөкис", "Қарақалпақстан",
+                           "Ургенч", "Ургенч университет", "Ургенч школа", "Ургенч работа", "Хорезм", "Хорезм студенты", "Хива"],
+}
+
+# Sahifadagi "tayyor so'zlar" bo'limlari: sarlavha -> (guruhlar, Avto-topishdagi kategoriya)
+PRESET_SETS = {
+    "Koreys tili kurslari": (KOREAN_PRESETS, "Koreys tili"),
+    "Ta'lim muassasalari": (EDU_PRESETS, "Universitet / maktab / bog'cha"),
+    "Qoraqalpog'iston, Xorazm, Nukus": (REGION_PRESETS, "Hudud: Qoraqalpog'iston / Xorazm"),
 }
 
 # Standart taqiq ro'yxati (foydalanuvchi sahifada tahrirlashi mumkin). So'z boshidan moslik: "islom" -> "islomiy" ham topiladi.
@@ -402,7 +483,7 @@ async def activate_ready(aid: int):
 
 # ---------------- kunlik sikl ----------------
 async def tick():
-    for a in db.q("SELECT a.* FROM accounts a JOIN autojoin j ON j.account_id=a.id WHERE j.active=1"):
+    for a in db.q("SELECT a.* FROM accounts a JOIN autojoin j ON j.account_id=a.id WHERE j.active=1 AND a.workspace='posting'"):
         aid = a["id"]
         svc = manager.services.get(aid)
         if not svc or not svc.info:

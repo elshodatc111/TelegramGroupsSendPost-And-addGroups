@@ -22,7 +22,7 @@ async def leave_group(aid: int, tg_id: int, title: str, reason: str, auto: bool)
 
 
 async def run_once():
-    for a in db.q("SELECT * FROM accounts"):
+    for a in db.q("SELECT * FROM accounts WHERE workspace='posting'"):
         uid = a["user_id"] or 1
         svc = manager.services.get(a["id"])
         if not svc or not svc.info or not leave_settings(uid)["on"]:

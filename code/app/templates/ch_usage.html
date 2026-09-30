@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}AI sarfi{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>AI sarfi (token va narx)</h1><p class="sub">Har bir kanal uchun alohida hisob. Kanal o'chirilsa ham sarf hisobi saqlanadi.</p></div>
+  <div class="actions">{% for m in months %}<a class="chip {{ 'on' if m == month }}" href="?month={{ m }}">{{ m }}</a>{% endfor %}
+  <a class="btn sec" href="/ch/usage.xlsx?month={{ month }}">Excel</a></div></div>
+<div class="grid g3">
+  <div class="stat"><div class="k">So'rovlar</div><div class="v">{{ tot.calls|num }}</div></div>
+  <div class="stat blue"><div class="k">Token (kirish / chiqish)</div><div class="v" style="font-size:22px">{{ tot.tin|num }} / {{ tot.tout|num }}</div></div>
+  <div class="stat pri"><div class="k">Jami xarajat</div><div class="v">{{ tot.cost|usd }}</div></div></div>
+<div class="card" style="margin-top:16px"><div class="card-h"><h2>Kanallar bo'yicha · {{ month }}</h2></div>
+{% if summary %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Kanal</th><th>So'rov</th><th>Kirish token</th><th>Chiqish token</th><th>Audio</th><th>Xarajat</th></tr></thead><tbody>
+{% for c in summary %}<tr><td><b>{{ c.title }}</b></td><td>{{ c.calls }}</td><td>{{ c.tin|num }}</td><td>{{ c.tout|num }}</td><td>{{ (c.audio / 60)|round(1) }} daq</td>
+  <td><b>{{ c.cost|usd }}</b>{% if c.unpriced %} <span class="badge" title="Ba'zi modellar uchun narx kiritilmagan">narx yo'q</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Bu oyda sarf yo'q.</div>{% endif %}</div>
+{% if sel %}<div class="card"><div class="card-h"><h2>Batafsil: {{ sel.title }}</h2></div>
+{% if detail %}<div class="tbl-wrap"><table class="aj-tbl mini-tbl"><thead><tr><th>Vaqt</th><th>Maqsad</th><th>Model</th><th>Kirish</th><th>Chiqish</th><th>Xarajat</th><th>Izoh</th></tr></thead><tbody>
+{% for r in detail %}<tr><td>{{ r.ts[:16] }}</td><td>{{ r.purpose }}</td><td>{{ r.model }}</td><td>{{ r.tokens_in|num }}</td><td>{{ r.tokens_out|num }}</td><td>{{ r.cost|usd }}</td><td>{{ r.note }}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Yozuv yo'q.</div>{% endif %}</div>{% endif %}
+{% endblock %}

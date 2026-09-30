@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}Postlar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>O'z postlarimiz: {{ ch.title }}</h1><p class="sub">Oxirgi 60 kun. ER = ko'rishlar / obunachilar.</p></div>
+  <div class="actions">{% for k, l in (('date','Sana'),('views','Ko\'rish'),('err','ER')) %}<a class="chip {{ 'on' if sort == k }}" href="?sort={{ k }}">{{ l }}</a>{% endfor %}</div></div>
+<div class="grid g3">
+  <div class="stat"><div class="k">30 kunda postlar</div><div class="v">{{ stats.posts }}</div></div>
+  <div class="stat blue"><div class="k">O'rtacha ko'rish</div><div class="v">{{ stats.avg_views|num }}</div></div>
+  <div class="stat"><div class="k">Video ulushi</div><div class="v">{{ stats.video_share }}%</div></div></div>
+<div class="card" style="margin-top:16px">
+{% if rows %}<div class="tbl-wrap"><table class="aj-tbl mini-tbl"><thead><tr><th>Sana</th><th>Tur</th><th>Matn</th><th>Ko'rish</th><th>Reaksiya</th><th>Forward</th><th>ER %</th><th></th></tr></thead><tbody>
+{% for p in rows %}<tr><td>{{ p.date[:16] }}</td><td>{{ MEDIA.get(p.media or 'text', p.media) }}{% if p.duration %} · {{ p.duration }}s{% endif %}</td>
+  <td style="max-width:420px">{{ (p.text or '')[:140] }}{% if p.transcript %}<div class="hint">Matn: {{ p.transcript[:140] }}…</div>{% endif %}</td>
+  <td>{{ (p.views or 0)|num }}</td><td>{{ p.reactions or 0 }}</td><td>{{ p.forwards or 0 }}</td><td>{{ p.err }}</td>
+  <td>{% if p.media == 'video' and not p.transcript and stt != 'off' %}<form method="post" action="/ch/posts/{{ p.id }}/transcribe" data-busy="..."><button class="btn sm sec">Matnga</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>{% else %}<div class="empty">Post topilmadi. Tahlil bo'limida «Yangilash» ni bosing.</div>{% endif %}</div>
+{% endblock %}

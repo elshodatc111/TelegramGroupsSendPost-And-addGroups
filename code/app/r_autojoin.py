@@ -90,7 +90,7 @@ async def autojoin_save(request: Request):
     for c in discovery.DEFAULT_KEYWORDS:
         lst = [x.strip() for x in (f.get("kw_" + c) or "").splitlines() if x.strip()]
         if lst:
-            kws[c] = lst[:40]
+            kws[c] = lst[:300]
     dmin = _int(f.get("min_delay"), 120, 30, 3600)
     dmax = max(dmin, _int(f.get("max_delay"), 300, 30, 7200))
     db.ex("UPDATE autojoin SET daily_target=?, min_members=?, min_per_day=?, min_uz=?, ad_wait_days=?, min_delay=?, max_delay=?, "

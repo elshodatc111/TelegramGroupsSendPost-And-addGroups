@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}Yo'riqnoma{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Ishga tushirish yo'riqnomasi</h1><p class="sub">Loyihani noldan ishlatish va muammo chiqqanda nima qilish kerak.</p></div><div class="actions"><a class="btn sec" href="/sys">← Tizim tahlili</a></div></div>
+<div class="card"><div class="card-h"><h2>1. Har kungi ishga tushirish</h2></div><ol style="line-height:1.9;padding-left:20px;margin:0">
+<li><code>C:\TelegramGroupPost\run.bat</code> ni ikki marta bosing. U XAMPP MySQL'ni o'zi ishga tushiradi va brauzerda <code>http://127.0.0.1:8000</code> ni ochadi.</li>
+<li>Oyna ochiq turishi kerak: yopsangiz rejalashtirilgan postlar, statistika va hisobotlar to'xtaydi.</li>
+<li>Bu sahifadagi «Qayta tekshirish» hammasi joyidaligini ko'rsatadi.</li></ol></div>
+<div class="card"><div class="card-h"><h2>2. Birinchi marta sozlash</h2></div><ol style="line-height:1.9;padding-left:20px;margin:0">
+<li><b>Sozlamalar</b>: Telegram API ID/HASH (my.telegram.org) va OpenAI kaliti.</li>
+<li><b>Kanallarim → Akkaunt</b>: kanal admini bo'lgan raqamni ulang.</li>
+<li><b>Kanallar</b>: kerakli kanalni biriktiring, <b>Kanal profili</b>da biznes ma'lumotlari, «Brend va aloqa» (telefon, manzil, mo'ljal, 3 rang, logotip) va lid havolasini kiriting.</li>
+<li><b>Kuzatuv havolasi</b> (ixtiyoriy, bepul): <code>code\tools\CLOUDFLARE.md</code> bo'yicha Cloudflare Worker'ni ulang. Shunda har post uchun alohida havola chiqadi va bosilishlar sanaladi.</li></ol></div>
+<div class="card"><div class="card-h"><h2>3. Ixtiyoriy qismlar</h2></div><ul style="line-height:1.9;padding-left:20px;margin:0">
+<li><b>Video → matn</b>: <code>code\tools\install_whisper.bat</code> (ffmpeg + faster-whisper). Video karta bo'lsa tezroq.</li>
+<li><b>Lokal rasm yaratish</b>: <code>code\tools\install_imagegen.bat</code> (PyTorch CUDA + diffusers, ~3 GB). Birinchi rasmda model yuklanadi (~2 GB), keyin internetsiz ishlaydi. Yangilash yoki o'rnatishdan so'ng dasturni qayta ishga tushiring.</li>
+<li>Bularsiz ham dastur ishlaydi: transkripsiya OpenAI orqali, rasm esa gradient fon bilan chiqadi.</li></ul></div>
+<div class="card"><div class="card-h"><h2>4. Muammo chiqsa</h2></div><ul style="line-height:1.9;padding-left:20px;margin:0">
+<li><b>MySQL ishlamayapti / «Aria crashed»</b>: XAMPP Control Panel'da MySQL'ni to'xtating, <code>C:\xampp\mysql\data</code> ichidagi <code>mysql</code> papkasini toza <code>backup</code> papkasidagi nusxa bilan almashtiring, qayta Start qiling. Bazadagi ma'lumotlarga tegilmaydi.</li>
+<li><b>Akkaunt «Ulanmagan»</b>: Akkaunt sahifasida «Qayta ulash», kodni kiriting.</li>
+<li><b>Post yuborilmadi</b>: Kontent reja sahifasidagi xato matniga qarang; ko'pincha akkauntda post yuborish huquqi yo'q yoki internet uzilgan.</li>
+<li><b>Rasm qora chiqdi</b>: GTX 16xx kartalarda bo'lishi mumkin; dastur o'zi aniqroq rejimda qayta urinadi. Yordam bermasa «Gradient fon» ni tanlang.</li>
+<li><b>Bildirishnoma kelmayapti</b>: Windows «Fokus/Bezovta qilmang» rejimini o'chiring, Ogohlantirishlar sahifasida «Bildirishnomani sinash».</li>
+<li>Tushunarsiz xato bo'lsa: Tizim tahlili → «AI xulosa so'rash».</li></ul></div>
+{% endblock %}

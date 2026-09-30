@@ -1,17 +1,63 @@
 <!doctype html>
 <html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}Telegram Group Post{% endblock %} · Group Post</title>
+<title>{% block title %}Telegram Group Post{% endblock %} · {{ 'Kanallarim' if ws == 'channels' else 'Tizim tahlili' if ws == 'system' else 'Group Post' }}</title>
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t)t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}})()</script>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23dc2626'/%3E%3Cpath d='M7 15l17-7-3 16-6-4-3 3v-5l8-7-10 6z' fill='white'/%3E%3C/svg%3E">
-</head><body>
+</head><body class="{{ 'ws-ch' if ws == 'channels' }}">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 {% for n, d in ICONS.items() %}<symbol id="i-{{ n }}" viewBox="0 0 24 24">{{ d }}</symbol>{% endfor %}
 </defs></svg>
 {% set p = request.url.path %}
 <div class="app">
 <aside class="side" id="side">
-  <div class="brand"><div class="logo">{{ ic('send') }}</div><div>Group Post<small>Reklama avtomatlashtirish</small></div></div>
+  <div class="dd wsdd">
+    <button class="ws-btn" data-dd type="button">
+      <div class="logo">{{ ic('layers' if ws == 'channels' else 'cpu' if ws == 'system' else 'send') }}</div>
+      <div class="t"><b>{{ 'Kanallarim' if ws == 'channels' else 'Tizim tahlili' if ws == 'system' else 'Group Post' }}</b><small>{{ "Kanalni rivojlantirish" if ws == 'channels' else 'Dastur holati va loglar' if ws == 'system' else 'Reklama avtomatlashtirish' }}</small></div>
+      {{ ic('chevron-down') }}
+    </button>
+    <div class="menu">
+      <div class="sec">Bo'lim</div>
+      <form method="post" action="/ws/switch"><input type="hidden" name="ws" value="posting"><button class="mi {{ 'cur' if ws == 'posting' }}"><span class="ava">{{ ic('send') }}</span><span class="t"><b>Group Post</b><small>Guruhlarga reklama yuborish</small></span>{% if ws == 'posting' %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>
+      <form method="post" action="/ws/switch"><input type="hidden" name="ws" value="channels"><button class="mi {{ 'cur' if ws == 'channels' }}"><span class="ava blue">{{ ic('layers') }}</span><span class="t"><b>Kanallarim</b><small>O'z kanallarni rivojlantirish</small></span>{% if ws == 'channels' %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>
+      <form method="post" action="/ws/switch"><input type="hidden" name="ws" value="system"><button class="mi {{ 'cur' if ws == 'system' }}"><span class="ava">{{ ic('cpu') }}</span><span class="t"><b>Tizim tahlili</b><small>Holat, loglar, yo'riqnoma</small></span>{% if ws == 'system' %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>
+    </div>
+  </div>
+{% if ws == 'channels' %}
+  <nav class="nav">
+    <a href="/ch" class="{{ 'active' if p == '/ch' }}">{{ ic('home') }} Bosh sahifa</a>
+    <a href="/ch/channels" class="{{ 'active' if p.startswith('/ch/channels') }}">{{ ic('layers') }} Kanallar</a>
+    <div class="nav-sec">{{ (cur_ch.title[:22] ~ '…' if cur_ch.title|length > 22 else cur_ch.title) if cur_ch else 'Kanal' }}</div>
+    <a href="/ch/ideas" class="{{ 'active' if p.startswith('/ch/ideas') }}">{{ ic('bulb') }} G'oya va ssenariy</a>
+    <a href="/ch/analysis" class="{{ 'active' if p.startswith('/ch/analysis') }}">{{ ic('trending') }} Raqobatchi tahlili</a>
+    <a href="/ch/competitors" class="{{ 'active' if p.startswith('/ch/competitors') }}">{{ ic('eye') }} Raqobatchilar</a>
+    <a href="/ch/month" class="{{ 'active' if p.startswith('/ch/month') }}">{{ ic('layers') }} Oylik reja</a>
+    <a href="/ch/plan" class="{{ 'active' if p.startswith('/ch/plan') }}">{{ ic('clock') }} Kontent reja</a>
+    <a href="/ch/images" class="{{ 'active' if p.startswith('/ch/images') }}">{{ ic('image') }} Post rasmi</a>
+    <a href="/ch/ab" class="{{ 'active' if p.startswith('/ch/ab') }}">{{ ic('repeat') }} A/B sinov</a>
+    <div class="nav-sec">Statistika</div>
+    <a href="/ch/stats" class="{{ 'active' if p.startswith('/ch/stats') }}">{{ ic('bar-chart') }} Kunlik / oylik</a>
+    <a href="/ch/audience" class="{{ 'active' if p.startswith('/ch/audience') }}">{{ ic('users') }} Auditoriya</a>
+    <a href="/ch/alerts" class="{{ 'active' if p.startswith('/ch/alerts') }}">{{ ic('alert') }} Viral ogohlantirish {% if alerts_unseen %}<span class="cnt">{{ alerts_unseen }}</span>{% endif %}</a>
+    <a href="/ch/comments" class="{{ 'active' if p.startswith('/ch/comments') }}">{{ ic('message') }} Izohlar</a>
+    <a href="/ch/reports" class="{{ 'active' if p.startswith('/ch/reports') }}">{{ ic('file-text') }} Hisobotlar</a>
+    <a href="/ch/posts" class="{{ 'active' if p.startswith('/ch/posts') }}">{{ ic('bar-chart') }} Postlar</a>
+    <a href="/ch/profile" class="{{ 'active' if p.startswith('/ch/profile') }}">{{ ic('edit') }} Kanal profili</a>
+    <div class="nav-sec">Tizim</div>
+    <a href="/ch/usage" class="{{ 'active' if p.startswith('/ch/usage') }}">{{ ic('cpu') }} AI sarfi (token)</a>
+    <a href="/ch/account" class="{{ 'active' if p.startswith('/ch/account') }}">{{ ic('shield') }} Akkaunt</a>
+    <a href="/ch/settings" class="{{ 'active' if p.startswith('/ch/settings') }}">{{ ic('settings') }} Sozlamalar</a>
+  </nav>
+{% elif ws == 'system' %}
+  <nav class="nav">
+    <a href="/sys" class="{{ 'active' if p == '/sys' }}">{{ ic('cpu') }} Holat tekshiruvi</a>
+    <a href="/sys/guide" class="{{ 'active' if p.startswith('/sys/guide') }}">{{ ic('file-text') }} Yo'riqnoma</a>
+    <div class="nav-sec">Boshqa bo'limlar</div>
+    <a href="/ch/usage">{{ ic('cpu') }} AI sarfi</a>
+    <a href="/settings">{{ ic('settings') }} Sozlamalar</a>
+  </nav>
+{% else %}
   <nav class="nav">
     <a href="/" class="{{ 'active' if p == '/' }}">{{ ic('home') }} Bosh sahifa</a>
     <div class="nav-sec">Reklama</div>
@@ -36,6 +82,7 @@
     <a href="/accounts" class="{{ 'active' if p.startswith('/accounts') }}">{{ ic('shield') }} Akkauntlar</a>
     <a href="/settings" class="{{ 'active' if p.startswith('/settings') }}">{{ ic('settings') }} Sozlamalar</a>
   </nav>
+{% endif %}
   <div class="side-foot">
     <button class="theme-btn" data-theme-toggle><svg class="ic" viewBox="0 0 24 24" data-theme-icon><use href="#i-moon"/></svg><span data-theme-label>Qorong'u rejim</span></button>
   </div>
@@ -43,6 +90,19 @@
 <div class="content">
 <header class="top">
   <button class="burger" id="burger" aria-label="Menyu">{{ ic('menu') }}</button>
+{% if ws == 'channels' %}
+  <div class="dd">
+    <button class="acc-btn" data-dd type="button"><span class="ava {{ 'blue' if not cur_ch }}">{{ cur_ch.title[:1]|upper if cur_ch else '∗' }}</span>
+      <span class="t"><b>{{ cur_ch.title if cur_ch else 'Barcha kanallar' }}</b><small>{% if cur_ch %}{{ '{:,}'.format(cur_ch.members or 0).replace(',', ' ') }} obunachi{% else %}{{ ch_list|length }} ta kanal{% endif %}</small></span>{{ ic('chevron-down') }}</button>
+    <div class="menu">
+      <div class="sec">Faol kanal</div>
+      <form method="post" action="/ch/select"><input type="hidden" name="id" value="all"><input type="hidden" name="next" value="{{ request.url.path }}"><button class="mi {{ 'cur' if not cur_ch }}"><span class="ava blue">∗</span><span class="t"><b>Barcha kanallar</b><small>Umumiy ko'rinish</small></span>{% if not cur_ch %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>
+      {% for c in ch_list %}<form method="post" action="/ch/select"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="next" value="{{ request.url.path }}"><button class="mi {{ 'cur' if cur_ch and c.id == cur_ch.id }}"><span class="ava {{ 'blue' if loop.index0 % 2 }}">{{ c.title[:1]|upper }}</span><span class="t"><b>{{ c.title }}</b><small>{{ '{:,}'.format(c.members or 0).replace(',', ' ') }} obunachi</small></span>{% if cur_ch and c.id == cur_ch.id %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>{% endfor %}
+      <hr><a class="mi" href="/ch/channels">{{ ic('plus') }} <span class="t"><b>Kanal biriktirish / boshqarish</b></span></a>
+    </div>
+  </div>
+{% elif ws == 'system' %}
+{% else %}
   <div class="dd">
     {% if cur %}
     <button class="acc-btn" data-dd type="button"><span class="ava">{{ cur.name[:1]|upper }}<span class="hd {{ cur.health.level }}"></span></span>
@@ -59,8 +119,9 @@
       <hr><a class="mi" href="/accounts">{{ ic('plus') }} <span class="t"><b>Akkaunt qo'shish / boshqarish</b></span></a>
     </div>
   </div>
+{% endif %}
   <div class="grow-sp"></div>
-  <a class="iconbtn" href="/inbox" title="Inbox">{{ ic('inbox') }}{% if unread %}<span class="dotc">{{ unread }}</span>{% endif %}</a>
+  {% if ws != 'channels' %}<a class="iconbtn" href="/inbox" title="Inbox">{{ ic('inbox') }}{% if unread %}<span class="dotc">{{ unread }}</span>{% endif %}</a>{% endif %}
   {% if auth_on %}<form method="post" action="/logout" style="margin:0"><button class="iconbtn" title="Chiqish">{{ ic('log-out') }}</button></form>{% endif %}
 </header>
 <main class="main">

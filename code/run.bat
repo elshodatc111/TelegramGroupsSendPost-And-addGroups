@@ -6,7 +6,10 @@ title Telegram Group Post
 
 rem ---- 1. Python topish ----
 set "PY="
-py -3 --version >nul 2>nul && set "PY=py -3"
+rem PyTorch (lokal rasm) uchun Python 3.12 eng mos: bo'lsa shuni tanlaymiz
+py -3.12 --version >nul 2>nul && set "PY=py -3.12"
+if not defined PY py -3.11 --version >nul 2>nul && set "PY=py -3.11"
+if not defined PY py -3 --version >nul 2>nul && set "PY=py -3"
 if not defined PY (
     python --version >nul 2>nul && set "PY=python"
 )
@@ -30,8 +33,11 @@ if errorlevel 1 (
     copy /y requirements.txt .venv\requirements.installed >nul
 )
 
+rem ---- Git xavfsizlik ilgagi (maxfiy fayllar commit bo'lmasligi uchun) ----
+where git >nul 2>nul && git -C "%~dp0.." config core.hooksPath .githooks >nul 2>nul
+
 rem ---- 4. Ishga tushirish (brauzer avtomatik ochiladi) ----
-echo [3/3] Dastur ishga tushmoqda...
+echo [3/3] Dastur ishga tushmoqda (kerak bo'lsa XAMPP MySQL avtomatik yoqiladi)...
 "%VPY%" -m app
 if errorlevel 1 goto fail
 goto end

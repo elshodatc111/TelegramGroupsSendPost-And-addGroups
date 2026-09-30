@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% block title %}Kanal profili{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Kanal profili: {{ ch.title }}</h1><p class="sub">AI g'oya va ssenariylarni shu ma'lumotlarga tayanib yozadi. Qancha aniq to'ldirsangiz, natija shuncha yaxshi bo'ladi.</p></div></div>
+<form method="post" action="/ch/profile" enctype="multipart/form-data">
+<div class="card"><div class="card-h"><h2>Asosiy</h2></div>
+  <div class="grid g2">
+    <div><label class="l">Kanal turi</label><select name="type_key"><option value="">— tanlanmagan —</option>
+      {% for t in types %}<option value="{{ t.key }}" {{ 'selected' if t.key == ch.type_key }}>{{ t.title }}</option>{% endfor %}</select>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:8px" class="small"><input type="checkbox" name="apply_type" value="1" style="width:auto"> Bo'sh maydonlarni tur bo'yicha to'ldirish</label></div>
+    <div><label class="l">Asosiy til</label><select name="lang">{% for k, v in langs.items() %}<option value="{{ k }}" {{ 'selected' if k == (ch.lang or 'uz') }}>{{ v }}</option>{% endfor %}</select></div>
+  </div>
+  <label class="l">Kanal maqsadi (nima sotiladi, kimga)</label><textarea name="purpose" rows="3">{{ ch.purpose or '' }}</textarea>
+  <label class="l">Auditoriya</label><textarea name="audience" rows="2">{{ ch.audience or '' }}</textarea>
+  <div class="grid g2"><div><label class="l">Ohang / uslub</label><input type="text" name="tone" value="{{ ch.tone or '' }}"></div>
+    <div><label class="l">Post chastotasi</label><input type="text" name="post_freq" value="{{ ch.post_freq or '' }}" placeholder="Masalan: kuniga 2 ta"></div></div>
+  <label class="l">Rubrikalar (har qatorda bittadan)</label><textarea name="rubrics" rows="4">{{ rub }}</textarea>
+</div>
+<div class="card"><div class="card-h"><h2>Biznes ma'lumotlari</h2></div>
+  <div class="grid g2">{% for k, label in biz_fields %}<div><label class="l">{{ label }}</label><textarea name="biz_{{ k }}" rows="2">{{ biz.get(k, '') }}</textarea></div>{% endfor %}</div>
+  <label class="l">CTA (chaqiriq)</label><input type="text" name="cta" value="{{ ch.cta or '' }}">
+  <label class="l">Taqiqlangan mavzu / so'zlar</label><textarea name="bans" rows="2">{{ ch.bans or '' }}</textarea>
+</div>
+<div class="card"><div class="card-h"><h2>Lead platformasi</h2></div>
+  <div class="hint">Har bir postning oxiriga avtomatik qo'shiladi.</div>
+  <div class="grid g2"><div><label class="l">O'zgarmas havola (bot yoki forma, https://...)</label><input type="text" name="lead_url" value="{{ ch.lead_url or '' }}" placeholder="https://t.me/atkobot?start=telegram"></div>
+    <div><label class="l">Havola oldidagi matn</label><input type="text" name="lead_text" value="{{ ch.lead_text or '' }}" placeholder="Bepul konsultatsiya:"></div></div>
+  <label style="display:flex;gap:10px;align-items:center;margin-top:12px"><span class="sw"><input type="checkbox" name="track_on" value="1" {{ 'checked' if ch.track_on is none or ch.track_on }}><i></i></span> Har post uchun kuzatuv havolasi yaratish (Cloudflare Worker orqali)</label>
+  <div class="hint">Havola o'zgarmaydi: botdagi statistika buzilmaydi. Har bir postga alohida kuzatuv havolasi beriladi va bosishlar sanaladi. Worker sozlamalari: Sozlamalar sahifasida.</div>
+</div>
+<div class="card"><div class="card-h"><h2>Brend va aloqa (rasm va postlar uchun)</h2></div>
+  <div class="grid g2"><div><label class="l">Brend nomi</label><input type="text" name="brand_name" value="{{ ch.brand_name or '' }}"></div>
+    <div><label class="l">Telefon raqam(lar)</label><input type="text" name="phones" value="{{ ch.phones or '' }}" placeholder="+998 90 123 45 67"></div></div>
+  <div class="grid g2"><div><label class="l">Manzil</label><textarea name="address" rows="2">{{ ch.address or '' }}</textarea></div>
+    <div><label class="l">Mo'ljal</label><textarea name="landmark" rows="2">{{ ch.landmark or '' }}</textarea></div></div>
+  <label class="l">Boshqa aloqa (Telegram, Instagram, sayt...)</label><textarea name="contacts" rows="2">{{ ch.contacts or '' }}</textarea>
+  <label class="l">Brend ranglari (3 ta)</label>
+  <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">{% for i in range(3) %}<label class="small" style="display:flex;gap:8px;align-items:center"><input type="color" name="color{{ i+1 }}" value="{{ colors[i] }}" style="width:48px;height:38px;padding:2px">{{ ['Asosiy','Qo\'shimcha','Matn/fon'][i] }}</label>{% endfor %}</div>
+  <label class="l">Logotip (png/jpg/webp, 5 MB gacha)</label><input type="file" name="logo_file" accept="image/*">
+  {% if ch.logo %}<div class="hint">Hozirgi logotip: <img src="/media/{{ ch.logo }}" alt="" style="height:34px;vertical-align:middle;margin-left:8px;border-radius:6px"></div>{% endif %}
+  <label class="l">Rasm uslubi (AI rasm uchun, ixtiyoriy)</label><textarea name="img_style" rows="2" placeholder="Masalan: sodda tekis illyustratsiya, yorqin, kulgan odamlar yo'q">{{ ch.img_style or '' }}</textarea>
+</div>
+<div class="card"><div class="card-h"><h2>Video format va namunalar</h2></div>
+  <label class="l">Kanalda odatda qanday videolar chiqadi (davomiylik, uslub, kim gapiradi)</label><textarea name="video_format" rows="3">{{ ch.video_format or '' }}</textarea>
+  <div class="hint">Bo'sh qoldirsangiz, AI o'z videolaringizni tahlil qilib o'zi o'rganadi (Tahlil bo'limida).</div>
+  <label class="l">Yoqqan post namunalari (ixtiyoriy)</label><textarea name="samples" rows="4">{{ ch.samples or '' }}</textarea>
+</div>
+<div class="actions"><button class="btn">Saqlash</button></div>
+</form>
+{% endblock %}

@@ -88,3 +88,10 @@ Soxta Telegram xizmati bilan avtomatik sinovdan o'tgan (variant rotatsiyasi va d
 - Filtr (`top50.evaluate`): kanal emas, a'zolar yoza oladi, reklama taqiqlanmagan (tavsif + pinned), a'zolar >= audit minimumi (100), taqiq ro'yxati (Avto-topish bilan bir xil) va o'zbek tili ulushi >= 25% (matn yetarli bo'lsa); allaqachon a'zo bo'lingan guruhlar va qora ro'yxat chiqmaydi.
 - Ro'yxat: a'zolar soni bo'yicha top 50 (kategoriya filtri bilan), nomma-nom, a'zolar/faollik/o'zbek %.
 - Navbatga qo'shish: belgilanganlar `top50.enqueue` orqali `join_batches`ga tushadi (sozlangan interval; yoki «Interval sozlab qo'shish» -> `/join/{id}/setup`). A'zo bo'lingach ro'yxatdan chiqadi (`refresh_status`). Joiner'dagi oldindan tekshiruv qo'shimcha himoya beradi.
+
+## v7.1 — Koreys tili auditoriyasi uchun tayyor so'zlar
+- `discovery.KOREAN_PRESETS` (6 guruh: o'rganish, TOPIK/EPS-TOPIK, Koreyada ish/viza, Koreyada o'qish, madaniyat, ruscha) `/discover` sahifasida bosiladigan chiplar sifatida chiqadi; «Avto-topishga qo'shish» tugmasi ularni Avto-topishning "Koreys tili" kategoriyasiga qo'shadi (`/discover/korean-to-autojoin`, takrorlanmaydi). Avto-topish kategoriyasidagi so'zlar chegarasi 120 ga oshirildi.
+
+## v7.2 — Ta'lim va hudud (Qoraqalpog'iston/Xorazm/Nukus) kalit so'zlari
+- `discovery.py`: `EDU_PRESETS` (universitet, maktab, bog'cha, texnikum/kollej, o'quv markaz), `REGION_PRESETS` (Nukus, Qoraqalpog'iston, Xorazm/Urganch/Xiva, tumanlar, qoraqalpoq tili, kirill), `PRESET_SETS`; yangi Avto-topish kategoriyasi "Hudud: Qoraqalpog'iston / Xorazm".
+- `/discover`: har bir to'plam uchun alohida karta + `POST /discover/preset-to-autojoin` ("Avto-topishga qo'shish"). Kalit so'z limiti 300.

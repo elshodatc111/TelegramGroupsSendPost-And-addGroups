@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block title %}Kanallarim{% endblock %}
+{% block content %}
+{% if not acc %}
+<div class="card empty" style="padding:56px 20px">{{ ic('shield') }}<h1 style="font-size:22px">1-qadam: Telegram akkaunt ulang</h1>
+  <p style="max-width:560px;margin:8px auto">Kanallaringizga <b>administrator</b> qilib biriktirilgan bitta Telegram akkaunt ulanadi. U Group Post bo'limi bilan umuman bog'lanmaydi (alohida raqam kerak).</p>
+  <div class="actions" style="justify-content:center"><a class="btn lg" href="/ch/account">{{ ic('plus') }} Akkaunt ulash</a></div></div>
+{% elif not connected %}
+<div class="note red">{{ ic('alert') }}<div>Kanal akkaunti Telegram'ga ulanmagan. <a href="/ch/account"><b>Akkaunt</b></a> bo'limida qayta ulang.</div></div>
+{% endif %}
+{% if acc and not total %}
+<div class="card empty" style="padding:50px 20px">{{ ic('layers') }}<h1 style="font-size:22px">2-qadam: Rivojlantiriladigan kanallarni tanlang</h1>
+  <p style="max-width:560px;margin:8px auto">Akkaunt admin bo'lgan kanallar ro'yxatidan faqat kerakli kanallarni belgilaysiz. Belgilanmagan kanallar bilan hech narsa qilinmaydi.</p>
+  <div class="actions" style="justify-content:center"><a class="btn lg" href="/ch/channels?scan=1">Kanallarni ko'rish</a></div></div>
+{% elif acc %}
+{% if not ai_ok %}<div class="note">{{ ic('alert') }}<div>AI ishlashi uchun <a href="/ch/settings"><b>Sozlamalar</b></a> da OpenAI kalitini kiriting.</div></div>{% endif %}
+<div class="page-h"><div><h1>{{ 'Kanal: ' ~ cur_ch.title if cur_ch else 'Kanallarim' }}</h1><p class="sub">{{ 'Tanlangan kanal bo\'yicha umumiy ko\'rinish' if cur_ch else 'Barcha biriktirilgan kanallar. Bitta kanal bilan ishlash uchun yuqoridagi tanlagichdan tanlang.' }}</p></div>
+  <div class="actions"><span class="badge">{{ month }} · AI sarfi: {{ total_cost|usd }}</span></div></div>
+<div class="grid {{ 'g2' if cards|length > 1 else '' }}">
+{% for c in cards %}{% set ch = c.ch %}
+<div class="card ch-card" style="margin:0">
+  <div class="card-h"><h2><span class="ava" style="width:40px;height:40px">{{ ch.title[:1]|upper }}</span> {{ ch.title }}</h2>
+    {% if c.prog and c.prog.running %}<span class="badge b-running">Yangilanmoqda {{ c.prog.done }}/{{ c.prog.total }}</span>{% endif %}</div>
+  <div class="mut small">{% if ch.username %}@{{ ch.username }} · {% endif %}{{ ch.members|num }} obunachi{% if c.g7 is not none %} · 7 kunda <b class="{{ 'blue' if c.g7 >= 0 else 'red' }}">{{ '+' if c.g7 > 0 }}{{ c.g7 }}</b>{% endif %}</div>
+  <div class="ch-kv">
+    <div><b>{{ c.s.per_day }}</b><span>post / kun</span></div>
+    <div><b>{{ c.s.avg_views|num }}</b><span>o'rtacha ko'rish</span></div>
+    <div><b>{{ c.s.er if c.s.er is not none else '—' }}{{ '%' if c.s.er is not none }}</b><span>ER (ko'rish/obunachi)</span></div>
+    <div><b>{{ c.comps }}</b><span>raqobatchi</span></div>
+    <div><b>{{ c.plan }}</b><span>rejalashtirilgan</span></div>
+    <div><b>{{ c.cost|usd }}</b><span>shu oy AI sarfi</span></div>
+  </div>
+  <div class="hint">{% if c.memo and c.memo.version %}Bilim xotirasi v{{ c.memo.version }} · {{ c.memo.updated_at[:16] }}{% else %}Bilim xotirasi hali bo'sh (raqobatchilar qo'shilgach to'planadi){% endif %}</div>
+  <form method="post" action="/ch/select" class="actions"><input type="hidden" name="id" value="{{ ch.id }}">
+    <button class="btn sm" name="next" value="/ch/ideas">{{ ic('bulb') }} G'oya so'rash</button>
+    <button class="btn sm sec" name="next" value="/ch/analysis">{{ ic('trending') }} Tahlil</button>
+    <button class="btn sm sec" name="next" value="/ch/plan">{{ ic('clock') }} Reja</button></form>
+</div>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

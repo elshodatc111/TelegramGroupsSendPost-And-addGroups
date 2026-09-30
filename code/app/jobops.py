@@ -133,8 +133,9 @@ async def auto_refresh_loop():
                 if svc and svc.info and not is_busy(j["id"]):
                     await refresh_stats(j["id"])
             today = datetime.now().strftime("%Y-%m-%d")
+            posting = manager.posting_ids()
             for aid, svc in list(manager.services.items()):      # kuniga bir marta a'zolar sonini yangilash
-                if svc.info and not db.one("SELECT 1 FROM group_members_log WHERE account_id=? AND day=?", (aid, today)):
+                if aid in posting and svc.info and not db.one("SELECT 1 FROM group_members_log WHERE account_id=? AND day=?", (aid, today)):
                     await svc.fetch_groups()
         except asyncio.CancelledError:
             raise

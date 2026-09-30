@@ -36,6 +36,24 @@
   }));
   document.addEventListener('click', e => { if (!e.target.closest('.dd')) document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')); });
 
+  // Uzoq davom etadigan formalar (AI, sinxron): yuborilganda tugma bloklanadi va holat ko'rsatiladi
+  document.querySelectorAll('form[data-busy]').forEach(f => f.addEventListener('submit', () => {
+    const msg = f.dataset.busy || 'Kuting...';
+    f.querySelectorAll('button').forEach(b => { if (!b.dataset.keep) { b.dataset.t = b.innerHTML; b.textContent = msg; setTimeout(() => { b.disabled = true; }, 0); } });
+  }));
+  // Nusxa olish
+  document.querySelectorAll('[data-copy],[data-copy-text]').forEach(b => b.addEventListener('click', () => {
+    let t = b.dataset.copyText;
+    if (t === undefined) {
+      const el = document.getElementById((b.dataset.copy || '').replace(/^#/, ''));
+      if (!el) return;
+      t = el.innerText;
+    }
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).catch(() => {
+      const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }).finally(() => { const o = b.textContent; b.textContent = 'Nusxalandi'; setTimeout(() => b.textContent = o, 1500); });
+  }));
+
   // Fayl tashlash zonalari
   document.querySelectorAll('[data-drop]').forEach(zone => {
     const input = zone.querySelector('input[type=file]');

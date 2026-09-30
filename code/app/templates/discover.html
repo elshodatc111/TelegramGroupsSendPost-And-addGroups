@@ -2,6 +2,12 @@
 {% block content %}
 <div class="page-h"><div><h1>Yangi guruhlarni topish</h1><p class="sub">Telegram'dagi ommaviy guruh va kanallarni kalit so'z bo'yicha qidiring va a'zo bo'ling</p></div></div>
 <div class="card"><form method="get" action="/discover" class="tools" style="margin:0"><input type="search" name="q" value="{{ q }}" placeholder="Masalan: toshkent savdo, ish e'lonlari, avto..." autofocus><button class="btn">{{ ic('search') }} Qidirish</button></form></div>
+{% set hints = {"Koreys tili kurslari": "Koreys tilini online yoki offline o'rganmoqchi bo'lganlar, TOPIK/EPS-TOPIK topshiruvchilar, Koreyada ish yoki o'qishni rejalashtirganlar.", "Ta'lim muassasalari": "Universitet, institut, maktab, bog'cha, texnikum, kollej va o'quv markazlari guruhlari.", "Qoraqalpog'iston, Xorazm, Nukus": "Qoraqalpog'iston Respublikasi, Xorazm viloyati va Nukus tumanlari bo'yicha guruhlar."} %}
+{% for sname, sv in preset_sets.items() %}<div class="card"><div class="card-h"><h2>{{ ic('tag') }} {{ sname }} — tayyor so'zlar</h2>
+  <form method="post" action="/discover/preset-to-autojoin" style="margin:0"><input type="hidden" name="set" value="{{ sname }}"><button class="btn sec sm" title="Bu so'zlar Avto-topish bo'limi qidiruviga ham qo'shiladi">{{ ic('plus') }} Avto-topishga qo'shish</button></form></div>
+  <div class="hint" style="margin:0 0 12px">{{ hints.get(sname, '') }} So'zni bosing — qidiruv ishga tushadi.</div>
+  {% for cat, words in sv[0].items() %}<div style="margin-bottom:10px"><div class="mut small" style="margin-bottom:6px;font-weight:600">{{ cat }}</div>
+   <div class="chips">{% for w in words %}<a class="chip {{ 'on' if q|lower == w|lower }}" href="/discover?q={{ w|urlencode }}">{{ w }}</a>{% endfor %}</div></div>{% endfor %}</div>{% endfor %}
 {% if error %}<div class="note red">{{ ic('alert') }}<div>{{ error }}</div></div>{% endif %}
 {% if hidden %}<div class="note info">{{ ic('shield') }}<div>Reklama yuborib bo'lmaydigan <b>{{ hidden.values()|sum }} ta</b> natija yashirildi: {% for k, v in hidden.items() %}{{ k }} — {{ v }}{{ ', ' if not loop.last }}{% endfor %}. Faqat post yuborish mumkin bo'lgan guruhlar ko'rsatilmoqda.</div></div>{% endif %}
 {% if q and not results and not error %}<div class="card empty">{{ ic('search') }}<div>Hech narsa topilmadi</div></div>{% endif %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Hisobotlar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Haftalik hisobot (PDF / Excel)</h1><p class="sub">Har dushanba 09:00 dan keyin dastur ishlab turgan bo'lsa, avtomatik tayyorlanadi va bildirishnoma chiqadi. Hisobot shu yerda va kompyuteringizdagi <code>data\reports</code> papkasida saqlanadi.</p></div></div>
+<div class="card"><form method="post" action="/ch/reports/make" data-busy="Tayyorlanmoqda..." class="actions" style="align-items:end;flex-wrap:wrap">
+  <div><label class="l">Davr (kun)</label><select name="days"><option value="7">7</option><option value="14">14</option><option value="30">30</option></select></div>
+  <label class="row" style="gap:8px"><input type="checkbox" name="with_ai" {{ 'checked' if ai_ok }} {{ 'disabled' if not ai_ok }}> AI xulosa qo'shilsin</label>
+  <button class="btn">{{ ic('file-text') }} Hisobot yaratish</button></form>
+  <form method="post" action="/ch/reports/weekly" class="actions" style="margin-top:10px"><label class="row" style="gap:8px"><input type="checkbox" name="on" {{ 'checked' if weekly }} onchange="this.form.submit()"> Har hafta avtomatik yaratish</label></form></div>
+<div class="card"><div class="card-h"><h2>Tayyor hisobotlar</h2></div>
+{% if rows %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Davr</th><th>Tur</th><th>Yaratilgan</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.period }}</td><td>{{ r.kind|upper }}</td><td>{{ r.created_at[:16] }}</td><td><a class="btn sm sec" href="/ch/reports/{{ r.id }}/download">{{ ic('download') }} Yuklab olish</a></td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Hisobot hali yo'q.</div>{% endif %}</div>
+{% endblock %}

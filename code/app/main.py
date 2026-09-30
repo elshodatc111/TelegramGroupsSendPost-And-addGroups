@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import auditor, dailyreport, db, discovery, jobops, leaver
+from . import auditor, backup, ch_ai, ch_collect, ch_data, ch_insight, ch_plan, ch_report, ch_track, dailyreport, db, discovery, jobops, leaver, syscheck
 from .config import CODE_DIR, MEDIA_DIR, log
 from .core import joiner, manager, sender
 from .web import acc_id, page
@@ -63,6 +63,13 @@ async def lifespan(app: FastAPI):
     from . import machine
     wiped = machine.check()
     db.init()
+    if wiped:                         # fayl izi mos kelmadi: bazadagi ma'lumotlar ham tozalanadi
+        db.wipe_all()
+        db.set_setting("machine_fp", machine.fingerprint())
+        db._seed()
+    elif machine.check_db():
+        wiped = True
+        db._seed()
     if wiped:
         db.set_setting("machine_notice", "Bu boshqa kompyuter: avvalgi akkauntlar va ma'lumotlar tozalandi. Akkauntni qaytadan qo'shib faollashtiring.")
     scan_media()
@@ -71,8 +78,11 @@ async def lifespan(app: FastAPI):
     db.ex("UPDATE join_batches SET status='interrupted', next_at=NULL WHERE status IN ('running','queued')")
     sender.begin_scheduler()
     joiner.begin_scheduler()
-    bg = [asyncio.create_task(manager.start_all()), asyncio.create_task(jobops.auto_refresh_loop()),
-          asyncio.create_task(leaver.loop()), asyncio.create_task(dailyreport.loop()), asyncio.create_task(discovery.loop()), asyncio.create_task(auditor.loop())]
+    sv = syscheck.supervise
+    bg = [sv("manager", manager.start_all), sv("auto_refresh", jobops.auto_refresh_loop), sv("leaver", leaver.loop),
+          sv("dailyreport", dailyreport.loop), sv("discovery", discovery.loop), sv("auditor", auditor.loop),
+          sv("ch_collect", ch_collect.loop), sv("ch_plan", ch_plan.loop), sv("ch_learn", ch_ai.learn_loop), sv("backup", backup.loop),
+          sv("ch_track", ch_track.loop), sv("ch_insight", ch_insight.loop), sv("ch_report", ch_report.loop)]
     log.info("Dastur ishga tushdi")
     yield
     for t in bg:
@@ -90,6 +100,14 @@ app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 PUBLIC = ("/static", "/login", "/logout")
 
 
+def _is_ch(path: str) -> bool:
+    return path == "/ch" or path.startswith("/ch/")
+
+
+def _is_sys(path: str) -> bool:
+    return path == "/sys" or path.startswith("/sys/")
+
+
 @app.middleware("http")
 async def guard(request: Request, call_next):
     path = request.url.path
@@ -99,12 +117,32 @@ async def guard(request: Request, call_next):
     user = db.one("SELECT * FROM users WHERE id=1")
     request.state.user = user
     db.cur_uid.set(1)
-    ids = [r["id"] for r in db.q("SELECT id FROM accounts ORDER BY id")]
-    try:
-        cid = int(request.cookies.get("acc", "0"))
-    except ValueError:
-        cid = 0
-    request.state.account_id = cid if cid in ids else (ids[0] if ids else None)
+    # ---- bo'lim: Group Post (posting) yoki Kanallarim (channels) ----
+    if path == "/" and request.cookies.get("ws") == "channels":
+        return RedirectResponse("/ch", status_code=303)
+    if path == "/" and request.cookies.get("ws") == "system":
+        return RedirectResponse("/sys", status_code=303)
+    request.state.ws = "channels" if _is_ch(path) else "system" if _is_sys(path) else "posting"
+    if not path.startswith("/static") and not path.startswith("/media"):
+        # Group Post akkauntlari (Kanallarim akkaunti bu yerda ko'rinmaydi)
+        ids = [r["id"] for r in db.q("SELECT id FROM accounts WHERE workspace='posting' ORDER BY id")]
+        try:
+            cid = int(request.cookies.get("acc", "0"))
+        except ValueError:
+            cid = 0
+        request.state.account_id = cid if cid in ids else (ids[0] if ids else None)
+        # Kanallarim: faol kanallar va tanlangani
+        chs = ch_data.channels()
+        request.state.channels = chs
+        request.state.ch_account = ch_data.channel_account()
+        raw = request.cookies.get("chid", "")
+        sel = next((c for c in chs if str(c["id"]) == raw), None)
+        request.state.ch_all = False
+        if raw == "all":
+            request.state.ch_all, sel = True, None
+        elif sel is None and chs:
+            sel = chs[0]
+        request.state.channel = sel
     return await call_next(request)
 
 
@@ -115,6 +153,8 @@ async def on_error(request: Request, exc: Exception):
 
 
 from . import r_account, r_groups, r_inbox, r_join, r_posts, r_stats, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit, r_top50  # noqa: E402
+from . import r_ch, r_ch_ai, r_ch_comp, r_ch_more, r_ch_plan, r_sys  # noqa: E402
 
-for r in (r_account, r_posts, r_groups, r_join, r_stats, r_inbox, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit, r_top50):
+for r in (r_account, r_posts, r_groups, r_join, r_stats, r_inbox, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit, r_top50,
+          r_ch, r_ch_ai, r_ch_comp, r_ch_plan, r_ch_more, r_sys):
     app.include_router(r.router)

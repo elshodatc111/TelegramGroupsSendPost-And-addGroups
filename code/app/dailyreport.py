@@ -81,7 +81,7 @@ async def loop():
     while True:
         try:
             yday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-            for a in db.q("SELECT id FROM accounts"):
+            for a in db.q("SELECT id FROM accounts WHERE workspace='posting'"):
                 if not (REPORT_DIR / str(a["id"]) / f"kunlik_{yday}.xlsx").exists():
                     save(a["id"], yday)
         except asyncio.CancelledError:

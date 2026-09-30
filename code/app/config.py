@@ -13,14 +13,19 @@ from pathlib import Path
 CODE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ.get("TGP_DATA_DIR", CODE_DIR.parent / "data")).resolve()
 
-DB_PATH = DATA_DIR / "app.db"
+DB_PATH = DATA_DIR / "app.db"            # eski SQLite bazasi (MySQL'ga ko'chirish manbai / zaxira)
+DBCONF_PATH = DATA_DIR / "dbconf.json"    # MySQL ulanish sozlamasi (parol shifrlangan)
+BACKUP_DIR = DATA_DIR / "backups"
+TMP_DIR = DATA_DIR / "tmp"               # vaqtinchalik fayllar (video transkripsiya va h.k.)
+# Baza turi: "mysql" (standart, XAMPP) yoki "sqlite" (eski rejim)
+DB_BACKEND = os.environ.get("TGP_DB", "mysql").lower()
 SESSION_DIR = DATA_DIR / "sessions"
 MEDIA_DIR = DATA_DIR / "media"
 IMPORT_DIR = DATA_DIR / "imports"
 LOG_DIR = DATA_DIR / "logs"
 SESSION_PATH = SESSION_DIR / "account"
 
-for _d in (DATA_DIR, SESSION_DIR, MEDIA_DIR, IMPORT_DIR, LOG_DIR):
+for _d in (DATA_DIR, SESSION_DIR, MEDIA_DIR, IMPORT_DIR, LOG_DIR, BACKUP_DIR, TMP_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 # Faqat local kompyuterdan ochiladi (xavfsizlik uchun)

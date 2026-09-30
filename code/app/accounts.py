@@ -25,14 +25,24 @@ class AccountManager:
             self.services[account_id] = svc
         return svc
 
-    def rows(self, uid=None):
-        if uid is None:
-            return db.q("SELECT * FROM accounts ORDER BY id")
-        return db.q("SELECT * FROM accounts WHERE user_id=? ORDER BY id", (uid,))
+    def rows(self, uid=None, ws=None):
+        """ws: 'posting' (Group Post) yoki 'channels' (Kanallarim). None = hammasi."""
+        sql, args = "SELECT * FROM accounts WHERE 1=1", []
+        if uid is not None:
+            sql += " AND user_id=?"
+            args.append(uid)
+        if ws:
+            sql += " AND workspace=?"
+            args.append(ws)
+        return db.q(sql + " ORDER BY id", args)
 
-    def list(self, uid=None) -> list[dict]:
+    def posting_ids(self) -> set[int]:
+        """Group Post akkauntlari. Fon jarayonlari (audit, chiqish, hisobot...) faqat shularga tegadi."""
+        return {r["id"] for r in db.q("SELECT id FROM accounts WHERE workspace='posting'")}
+
+    def list(self, uid=None, ws="posting") -> list[dict]:
         out = []
-        for r in self.rows(uid):
+        for r in self.rows(uid, ws):
             info = self.services[r["id"]].info if r["id"] in self.services else None
             d = dict(r)
             d.update(connected=bool(info), info=info, health=health(r["id"]),
@@ -40,8 +50,9 @@ class AccountManager:
             out.append(d)
         return out
 
-    def create(self, name: str, uid: int = 1) -> int:
-        aid = db.ex("INSERT INTO accounts(name,session,created_at,user_id) VALUES(?,?,?,?)", (name, "tmp", db.now(), uid))
+    def create(self, name: str, uid: int = 1, workspace: str = "posting") -> int:
+        aid = db.ex("INSERT INTO accounts(name,session,created_at,user_id,workspace) VALUES(?,?,?,?,?)",
+                    (name, "tmp", db.now(), uid, workspace))
         db.ex("UPDATE accounts SET session=? WHERE id=?", (f"acc_{aid}", aid))
         return aid
 
@@ -59,6 +70,8 @@ class AccountManager:
                     f.unlink()
                 except OSError:
                     pass
+        from . import ch_data
+        ch_data.delete_account_data(account_id)
         for sql in (
             "DELETE FROM join_batches WHERE account_id=?", "DELETE FROM jobs WHERE account_id=?",
             "DELETE FROM campaigns WHERE account_id=?", "DELETE FROM group_lists WHERE account_id=?",

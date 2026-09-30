@@ -1,10 +1,10 @@
-Bu papka dastur ma'lumotlari uchun (kod: ..\code). Bu papka Githubga YUKLANMAYDI (.gitignore).
+Bu papka dastur ma'lumotlari uchun (kod: ..\code). Bu papka GitHub'ga YUKLANMAYDI (.gitignore).
 
-  app.db      - SQLite baza: sozlamalar, guruhlar, kampaniyalar, yuborishlar tarixi
+  dbconf.json - MySQL ulanish sozlamasi (parol shifrlangan)
   sessions\   - Telegram session fayllari (MAXFIY! Hech kimga bermang)
   media\      - yuklangan rasm va videolar
-  logs\       - loglar
-  machine.id  - kompyuterga bog'lash belgisi
+  backups\    - kunlik MySQL zaxira nusxalari (oxirgi 7 ta)
+  app.db      - eski SQLite baza (MySQL'ga ko'chirilgan; zaxira sifatida qoldirilgan)
 
-Papka boshqa kompyuterga ko'chirilsa, dastur birinchi ishga tushganda barcha akkaunt va ma'lumotlarni
-avtomatik tozalaydi; hammasi noldan boshlanadi va akkauntni qayta ulash kerak bo'ladi.
+Asosiy ma'lumotlar XAMPP MySQL'dagi 'tgpost' bazasida turadi.
+Loyiha boshqa kompyuterga ko'chirilsa, ma'lumotlar avtomatik o'chiriladi (mashinaga bog'langan).

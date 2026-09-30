@@ -64,6 +64,10 @@ _ICONS = {
     "log-out": '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
     "message": '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     "file": '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>',
+    "bulb": '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/>',
+    "trending": '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+    "cpu": '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>',
+    "film": '<rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/>',
     "link": '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
 }
 ICONS = {k: Markup(v) for k, v in _ICONS.items()}
@@ -101,7 +105,24 @@ def spark(values, w=90, h=26, cls="") -> Markup:
                   f'stroke="{"var(--blue)" if up else "var(--pri)"}" stroke-width="2" stroke-linejoin="round" points="{pts}"/></svg>')
 
 
+def num(v) -> str:
+    try:
+        return f"{int(v):,}".replace(",", " ")
+    except (TypeError, ValueError):
+        return "—"
+
+
+def usd(v) -> str:
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return "—"
+    return f"${v:,.4f}" if v < 1 else f"${v:,.2f}"
+
+
 templates.env.filters["render_text"] = render_text
+templates.env.filters["num"] = num
+templates.env.filters["usd"] = usd
 templates.env.globals["spark"] = spark
 templates.env.globals.update(STATUS=STATUS_LABELS, JOIN=JOIN_LABELS, BATCH=BATCH_LABELS, ICONS=ICONS, ic=ic)
 
@@ -117,6 +138,22 @@ def acc_id(request: Request):
     return getattr(request.state, "account_id", None)
 
 
+def ws_of(request: Request) -> str:
+    return getattr(request.state, "ws", "posting")
+
+
+def cur_channel(request: Request):
+    """Kanallarim: tanlangan kanal (yoki None — «Barcha kanallar» / kanal yo'q)."""
+    return getattr(request.state, "channel", None)
+
+
+def need_channel(request: Request):
+    """Kanal tanlanmagan bo'lsa, kanal tanlash sahifasini ko'rsatadi."""
+    if cur_channel(request):
+        return None
+    return page(request, "ch_pick.html")
+
+
 def page(request: Request, name: str, status_code: int = 200, **ctx):
     from .core import manager
     ctx.setdefault("msg", request.query_params.get("msg"))
@@ -125,15 +162,29 @@ def page(request: Request, name: str, status_code: int = 200, **ctx):
         db.del_setting("machine_notice")
     ctx.setdefault("err", request.query_params.get("err"))
     user = getattr(request.state, "user", None)
-    try:
-        accounts = manager.list(user["id"]) if user else []
-    except Exception:
-        accounts = []
-    aid = acc_id(request)
-    cur = next((a for a in accounts if a["id"] == aid), None)
+    ws = ws_of(request)
+    accounts, cur = [], None
+    if ws == "posting":
+        try:
+            accounts = manager.list(user["id"], "posting") if user else []
+        except Exception:
+            accounts = []
+        aid = acc_id(request)
+        cur = next((a for a in accounts if a["id"] == aid), None)
     ctx.update(accounts=accounts, cur=cur, unread=cur["unread"] if cur else 0,
-               auth_on=bool(db.get_setting("password_hash")), user=user)
+               auth_on=bool(db.get_setting("password_hash")), user=user, ws=ws,
+               ch_list=getattr(request.state, "channels", []), cur_ch=cur_channel(request),
+               ch_all=getattr(request.state, "ch_all", False), ch_acc=getattr(request.state, "ch_account", None),
+               alerts_unseen=_unseen() if ws == "channels" else 0)
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)
+
+
+def _unseen() -> int:
+    try:
+        from . import ch_insight
+        return ch_insight.unseen()
+    except Exception:
+        return 0
 
 
 def go(url: str, msg: str | None = None, err: str | None = None):

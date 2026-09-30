@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block title %}G'oyalar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>G'oyalar: {{ ch.title }}</h1><p class="sub">G'oya faqat so'raganingizda yaratiladi. Raqobatchilar ma'lumoti, bilim xotirasi va oldingi g'oyalar hisobga olinadi.</p></div>
+  <div class="actions"><span class="badge">Shu oy: {{ month_cost|usd }}</span></div></div>
+{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div><a href="/ch/settings"><b>Sozlamalar</b></a> da OpenAI kalitini kiriting.</div></div>{% endif %}
+{% if not n_comp %}<div class="note">{{ ic('alert') }}<div>Raqobatchi biriktirilmagan: g'oya umumiyroq bo'ladi. <a href="/ch/competitors"><b>Raqobatchi qo'shish</b></a></div></div>{% endif %}
+<div class="card"><div class="card-h"><h2>{{ ic('bulb') }} Yangi g'oya so'rash</h2></div>
+<form method="post" action="/ch/ideas/new" data-busy="AI g'oya va ssenariy yozmoqda (1-2 daqiqa)...">
+  <div class="grid g2"><div><label class="l">Til</label><select name="lang"><option value="uz" {{ 'selected' if default_lang == 'uz' }}>O'zbekcha</option><option value="ru" {{ 'selected' if default_lang == 'ru' }}>Ruscha</option><option value="both" {{ 'selected' if default_lang == 'both' }}>O'zbekcha + Ruscha</option></select></div>
+    <div><label class="l">Video ssenariy</label><select name="video"><option value="auto">AI o'zi hal qilsin</option><option value="yes">Ha, to'liq video ssenariy kerak</option><option value="no">Yo'q, faqat post</option></select></div></div>
+  <label class="l">Izoh (ixtiyoriy): mavzu, aksiya, nimaga urg'u</label><textarea name="note" rows="2" placeholder="Masalan: shu hafta yangi guruh ochilmoqda"></textarea>
+  <div class="hint">Model: {{ idea_model }}</div>
+  <div class="actions" style="margin-top:12px"><button class="btn" {{ '' if ai_ok else 'disabled' }}>G'oya yaratish</button></div></form></div>
+<div class="card"><div class="card-h"><h2>Oldingi g'oyalar</h2></div>
+{% if ideas %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Sana</th><th>G'oya</th><th>Holat</th><th>Token</th><th>Narx</th></tr></thead><tbody>
+{% for i in ideas %}<tr><td>{{ i.created_at[:16] }}</td><td><a href="/ch/ideas/{{ i.id }}"><b>{{ i.title }}</b></a></td>
+  <td><span class="badge {{ 'b-good' if i.status == 'accepted' else 'b-bad' if i.status == 'rejected' else '' }}">{{ {'new':'Yangi','accepted':'Qabul','rejected':'Rad'}.get(i.status, i.status) }}</span></td>
+  <td>{{ ((i.tokens_in or 0) + (i.tokens_out or 0))|num }}</td><td>{{ (i.cost or 0)|usd }}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Hali g'oya yo'q.</div>{% endif %}</div>
+{% endblock %}

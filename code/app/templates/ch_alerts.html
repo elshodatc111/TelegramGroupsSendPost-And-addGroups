@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}Ogohlantirishlar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Viral post ogohlantirishi</h1><p class="sub">Raqobatchi (yoki o'zingizning) posti odatdagidan ancha ko'p ko'rilsa, Windows bildirishnomasi chiqadi va shu yerda yoziladi. AI nima uchun ishlaganini tushuntiradi.</p></div>
+  <div class="actions"><form method="post" action="/ch/alerts/scan" style="margin:0"><button class="btn sm sec">Hozir tekshirish</button></form>
+  <form method="post" action="/ch/alerts/seen" style="margin:0"><button class="btn sm ghost">Hammasini o'qilgan qilish</button></form></div></div>
+<div class="card"><form method="post" action="/ch/alerts/settings" class="actions" style="align-items:end;flex-wrap:wrap">
+  <div><label class="l">Necha marta ko'p (×)</label><input type="number" step="0.1" min="1.3" name="x" value="{{ x }}" style="width:110px"></div>
+  <div><label class="l">Kamida ko'rish</label><input type="number" name="mn" value="{{ mn }}" style="width:110px"></div>
+  <label class="row" style="gap:8px"><input type="checkbox" name="notify_on" {{ 'checked' if notify_on }}> Windows bildirishnomasi</label>
+  <button class="btn sm">Saqlash</button></form>
+  <div class="actions" style="margin-top:10px"><form method="post" action="/ch/alerts/test-toast" style="margin:0"><button class="btn sm sec">Bildirishnomani sinash</button></form></div>
+  <div class="hint">Signal: post ko'rishi shu manbaning oxirgi 30 kundagi odatdagi (median) ko'rishidan {{ x }} baravar ko'p bo'lsa. Postning yoshi hisobga olinadi.</div></div>
+{% for a in items %}
+<div class="card" style="{{ 'border-color:var(--pri)' if not a.seen }}"><div class="card-h"><h2>{{ ic('trending') }} {{ a.title }}</h2>
+  <span class="badge {{ 'b-running' if a.kind == 'own' else '' }}">{{ 'Sizning post' if a.kind == 'own' else 'Raqobatchi' }} · ×{{ a.ratio }}</span></div>
+  <div class="mut small">{{ a.ts[:16] }} · {{ a.views|num }} ko'rish</div><p style="margin:8px 0">{{ a.info }}</p>
+  {% if a.an %}<div class="note info"><div><b>Nega ishlaydi:</b><ul style="margin:4px 0 8px 18px">{% for w in a.an.why or [] %}<li>{{ w }}</li>{% endfor %}</ul>
+    <b>Biz uchun:</b> {{ a.an.use_for_us }}<br><b>Post g'oyasi:</b><div style="white-space:pre-wrap">{{ a.an.post_idea }}</div></div></div>
+  {% else %}<form method="post" action="/ch/alerts/{{ a.id }}/analyze" data-busy="AI tahlil qilmoqda..."><button class="btn sm">{{ ic('bulb') }} AI bilan tahlil qilish</button></form>{% endif %}
+</div>
+{% else %}<div class="card empty">Hozircha signal yo'q. Raqobatchilar qo'shib sinxronlang: dastur o'zi har ~45 daqiqada tekshiradi.</div>{% endfor %}
+{% endblock %}

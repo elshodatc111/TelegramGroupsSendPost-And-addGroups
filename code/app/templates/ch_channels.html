@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block title %}Kanallar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Kanallar</h1><p class="sub">Akkaunt administrator bo'lgan kanallardan faqat tanlanganlari bilan ishlanadi. Kanal o'chirilsa yoki arxivlansa, Telegramdagi kanalga hech narsa bo'lmaydi.</p></div>
+  <div class="actions">{% if acc %}<a class="btn" href="/ch/channels?scan=1">{{ ic('layers') }} Admin kanallarni ko'rish</a>{% endif %}</div></div>
+{% if not acc %}<div class="note red">{{ ic('alert') }}<div>Avval <a href="/ch/account"><b>akkaunt ulang</b></a>.</div></div>{% endif %}
+{% if scan_err %}<div class="note red">{{ ic('alert') }}<div>Kanallar ro'yxati olinmadi: {{ scan_err }}</div></div>{% endif %}
+{% if scanned and not scan_err %}
+<div class="card"><div class="card-h"><h2>Akkaunt admin bo'lgan kanallar</h2></div>
+{% if found %}
+<form method="post" action="/ch/channels/attach" data-busy="Biriktirilmoqda...">
+  <div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th style="width:44px"></th><th>Kanal</th><th>Obunachi</th><th>Huquq</th></tr></thead><tbody>
+  {% for f in found %}<tr><td><label class="sw"><input type="checkbox" name="tg_ids" value="{{ f.tg_id }}"><i></i></label></td>
+    <td class="aj-name"><b>{{ f.title }}</b><span>{% if f.username %}@{{ f.username }}{% else %}yopiq kanal{% endif %}</span></td>
+    <td>{{ f.members|num }}</td><td>{% if f.is_creator %}<span class="badge b-good">Egasi</span>{% else %}<span class="badge">Admin</span>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+  <div class="actions" style="margin-top:14px"><button class="btn">Tanlanganlarni biriktirish</button></div>
+</form>
+{% else %}<div class="empty">Yangi biriktiriladigan admin kanal topilmadi. Akkauntni kanalga administrator qilganingizga ishonch hosil qiling.</div>{% endif %}
+</div>
+{% endif %}
+<div class="card"><div class="card-h"><h2>Biriktirilgan kanallar</h2></div>
+{% if attached %}
+<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Kanal</th><th>Tur</th><th>Obunachi</th><th>7 kun</th><th>Holat</th><th></th></tr></thead><tbody>
+{% for c in attached %}<tr>
+  <td class="aj-name"><b>{{ c.title }}</b><span>{% if c.username %}@{{ c.username }}{% else %}yopiq{% endif %}</span></td>
+  <td>{{ c.type_key or '—' }}</td><td>{{ c.members|num }}</td>
+  <td>{% set g = cards[c.id] %}{% if g is none %}—{% else %}<b class="{{ 'blue' if g >= 0 else 'red' }}">{{ '+' if g > 0 }}{{ g }}</b>{% endif %}</td>
+  <td>{% if c.status == 'active' %}<span class="badge b-good">Faol</span>{% else %}<span class="badge">Arxiv</span>{% endif %}</td>
+  <td><div class="actions" style="justify-content:flex-end">
+    {% if c.status == 'active' %}
+      <form method="post" action="/ch/select"><input type="hidden" name="id" value="{{ c.id }}"><button class="btn sm sec" name="next" value="/ch/profile">Profil</button></form>
+      <form method="post" action="/ch/channels/{{ c.id }}/archive" onsubmit="return confirm('Kanal arxivlansinmi? Rejalangan postlar bekor qilinadi.')"><button class="btn sm ghost">Arxivlash</button></form>
+    {% else %}
+      <form method="post" action="/ch/channels/{{ c.id }}/restore"><button class="btn sm sec">Qaytarish</button></form>
+    {% endif %}
+    <details class="del"><summary class="btn sm ghost">{{ ic('trash') }}</summary>
+      <form method="post" action="/ch/channels/{{ c.id }}/delete" style="margin-top:8px;min-width:240px"><div class="hint">Barcha ma'lumotlari o'chadi. Tasdiqlash uchun nomini yozing: <b>{{ c.title }}</b></div>
+      <input type="text" name="typed" required autocomplete="off"><button class="btn sm" style="margin-top:8px">O'chirish</button></form></details>
+  </div></td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<div class="empty">Hali kanal biriktirilmagan.</div>{% endif %}
+</div>
+{% endblock %}

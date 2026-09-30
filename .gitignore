@@ -1,6 +1,30 @@
-# Shaxsiy ma'lumotlar Githubga chiqmasin (akkaunt sessionlari, baza, media, loglar)
+# Shaxsiy ma'lumotlar GitHub'ga chiqmasin (sessionlar, baza, kalitlar, media, zaxira, loglar)
 data/*
 !data/README.txt
+**/data/**
+!**/data/README.txt
+.env
+.env.*
+!.env.example
+dbconf.json
+*.session
+*.session-journal
+*.db
+*.db-wal
+*.db-shm
+*.sql
+*.sql.gz
+*.sqlite
+*.sqlite3
+backups/
+tmp/
+media/
+imports/
+reports/
+logs/
+*.log
+*.key
+*.pem
 
 # Python
 __pycache__/
@@ -8,9 +32,3 @@ __pycache__/
 .venv/
 venv/
 code/.venv/
-*.session
-*.session-journal
-*.db
-*.db-wal
-*.db-shm
-.env

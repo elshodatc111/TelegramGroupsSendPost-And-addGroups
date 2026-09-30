@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block title %}Raqobatchilar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Raqobatchilar: {{ ch.title }}</h1><p class="sub">Raqobatchi kanallarga telefoningizdan o'zingiz a'zo bo'lasiz (ommaviy yoki yopiq). Dastur ularni akkaunt ro'yxatidan topib, faqat o'qiydi: hech narsaga qo'shilmaydi va yozmaydi.</p></div>
+  <div class="actions"><a class="btn" href="/ch/competitors?scan=1">{{ ic('plus') }} Ro'yxatdan qo'shish</a>
+    <form method="post" action="/ch/sync" data-busy="Boshlanmoqda..."><input type="hidden" name="next" value="/ch/competitors"><button class="btn sec">Yangilash</button></form></div></div>
+{% if prog and prog.running %}<div class="note info">{{ ic('clock') }}<div>Ma'lumot yig'ilmoqda: {{ prog.done }}/{{ prog.total }} {{ prog.current or '' }}</div></div>{% endif %}
+{% if scan_err %}<div class="note red">{{ ic('alert') }}<div>{{ scan_err }}</div></div>{% endif %}
+{% if scanned and not scan_err %}
+<div class="card"><div class="card-h"><h2>Akkaunt a'zo bo'lgan kanallar</h2></div>
+{% if found %}<form method="post" action="/ch/competitors/add" data-busy="Qo'shilmoqda...">
+  <div class="tbl-wrap"><table class="aj-tbl"><tbody>{% for f in found %}<tr><td style="width:44px"><label class="sw"><input type="checkbox" name="tg_ids" value="{{ f.tg_id }}"><i></i></label></td>
+    <td class="aj-name"><b>{{ f.title }}</b><span>{% if f.username %}@{{ f.username }}{% else %}yopiq kanal{% endif %}</span></td><td>{{ f.members|num }}</td></tr>{% endfor %}</tbody></table></div>
+  <div class="actions" style="margin-top:14px"><button class="btn">Raqobatchi sifatida biriktirish</button></div></form>
+{% else %}<div class="empty">Ro'yxatda yangi kanal yo'q. Avval telefoningizdan raqobatchi kanalga a'zo bo'ling, so'ng qayta bosing.</div>{% endif %}</div>
+{% endif %}
+<div class="card"><div class="card-h"><h2>Biriktirilgan raqobatchilar ({{ rows|length }})</h2></div>
+{% if rows %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Kanal</th><th>Obunachi</th><th>7 kun</th><th>Post/kun</th><th>O'rt. ko'rish</th><th>Video</th><th>Holat</th><th></th></tr></thead><tbody>
+{% for r in rows %}{% set c = r.c %}<tr>
+  <td class="aj-name"><b>{{ c.title }}</b><span>{% if c.username %}@{{ c.username }}{% else %}yopiq{% endif %}{% if c.last_sync %} · {{ c.last_sync[:16] }}{% endif %}</span>
+    {% if c.error %}<span class="red">{{ c.error }}</span>{% endif %}</td>
+  <td>{{ c.members|num }}</td>
+  <td>{% if r.g7 is none %}—{% else %}<b class="{{ 'blue' if r.g7 >= 0 else 'red' }}">{{ '+' if r.g7 > 0 }}{{ r.g7 }}</b>{% endif %}</td>
+  <td>{{ r.s.per_day }}</td><td>{{ r.s.avg_views|num }}</td><td>{{ r.s.video_share }}%</td>
+  <td>{% if c.active %}<span class="badge b-good">Faol</span>{% else %}<span class="badge">To'xtatilgan</span>{% endif %}</td>
+  <td><div class="actions" style="justify-content:flex-end">
+    <form method="post" action="/ch/competitors/{{ c.id }}/toggle"><button class="btn sm sec">{{ 'To\'xtatish' if c.active else 'Yoqish' }}</button></form>
+    <form method="post" action="/ch/competitors/{{ c.id }}/remove" onsubmit="return confirm('Raqobatchi va uning saqlangan postlari olib tashlansinmi?')"><button class="btn sm ghost">{{ ic('trash') }}</button></form></div></td></tr>
+<tr><td colspan="8" style="padding-top:0"><form method="post" action="/ch/competitors/{{ c.id }}/notes" style="display:flex;gap:8px"><input type="text" name="notes" value="{{ c.notes or '' }}" placeholder="Izoh (AI ham hisobga oladi)"><button class="btn sm sec">Saqlash</button></form></td></tr>
+{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Raqobatchi biriktirilmagan.</div>{% endif %}</div>
+{% endblock %}

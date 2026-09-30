@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% block title %}Post rasmi{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Post rasmi (lokal, bepul)</h1><p class="sub">OpenAI faqat rasm <b>tavsifini</b> yozadi (pullik rasm chizmaydi). Fonni kompyuteringizdagi video karta chizadi, brend qatlamini (telefon, manzil, mo'ljal, aloqa, 3 rang, logotip) dastur o'zi qo'yadi, shuning uchun yozuvlar xatosiz chiqadi.</p></div></div>
+{% if not st.ready %}<div class="note">{{ ic('alert') }}<div>
+  Lokal rasm chizish hozircha tayyor emas ({% if not st.torch %}PyTorch yo'q{% elif not st.cuda %}video karta (CUDA) topilmadi{% elif not st.diffusers %}diffusers yo'q{% endif %}).
+  «Gradient fon» bilan brend kartasi baribir chiqadi. Lokal chizish uchun o'rnating:
+  <form method="post" action="/ch/images/install" style="display:inline"><button class="btn sm">{{ ic('download') }} O'rnatish (install_imagegen.bat)</button></form></div></div>
+{% else %}<div class="note info">{{ ic('cpu') }}<div>Video karta: <b>{{ st.gpu }}</b> ({{ st.vram_gb }} GB). Model: <b>{{ models[st.model][0] if st.model in models else st.model }}</b></div></div>{% endif %}
+{% if not brand_ok %}<div class="note">{{ ic('alert') }}<div>Brend ma'lumotlari bo'sh: <a href="/ch/profile"><b>Kanal profili → Brend va aloqa</b></a> da telefon, manzil, mo'ljal, 3 rang va logotipni kiriting.</div></div>{% endif %}
+<div class="grid g2">
+<div class="card" style="margin:0"><div class="card-h"><h2>{{ ic('image') }} Yangi rasm</h2></div>
+  <label class="l">Qaysi post uchun</label>
+  <select id="plan_id" onchange="location='?plan='+this.value"><option value="">— tanlanmagan —</option>{% for p in plan %}<option value="{{ p.id }}" {{ 'selected' if sel and sel.id == p.id }}>{{ (p.scheduled_at or '')[:16] }} · {{ p.title[:50] }}</option>{% endfor %}</select>
+  <div class="actions" style="margin-top:8px"><button type="button" class="btn sm sec" id="b_prompt" {{ 'disabled' if not ai_ok }}>{{ ic('bulb') }} AI prompt yozsin</button><span class="mut small" id="p_msg"></span></div>
+  <label class="l">Rasm tavsifi (inglizcha, matnsiz)</label><textarea id="prompt" rows="4">{{ sel.image_prompt if sel and sel.image_prompt }}</textarea>
+  <div class="grid g2"><div><label class="l">Katta yozuv (sarlavha)</label><input type="text" id="headline" maxlength="80"></div><div><label class="l">Kichik yozuv</label><input type="text" id="subline" maxlength="120"></div></div>
+  <div class="grid g3"><div><label class="l">O'lcham</label><select id="size">{% for k in sizes %}<option>{{ k }}</option>{% endfor %}</select></div>
+    <div><label class="l">Joylashuv</label><select id="layout">{% for k, v in layouts.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+    <div><label class="l">Fon</label><select id="engine"><option value="local" {{ '' if st.ready else 'disabled' }}>Lokal AI (video karta)</option><option value="gradient" {{ 'selected' if not st.ready }}>Gradient (brend ranglari)</option></select></div></div>
+  <div class="actions" style="margin-top:8px">{% for c in colors %}<span class="badge" style="background:{{ c }};color:#fff">{{ c }}</span>{% endfor %}</div>
+  <div class="actions" style="margin-top:12px"><button type="button" class="btn" id="b_gen">Rasm yaratish</button><span class="mut small" id="g_msg"></span></div>
+  <div id="preview" style="margin-top:12px"></div></div>
+<div class="card" style="margin:0"><div class="card-h"><h2>Sozlama</h2></div>
+  <form method="post" action="/ch/images/model"><label class="l">Lokal model</label><select name="model">{% for k, v in models.items() %}<option value="{{ k }}" {{ 'selected' if k == st.model }}>{{ v[0] }}</option>{% endfor %}</select>
+    <div class="actions" style="margin-top:8px"><button class="btn sm sec">Saqlash</button></div></form>
+  <div class="hint">GTX 1660 Super (6 GB) uchun SD-Turbo tavsiya etiladi: bir rasm ~10–40 soniya. Birinchi marta model internetdan yuklanadi (~2 GB), keyin internetsiz ishlaydi. Rasm qora chiqsa, dastur o'zi aniq hisoblash rejimiga o'tib qayta urinadi.</div>
+  <ul class="small" style="margin:8px 0 0 18px"><li>Pillow: {{ 'bor' if st.pillow else "yo'q" }}</li><li>PyTorch: {{ 'bor' if st.torch else "yo'q" }}</li><li>CUDA: {{ 'bor' if st.cuda else "yo'q" }}</li><li>diffusers: {{ 'bor' if st.diffusers else "yo'q" }}</li></ul></div></div>
+<div class="card" style="margin-top:14px"><div class="card-h"><h2>Yaratilgan rasmlar</h2></div>
+{% if imgs %}<div class="grid g4">{% for i in imgs %}<div><a href="/media/{{ i.name }}" target="_blank"><img src="/media/{{ i.name }}" style="width:100%;border-radius:10px;border:1px solid var(--bd)" loading="lazy"></a>
+  <div class="mut tiny">{{ i.created_at[:16] }} · {{ i.engine.split('/')[-1] }}</div>
+  <form method="post" action="/ch/images/{{ i.id }}/attach" class="actions" style="margin-top:4px"><select name="plan_id" style="max-width:100%">{% for p in plan %}<option value="{{ p.id }}" {{ 'selected' if (sel and sel.id == p.id) or p.id == i.plan_id }}>{{ p.title[:28] }}</option>{% endfor %}</select><button class="btn sm sec" {{ 'disabled' if not plan }}>Postga</button></form>
+  <form method="post" action="/ch/images/{{ i.id }}/delete" onsubmit="return confirm('O\'chirilsinmi?')"><button class="btn ghost sm">{{ ic('trash') }}</button></form></div>{% endfor %}</div>
+{% else %}<div class="empty">Hali rasm yo'q.</div>{% endif %}</div>
+{% endblock %}
+{% block scripts %}<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  async function post(url, data) { const r = await fetch(url, { method: 'POST', body: new URLSearchParams(data) }); return r.json(); }
+  $('b_prompt').addEventListener('click', async () => {
+    $('p_msg').textContent = 'AI yozmoqda...';
+    const d = await post('/ch/images/prompt', { plan_id: $('plan_id').value, text: {{ (sel.text if sel else '')|tojson }}, title: {{ (sel.title if sel else '')|tojson }} });
+    if (d.ok) { $('prompt').value = d.image_prompt; $('headline').value = d.headline; $('subline').value = d.subline; $('p_msg').textContent = 'Tayyor'; }
+    else $('p_msg').textContent = d.msg || 'Xato';
+  });
+  $('b_gen').addEventListener('click', async () => {
+    const b = $('b_gen'); b.disabled = true; $('g_msg').textContent = 'Boshlandi...';
+    const d = await post('/ch/images/generate', { prompt: $('prompt').value, headline: $('headline').value, subline: $('subline').value, layout: $('layout').value, size: $('size').value, engine: $('engine').value, plan_id: $('plan_id').value });
+    if (!d.ok) { $('g_msg').textContent = d.msg; b.disabled = false; return; }
+    const t = setInterval(async () => {
+      const j = await (await fetch('/ch/images/job/' + d.job)).json();
+      $('g_msg').textContent = j.msg || '';
+      if (j.done) { clearInterval(t); b.disabled = false; if (j.ok) { $('preview').innerHTML = '<img src="/media/' + j.name + '" style="max-width:100%;border-radius:12px;border:1px solid var(--bd)"><div class="actions" style="margin-top:8px"><a class="btn sm sec" href="">Ro\'yxatni yangilash</a></div>'; } }
+    }, 1500);
+  });
+})();
+</script>{% endblock %}

@@ -65,7 +65,7 @@ class AccountManager:
             "DELETE FROM groups WHERE account_id=?", "DELETE FROM group_tags WHERE account_id=?",
             "DELETE FROM group_members_log WHERE account_id=?", "DELETE FROM blacklist WHERE account_id=?",
             "DELETE FROM inbox WHERE account_id=?", "DELETE FROM account_events WHERE account_id=?",
-            "DELETE FROM warmup WHERE account_id=?", "DELETE FROM autojoin WHERE account_id=?", "DELETE FROM audit_cfg WHERE account_id=?", "DELETE FROM disc_candidates WHERE account_id=?", "DELETE FROM leave_log WHERE account_id=?",
+            "DELETE FROM warmup WHERE account_id=?", "DELETE FROM autojoin WHERE account_id=?", "DELETE FROM audit_cfg WHERE account_id=?", "DELETE FROM top_groups WHERE account_id=?", "DELETE FROM top_meta WHERE account_id=?", "DELETE FROM disc_candidates WHERE account_id=?", "DELETE FROM leave_log WHERE account_id=?",
             "DELETE FROM accounts WHERE id=?",
         ):
             db.ex(sql, (account_id,))

@@ -177,7 +177,15 @@ class Joiner:
                   (status, detail, title, db.now(), t["id"]))
 
         try:
-            status, title = await self.mgr.get(aid).join(t["kind"], t["key"])
+            svc = self.mgr.get(aid)
+            if db.get_setting("join_precheck") != "0":
+                from .auditor import get_cfg
+                ac = get_cfg(aid)
+                fit = await svc.check_target(t["kind"], t["key"], ac["min_members"], bool(ac["check_ads"]))
+                if not fit["ok"]:
+                    save("invalid", "Mos emas: " + fit["reason"])
+                    return "invalid"
+            status, title = await svc.join(t["kind"], t["key"])
             if status == "joined":
                 event(aid, "joined")
             save(status, "Muvaffaqiyatli a'zo bo'lindi" if status == "joined" else "Allaqachon a'zo edingiz", title)

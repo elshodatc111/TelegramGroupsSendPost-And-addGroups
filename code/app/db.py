@@ -126,9 +126,14 @@ CREATE TABLE IF NOT EXISTS disc_candidates(
     batch_id INTEGER, found_at TEXT, joined_at TEXT, ad_at TEXT, tg_id INTEGER, UNIQUE(account_id, username)
 );
 CREATE TABLE IF NOT EXISTS audit_cfg(
-    account_id INTEGER PRIMARY KEY, auto INTEGER DEFAULT 0, min_members INTEGER DEFAULT 100, check_ads INTEGER DEFAULT 1,
-    check_post INTEGER DEFAULT 1, mute_all INTEGER DEFAULT 1, max_leave INTEGER DEFAULT 10,
+    account_id INTEGER PRIMARY KEY, auto INTEGER DEFAULT 1, min_members INTEGER DEFAULT 100, check_ads INTEGER DEFAULT 1,
+    check_post INTEGER DEFAULT 1, mute_all INTEGER DEFAULT 1, max_leave INTEGER DEFAULT 30,
     min_delay INTEGER DEFAULT 25, max_delay INTEGER DEFAULT 60, last_scan TEXT);
+CREATE TABLE IF NOT EXISTS top_groups(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, username TEXT NOT NULL, title TEXT, about TEXT,
+    members INTEGER, per_day REAL, uz INTEGER, category TEXT, status TEXT, reason TEXT, batch_id INTEGER, found_at TEXT,
+    UNIQUE(account_id, username));
+CREATE TABLE IF NOT EXISTS top_meta(account_id INTEGER PRIMARY KEY, ptr_json TEXT, last_run TEXT, runs INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS leave_log(
     id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, tg_id INTEGER, title TEXT,
     reason TEXT, auto INTEGER DEFAULT 0, ts TEXT
@@ -252,6 +257,11 @@ def init():
         ]:
             _add(c, table, col, ddl)
         c.commit()
+        # v6.3: guruh auditi avtomatik rejimi standart bo'yicha yoqiladi (bir marta)
+        if not c.execute("SELECT 1 FROM settings WHERE key='audit_auto_v63'").fetchone():
+            c.execute("UPDATE audit_cfg SET auto=1, max_leave=MAX(max_leave,30)")
+            c.execute("INSERT OR REPLACE INTO settings(key,value) VALUES('audit_auto_v63','1')")
+            c.commit()
         # foydalanuvchilar: birinchisi lokal administrator (eski ma'lumotlar unga tegishli)
         if not c.execute("SELECT 1 FROM users LIMIT 1").fetchone():
             c.execute("INSERT INTO users(id,email,name,role,status,created_at) VALUES(1,NULL,'Lokal foydalanuvchi','admin','active',?)", (now(),))

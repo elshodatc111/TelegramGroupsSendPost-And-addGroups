@@ -74,3 +74,17 @@ Soxta Telegram xizmati bilan avtomatik sinovdan o'tgan (variant rotatsiyasi va d
 ## v6.2 — Kanallar auditga kiritildi
 - Sabab: `fetch_groups` yozish huquqi yo'q kanallarni butunlay tashlab yuborardi, shuning uchun ular "Mening guruhlarim"da ko'rinmasdi va audit ularni ko'rmasdi (chiqib ketilmasdi). Endi kanallar ham `groups` jadvaliga `kind='channel', can_post=0` bilan yoziladi (compose'da o'chirilgan ko'rinadi), audit ularni "Kanal: reklama yozib bo'lmaydi" sababi bilan chiqishga belgilaydi.
 - Audit sahifasiga "Hammasini bajarish" (tahlil -> chiqish -> mute) tugmasi qo'shildi (`auditor.run_all`).
+
+## v6.3 — Audit avtomatik rejimi standart bo'yicha yoqiq
+- `audit_cfg.auto` standart 1 (mavjud akkauntlar uchun bir marta yoqildi, `settings.audit_auto_v63`), kunlik chiqish chegarasi 30.
+- `auditor.loop`: 90 s dan so'ng boshlanadi, har 15 daqiqada `scan` (faqat yangi/eskirgan guruhlar uchun API so'rovi) -> `run_leave` -> `mute_pending`. Yozib bo'lmaydigan kanal/guruhlar, a'zosi <100 va reklama taqiqlanganlardan avtomatik chiqiladi.
+
+## v6.4 — Yozib bo'lmaydigan guruh/kanallardan cheklovsiz chiqish
+- `auditor.run_leave`: `can_post=0` bo'lgan barcha guruh/kanallar chegarasiz chiqiladi (25–60 s kechikish bilan); "a'zolar kam"/"reklama taqiqi" sabablari uchun kunlik chegara (`max_leave`, standart 30) saqlanadi. FloodWait bo'lsa to'xtab, keyingi 15 daqiqalik siklda davom etadi.
+
+## v7 — Top 50 guruhlar (`/top50`)
+- Modul: `top50.py`, marshrutlar: `r_top50.py`, sahifa: `templates/top50.html`, jadvallar: `top_groups`, `top_meta`.
+- Kalit so'z kiritilmaydi: 5 kategoriya (Mahalla, Maktab, Oliy ta'lim, Texnikum/kollej, O'quv markaz) uchun tayyor so'rovlar (viloyatlar, raqamli maktablar, OTM qisqartmalari bilan). Har «Qidirish» bosilganda har kategoriyadan 3 tadan navbatdagi so'rov ishlaydi (pointer `top_meta.ptr_json`), havza kengayib boradi.
+- Filtr (`top50.evaluate`): kanal emas, a'zolar yoza oladi, reklama taqiqlanmagan (tavsif + pinned), a'zolar >= audit minimumi (100), taqiq ro'yxati (Avto-topish bilan bir xil) va o'zbek tili ulushi >= 25% (matn yetarli bo'lsa); allaqachon a'zo bo'lingan guruhlar va qora ro'yxat chiqmaydi.
+- Ro'yxat: a'zolar soni bo'yicha top 50 (kategoriya filtri bilan), nomma-nom, a'zolar/faollik/o'zbek %.
+- Navbatga qo'shish: belgilanganlar `top50.enqueue` orqali `join_batches`ga tushadi (sozlangan interval; yoki «Interval sozlab qo'shish» -> `/join/{id}/setup`). A'zo bo'lingach ro'yxatdan chiqadi (`refresh_status`). Joiner'dagi oldindan tekshiruv qo'shimcha himoya beradi.

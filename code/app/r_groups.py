@@ -162,18 +162,28 @@ async def rules_progress(request: Request):
 
 
 # ---------------- yangi guruhlarni topish ----------------
+def get_cfg_min(aid):
+    from .auditor import get_cfg
+    return get_cfg(aid)["min_members"]
+
+
 @router.get("/discover")
 async def discover(request: Request, q: str = ""):
     if (r := need_account(request)):
         return r
     aid = acc_id(request)
-    results, error = [], None
+    results, error, hidden = [], None, {}
     if q.strip():
         try:
-            results = await manager.get(aid).search_public(q.strip())
+            from .auditor import get_cfg
+            ac = get_cfg(aid)
+            st = {}
+            results = await manager.get(aid).search_public(q.strip(), strict=True, min_members=ac["min_members"],
+                                                           check_ads=bool(ac["check_ads"]), stats=st)
+            hidden = st.get("hidden", {})
         except Exception as e:
             error = f"Qidirishda xato: {e}"
-    return page(request, "discover.html", q=q, results=results, error=error)
+    return page(request, "discover.html", q=q, results=results, error=error, hidden=hidden, min_members=get_cfg_min(aid))
 
 
 @router.post("/discover/join")

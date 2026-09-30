@@ -95,24 +95,30 @@ def leave_candidates(aid: int) -> list:
 
 
 def left_today(aid: int) -> int:
+    """Bugun 'boshqa sabab' (a'zolar kam, reklama taqiqi) bilan chiqilganlar soni. Yozib bo'lmaydiganlar chegaraga kirmaydi."""
     t0 = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
-    return db.one("SELECT COUNT(*) c FROM leave_log WHERE account_id=? AND reason LIKE 'Audit:%' AND ts>=?", (aid, t0))["c"]
+    return db.one("SELECT COUNT(*) c FROM leave_log WHERE account_id=? AND reason LIKE 'Audit:%' AND ts>=? "
+                  "AND reason NOT LIKE '%yozib bo''lmaydi%' AND reason NOT LIKE '%Xabar yozish mumkin emas%'", (aid, t0))["c"]
 
 
 async def run_leave(aid: int, only: list[int] | None = None, ignore_cap: bool = False) -> dict:
-    """Mos kelmagan guruhlardan chiqadi (kunlik chegara bilan). Faol yuborish bor bo'lsa, kutadi."""
+    """Mos kelmagan guruhlardan chiqadi. Post yuborib bo'lmaydigan guruh/kanallardan CHEKLOVSIZ (hammasidan), qolgan sabablar
+    bo'yicha kunlik chegara bilan. Faol yuborish bor bo'lsa, kutadi."""
     cfg = get_cfg(aid)
     if db.one("SELECT 1 FROM jobs WHERE account_id=? AND status IN ('running','queued','waiting')", (aid,)):
         return {"left": 0, "failed": 0, "blocked": "Faol yuborish ketmoqda, u tugagach qayta urinib ko'ring"}
     cands = leave_candidates(aid)
     if only is not None:
         cands = [c for c in cands if c["tg_id"] in set(only)]
-    room = len(cands) if ignore_cap else max(0, cfg["max_leave"] - left_today(aid))
+    must = [c for c in cands if not c["can_post"]]
+    rest = [c for c in cands if c["can_post"]]
+    room = len(rest) if ignore_cap else max(0, cfg["max_leave"] - left_today(aid))
+    todo = must + rest[:room]
     ok = fail = 0
     prog = progress.setdefault(aid, {})
-    prog.update(running=True, done=0, total=min(room, len(cands)), msg="Guruhlardan chiqilmoqda")
+    prog.update(running=True, done=0, total=len(todo), msg="Guruhlardan chiqilmoqda")
     try:
-        for c in cands[:room]:
+        for c in todo:
             try:
                 await leave_group(aid, c["tg_id"], c["title"], "Audit: " + (c["verdict_reason"] or ""), only is None)
                 ok += 1
@@ -169,16 +175,14 @@ async def tick():
         if not svc or not svc.info or progress.get(aid, {}).get("running"):
             continue
         cfg = get_cfg(aid)
-        last = cfg["last_scan"]
-        if not last or datetime.strptime(last, "%Y-%m-%d %H:%M:%S") < datetime.now() - timedelta(hours=12):
-            await scan(aid)
+        await scan(aid)          # har safar: yangi a'zo bo'lingan guruh/kanallar ham tekshiriladi (faqat yangilari uchun API so'rovi)
         await run_leave(aid)
         if cfg["mute_all"]:
             await mute_pending(aid)
 
 
 async def loop():
-    await asyncio.sleep(420)
+    await asyncio.sleep(90)
     while True:
         try:
             await tick()
@@ -186,4 +190,4 @@ async def loop():
             raise
         except Exception:
             log.exception("auditor.tick")
-        await asyncio.sleep(1800)
+        await asyncio.sleep(900)

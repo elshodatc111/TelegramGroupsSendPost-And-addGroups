@@ -218,11 +218,15 @@ def classify(info: dict, cfg: dict, keyword: str = "") -> dict:
     res["category"] = cat
     uz, wc = uz_share(texts + [title, about])
     res["uz"] = uz
+    from .auditor import get_cfg as _acfg
+    min_members = max(cfg["min_members"], _acfg(cfg["account_id"])["min_members"])
     members, per_day = info.get("members") or 0, info.get("per_day") or 0
+    if info.get("ads_flag"):
+        return dict(res, status="low", reason="Guruhda reklama taqiqlangan (tavsif/mahkamlangan xabar)")
     if not info.get("can_send", True):
         return dict(res, status="low", reason="Guruhda a'zolar yoza olmaydi")
-    if members < cfg["min_members"]:
-        return dict(res, status="low", reason=f"A'zolar kam ({members} < {cfg['min_members']})")
+    if members < min_members:
+        return dict(res, status="low", reason=f"A'zolar kam ({members} < {min_members})")
     if per_day < cfg["min_per_day"]:
         return dict(res, status="low", reason=f"Faollik past (kuniga {per_day} xabar < {cfg['min_per_day']})")
     if wc >= 25 and uz < cfg["min_uz"]:

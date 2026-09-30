@@ -3,6 +3,7 @@
 <div class="page-h"><div><h1>Yangi guruhlarni topish</h1><p class="sub">Telegram'dagi ommaviy guruh va kanallarni kalit so'z bo'yicha qidiring va a'zo bo'ling</p></div></div>
 <div class="card"><form method="get" action="/discover" class="tools" style="margin:0"><input type="search" name="q" value="{{ q }}" placeholder="Masalan: toshkent savdo, ish e'lonlari, avto..." autofocus><button class="btn">{{ ic('search') }} Qidirish</button></form></div>
 {% if error %}<div class="note red">{{ ic('alert') }}<div>{{ error }}</div></div>{% endif %}
+{% if hidden %}<div class="note info">{{ ic('shield') }}<div>Reklama yuborib bo'lmaydigan <b>{{ hidden.values()|sum }} ta</b> natija yashirildi: {% for k, v in hidden.items() %}{{ k }} — {{ v }}{{ ', ' if not loop.last }}{% endfor %}. Faqat post yuborish mumkin bo'lgan guruhlar ko'rsatilmoqda.</div></div>{% endif %}
 {% if q and not results and not error %}<div class="card empty">{{ ic('search') }}<div>Hech narsa topilmadi</div></div>{% endif %}
 {% if results %}<form method="post" action="/discover/join"><input type="hidden" name="q" value="{{ q }}">
 <div class="card"><div class="card-h"><h2>Natijalar ({{ results|length }})</h2><button class="btn ok sm">{{ ic('user-plus') }} Belgilanganlarga a'zo bo'lish</button></div>

@@ -114,7 +114,7 @@ async def on_error(request: Request, exc: Exception):
     return page(request, "error.html", status_code=500, detail=f"{type(exc).__name__}: {exc}")
 
 
-from . import r_account, r_groups, r_inbox, r_join, r_posts, r_stats, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit  # noqa: E402
+from . import r_account, r_groups, r_inbox, r_join, r_posts, r_stats, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit, r_top50  # noqa: E402
 
-for r in (r_account, r_posts, r_groups, r_join, r_stats, r_inbox, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit):
+for r in (r_account, r_posts, r_groups, r_join, r_stats, r_inbox, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit, r_top50):
     app.include_router(r.router)

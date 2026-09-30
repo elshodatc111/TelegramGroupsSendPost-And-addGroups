@@ -5,7 +5,7 @@
     <p class="sub" style="color:var(--mut);margin:6px 0 0;max-width:660px">A'zo bo'lingan guruhlarni tekshiradi: a'zolar soni kam yoki reklama yuborib bo'lmaydigan guruhlardan chiqadi, qolgan barcha guruhlarning bildirishnomalarini o'chiradi (mute).</p></div>
   <form method="post" action="/audit/toggle" class="aj-master">
     <label class="sw"><input type="checkbox" {% if cfg.auto %}checked{% endif %} onchange="this.form.submit()"><i></i></label>
-    <div><b>{{ 'Avtomatik audit yoqilgan' if cfg.auto else 'Avtomatik audit o\'chiq' }}</b><span>{% if not connected %}Akkaunt ulanmagan{% elif cfg.auto %}Har 12 soatda tahlil, kuniga {{ cfg.max_leave }} tagacha chiqish{% else %}Faqat qo'lda ishlaydi{% endif %}</span></div>
+    <div><b>{{ 'Avtomatik audit yoqilgan' if cfg.auto else 'Avtomatik audit o\'chiq' }}</b><span>{% if not connected %}Akkaunt ulanmagan{% elif cfg.auto %}Har 15 daqiqada tekshiriladi · yozib bo'lmaydiganlardan cheklovsiz chiqadi{% else %}Faqat qo'lda ishlaydi{% endif %}</span></div>
   </form>
 </div>
 
@@ -24,18 +24,18 @@
 <div class="card"><div class="card-h"><h2>{{ ic('play') }} Amallar</h2><span class="mut small" id="prog">{% if running %}Amal ketmoqda...{% endif %}</span></div>
   <div class="aj-act">
     <form method="post" action="/audit/scan"><button class="btn blue" {% if running or not connected %}disabled{% endif %}>{{ ic('search') }} 1. Tahlil qilish</button></form>
-    <form method="post" action="/audit/leave" onsubmit="return confirm('{{ pending }} ta guruhdan chiqilsinmi? Bugun chegara: {{ cfg.max_leave }} ta. Bu amalni qaytarib bo\'lmaydi.')"><button class="btn bad" {% if running or not connected or not pending %}disabled{% endif %}>{{ ic('log-out') }} 2. Chiqish ({{ pending }})</button></form>
+    <form method="post" action="/audit/leave" onsubmit="return confirm('{{ pending }} ta guruhdan chiqilsinmi? Yozib bo\'lmaydiganlar cheklovsiz, qolganlari kuniga {{ cfg.max_leave }} tagacha. Bu amalni qaytarib bo\'lmaydi.')"><button class="btn bad" {% if running or not connected or not pending %}disabled{% endif %}>{{ ic('log-out') }} 2. Chiqish ({{ pending }})</button></form>
     <form method="post" action="/audit/mute"><button class="btn ok" {% if running or not connected %}disabled{% endif %}>{{ ic('lock') }} 3. Hammasini mute qilish</button></form>
-    <form method="post" action="/audit/all" onsubmit="return confirm('Tahlil qilinadi, mos kelmagan guruh va kanallardan chiqiladi (bugungi chegara: {{ cfg.max_leave }} ta), qolganlari mute qilinadi. Davom etilsinmi?')"><button class="btn" {% if running or not connected %}disabled{% endif %}>{{ ic('play') }} Hammasini bajarish</button></form>
+    <form method="post" action="/audit/all" onsubmit="return confirm('Tahlil qilinadi, mos kelmagan guruh va kanallardan chiqiladi (yozib bo\'lmaydiganlar cheklovsiz), qolganlari mute qilinadi. Davom etilsinmi?')"><button class="btn" {% if running or not connected %}disabled{% endif %}>{{ ic('play') }} Hammasini bajarish</button></form>
     <form method="post" action="/audit/scan"><input type="hidden" name="full" value="1"><button class="btn ghost" {% if running or not connected %}disabled{% endif %}>To'liq qayta tekshirish</button></form>
   </div>
   <div class="aj-prog"><i id="pbar" style="width:{{ 100 if running else 0 }}%"></i></div>
-  <div class="hint" style="margin-top:12px">Bugun chiqildi: <b>{{ left_today }}</b> / {{ cfg.max_leave }}. Chiqilgan guruh qora ro'yxatga tushadi (qayta a'zo bo'linmaydi). Mute: xabarlar keladi, lekin siz o'zingiz ochib ko'rmaguningizcha ovoz/bildirishnoma bo'lmaydi; Telegram'da istalgan guruhni qayta yoqish mumkin.</div></div>
+  <div class="hint" style="margin-top:12px">Post yuborib bo'lmaydigan guruh/kanallardan <b>cheklovsiz</b>, hammasidan chiqiladi. Boshqa sabablar bo'yicha bugun: <b>{{ left_today }}</b> / {{ cfg.max_leave }}. Chiqilgan guruh qora ro'yxatga tushadi (qayta a'zo bo'linmaydi). Mute: xabarlar keladi, lekin siz o'zingiz ochib ko'rmaguningizcha ovoz/bildirishnoma bo'lmaydi; Telegram'da istalgan guruhni qayta yoqish mumkin.</div></div>
 
 <form method="post" action="/audit/save" class="card"><div class="card-h"><h2>{{ ic('settings') }} Qoidalar</h2></div>
   <div class="aj-set">
     <div><label class="l">Min. obunachi soni</label><input type="number" name="min_members" value="{{ cfg.min_members }}" min="0"></div>
-    <div><label class="l">Kuniga ko'pi bilan chiqish</label><input type="number" name="max_leave" value="{{ cfg.max_leave }}" min="1" max="200"></div>
+    <div><label class="l">Kunlik chegara (a'zolar kam / reklama taqiqi)</label><input type="number" name="max_leave" value="{{ cfg.max_leave }}" min="1" max="200"></div>
     <div><label class="l">Chiqish oralig'i, min (soniya)</label><input type="number" name="min_delay" value="{{ cfg.min_delay }}" min="10"></div>
     <div><label class="l">Chiqish oralig'i, max (soniya)</label><input type="number" name="max_delay" value="{{ cfg.max_delay }}" min="10"></div>
   </div>

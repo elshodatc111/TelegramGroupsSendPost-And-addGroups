@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% block title %}Top 50 guruhlar{% endblock %}
+{% block content %}
+<div class="aj-head">
+  <div><div class="aj-eyebrow">Ta'lim va mahalla · Avtomatik qidiruv</div><h1>Top 50 guruhlar</h1>
+    <p class="sub" style="color:var(--mut);margin:6px 0 0;max-width:680px">Mahalla, maktab, oliy ta'lim, texnikum va o'quv markazlarining guruhlari. So'z kiritish shart emas: «Qidirish» ni bosing, dastur o'zi topadi. Faqat siz hali a'zo bo'lmagan va post yuborish mumkin bo'lgan guruhlar chiqadi.</p></div>
+</div>
+
+<section class="t50-hero">
+  <div><h2>{{ 'Qidiruv ketmoqda...' if running else 'Yangi guruhlarni qidirish' }}</h2>
+    <p>Har bosishda har kategoriyadan yangi so'rovlar ishlaydi va ro'yxat kengayib boradi.{% if meta.last_run %} Oxirgi qidiruv: {{ meta.last_run }} · {{ meta.runs }} marta.{% endif %} Minimal a'zolar soni: {{ min_members }}.</p>
+    <div class="aj-prog"><i id="pbar" style="width:{{ 100 if running else 0 }}%"></i></div><div class="mut small" id="prog" style="margin-top:6px">{% if running %}Qidiruv ketmoqda...{% endif %}</div></div>
+  <form method="post" action="/top50/search"><button class="btn lg" {% if running or not connected %}disabled{% endif %}>{{ ic('search') }} Qidirish</button></form>
+</section>
+
+<div class="grid g4" style="margin-bottom:18px">
+  <div class="stat"><div class="k">Ro'yxatdagi guruhlar</div><div class="v">{{ rows|length }}</div></div>
+  <div class="stat"><div class="k">Jami a'zolar (ro'yxatda)</div><div class="v">{{ '{:,}'.format(sum_members).replace(',', ' ') }}</div></div>
+  <div class="stat"><div class="k">Navbatda</div><div class="v">{{ queued }}</div></div>
+  <div class="stat"><div class="k">A'zo bo'lingan / Rad etilgan</div><div class="v">{{ joined }} <span style="font-size:16px;color:var(--mut)">/ {{ rej }}</span></div></div>
+</div>
+
+<div class="aj-filter"><div class="chips"><a class="chip {{ 'on' if not cat }}" href="/top50">Hammasi · {{ total_pool }}</a>{% for c in cats %}<a class="chip {{ 'on' if cat == c }}" href="/top50?c={{ c|urlencode }}">{{ c }} · {{ cnt[c] }}</a>{% endfor %}</div></div>
+
+{% if rows %}
+<form method="post" action="/top50/queue" id="qf"><div class="card" style="padding:0">
+<div class="tbl-wrap" style="border:0"><table class="aj-tbl"><thead><tr><th style="width:36px"><input type="checkbox" id="all"></th><th style="width:50px">#</th><th>Guruh</th><th>Kategoriya</th><th>A'zolar</th><th>Faollik/kun</th><th>O'zbek</th><th>Holat</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{% if r.status == 'ok' %}<input type="checkbox" name="usernames" value="{{ r.username }}" class="sel">{% endif %}</td>
+  <td><div class="t50-rank {{ 'first' if loop.index <= 3 }}">{{ loop.index }}</div></td>
+  <td class="aj-name"><a href="https://t.me/{{ r.username }}" target="_blank" rel="noopener"><b>{{ r.title or r.username }}</b></a><span>@{{ r.username }}</span></td>
+  <td><span class="t50-cat">{{ r.category }}</span></td>
+  <td><div class="t50-mem"><b>{{ '{:,}'.format(r.members or 0).replace(',', ' ') }}</b><div class="bar"><i style="width:{{ [100, (r.members or 0) * 100 // maxm]|min }}%"></i></div></div></td>
+  <td>{{ r.per_day|round(1) if r.per_day is not none else '—' }}</td><td>{{ r.uz or 0 }}%</td>
+  <td>{% if r.status == 'queued' %}<span class="badge b-running">Navbatda</span>{% else %}<span class="badge b-good">Post yuborish mumkin</span>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></div>
+<div class="t50-bar"><span class="mut small">Tanlangan: <b id="n">0</b> ta guruh</span>
+  <div class="actions"><button class="btn ok" name="mode" value="now" {% if not connected %}disabled{% endif %}>{{ ic('user-plus') }} Navbatga qo'shish</button><button class="btn sec" name="mode" value="setup">Interval sozlab qo'shish</button></div></div>
+</form>
+{% else %}<div class="card empty" style="padding:44px">{{ ic('search') }}<div><b>Hozircha ro'yxat bo'sh.</b><br>«Qidirish» tugmasini bosing — dastur mahalla, maktab, OTM, texnikum va o'quv markazlarini o'zi topadi.</div></div>{% endif %}
+
+<script>
+(function(){
+ var all=document.getElementById('all'),n=document.getElementById('n');
+ function upd(){if(n)n.textContent=document.querySelectorAll('.sel:checked').length}
+ if(all)all.addEventListener('change',function(){document.querySelectorAll('.sel').forEach(function(c){c.checked=all.checked});upd()});
+ document.querySelectorAll('.sel').forEach(function(c){c.addEventListener('change',upd)});
+ {% if running %}(function poll(){fetch('/api/top50/progress').then(function(r){return r.json()}).then(function(p){var e=document.getElementById('prog');if(p.running){e.textContent=(p.msg||'')+' · '+p.done+'/'+p.total+' · yangi: '+p.new;var b=document.getElementById('pbar');if(b&&p.total)b.style.width=Math.max(5,p.done*100/p.total)+'%';setTimeout(poll,3000)}else{location.reload()}}).catch(function(){})})();{% endif %}
+})();
+</script>
+{% endblock %}

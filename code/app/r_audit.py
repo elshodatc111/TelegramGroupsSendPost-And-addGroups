@@ -100,6 +100,19 @@ async def audit_scan(request: Request):
     return go("/audit", msg="Tahlil boshlandi")
 
 
+@router.post("/audit/all")
+async def audit_all(request: Request):
+    if (r := need_account(request)):
+        return r
+    aid = acc_id(request)
+    if not _connected(aid):
+        return go("/audit", err="Akkaunt ulanmagan")
+    if auditor.progress.get(aid, {}).get("running"):
+        return go("/audit", err="Boshqa amal ketmoqda")
+    _bg(auditor.run_all(aid))
+    return go("/audit", msg="Tahlil, chiqish va mute ketma-ket boshlandi")
+
+
 @router.post("/audit/leave")
 async def audit_leave(request: Request, tg_ids: list[int] = Form(default=[]), sel: str = Form(default="")):
     if (r := need_account(request)):

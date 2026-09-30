@@ -206,10 +206,9 @@ class TelegramService:
                 if getattr(e, "left", False):
                     continue
                 if e.broadcast:
+                    # Kanallar ham saqlanadi (yozish huquqi bo'lmasa can_post=0): Guruh auditi ulardan chiqib keta olishi uchun
                     kind = "channel"
                     can = bool(e.creator or (e.admin_rights and e.admin_rights.post_messages))
-                    if not can:
-                        continue
                 else:
                     kind = "supergroup"
                     br = e.default_banned_rights

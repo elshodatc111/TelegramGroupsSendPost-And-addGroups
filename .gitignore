@@ -1,0 +1,16 @@
+# Shaxsiy ma'lumotlar Githubga chiqmasin (akkaunt sessionlari, baza, media, loglar)
+data/*
+!data/README.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+code/.venv/
+*.session
+*.session-journal
+*.db
+*.db-wal
+*.db-shm
+.env

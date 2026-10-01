@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% from "meet_macros.html" import pill, copybtn, actions %}{% block title %}Dars{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>{{ l.group_title }}</h1><p class="sub">{{ l.wd }} {{ l.day }} · {{ l.hhmm }}–{{ l.end_hhmm }} ({{ l.duration_min }} daq) · {{ pill(l) }}{% if l.moved_from %} · ko'chirilgan (avval {{ l.moved_from[:16] }}){% endif %}</p></div>
+<div class="actions"><a class="btn sec" href="/meet/groups/{{ g.id }}">{{ ic('users') }} Guruh</a>{{ actions(l, '/meet/lessons/' ~ l.id) }}</div></div>
+{% if l.warn %}<div class="mt-warn">{{ ic('alert') }}<div>{{ l.warn }}</div></div>{% endif %}
+{% if l.prov_err %}<div class="mt-warn">{{ ic('alert') }}<div>Meet/Kalendar yaratilmadi: {{ l.prov_err }}</div></div>{% endif %}
+{% if l.status == 'cancelled' %}<div class="mt-warn">{{ ic('alert') }}<div>Dars bekor qilingan. {{ l.cancel_reason or '' }}</div></div>{% endif %}
+<div class="mt-grid2">
+<div class="card"><div class="card-h"><h2>{{ ic('video') }} Meet xonasi</h2></div>
+{% if l.meeting_uri %}<div class="mt-link"><code id="uri">{{ l.meeting_uri }}</code>{{ copybtn(l.meeting_uri) }}<a class="btn sec sm" href="{{ l.meeting_uri }}" target="_blank" rel="noopener">Ochish</a></div>
+<div class="mut small" style="margin-top:8px">Havola ochiq (accessType OPEN). O'qituvchi: {{ teacher.name if teacher else '—' }}{% if teacher and teacher.gmail %} · {{ 'co-host ✓' if l.cohost_ok else 'co-host qo\'shilmadi' }}{% endif %}</div>
+{% else %}<div class="empty"><div>Havola hali yaratilmagan.</div></div><form method="post" action="/meet/lessons/{{ l.id }}/provision"><button class="btn">Meet xonasi yaratish</button></form>{% endif %}
+<div class="actions" style="margin-top:12px"><form method="post" action="/meet/lessons/{{ l.id }}/send"><input type="hidden" name="who" value="teacher"><button class="btn sec sm">O'qituvchiga yuborish</button></form>
+<form method="post" action="/meet/lessons/{{ l.id }}/send"><input type="hidden" name="who" value="group"><button class="btn sec sm">Guruhga yuborish</button></form></div>
+<div class="mut tiny" style="margin-top:8px">Yuborilgan: o'qituvchiga {{ l.fl.get('t_link', '—')[:16] }} · guruhga {{ l.fl.get('g_link', '—')[:16] }} · eslatmalar {{ l.fl.get('g_a', '—')[:16] }} / {{ l.fl.get('g_b', '—')[:16] }}</div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('clock') }} Vaqt</h2></div>
+<div class="row" style="gap:24px;flex-wrap:wrap"><div><div class="mut small">Dars qancha vaqt o'tdi</div><div class="mt-elapsed" {% if l.status == 'live' %}data-elapsed-start="{{ l.real_start }}"{% endif %}>{{ l.elapsed }} daq</div></div>
+<div><div class="mut small">Meet boshlandi</div><b>{{ l.real_start[11:16] if l.real_start else '—' }}</b></div><div><div class="mut small">Tugadi</div><b>{{ l.real_end[11:16] if l.real_end else '—' }}</b></div><div><div class="mut small">Eng ko'pi bilan</div><b>{{ l.peak or 0 }}</b></div></div>
+<div class="actions" style="margin-top:12px"><form method="post" action="/meet/lessons/{{ l.id }}/poll"><button class="btn sec sm">{{ ic('refresh') }} Davomatni hozir yangilash</button></form>
+{% if l.status in ('planned','live') %}<form method="post" action="/meet/lessons/{{ l.id }}/finish" onsubmit="return confirm('Dars yakunlansinmi va hisobot tayyorlansinmi?')"><button class="btn ghost sm">Yakunlash</button></form>{% endif %}</div>
+<form method="post" action="/meet/lessons/{{ l.id }}/record" style="margin-top:14px"><label class="l">Yozuv (record) havolasi</label><div class="row" style="gap:8px"><input type="text" name="url" value="{{ l.record_url or '' }}" placeholder="https://drive.google.com/..."><button class="btn sm">Saqlash</button></div>
+<div class="hint">Gmail'da yozuv avtomatik bog'lanmaydi: havolani qo'lda kiriting (Workspace'da avtomatik).</div></form>
+{% if l.record_url %}<a href="{{ l.record_url }}" target="_blank" rel="noopener">{{ ic('film') }} Yozuvni ochish</a>{% endif %}</div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('users') }} Davomat ({{ sm.students|length }} o'quvchi)</h2><span class="mut small">Kech qolgan: &gt;{{ late_min }} daq · Erta chiqqan: &gt;{{ early_min }} daq (Sozlamalar)</span></div>
+{% if people %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Ism (Meet'dagi nom)</th><th>Kirdi</th><th>Chiqdi</th><th>Jami</th><th>Holat</th><th></th></tr></thead><tbody>
+{% for p in people %}<tr><td><b>{{ p.person }}</b>{% if p.is_teacher %} <span class="mt-pill done">o'qituvchi</span>{% endif %}{% if p.raws|length > 1 %}<div class="mut tiny">{{ p.raws|join(' · ') }}</div>{% endif %}</td><td>{{ p.first_in[11:16] }}</td><td>{{ p.last_out[11:16] if p.last_out else ('hozir ichida' if p.in_now else '—') }}</td><td>{{ p.minutes }} daq</td>
+<td>{% if p.late %}<span class="mt-pill planned">kech +{{ p.late_min }}</span> {% endif %}{% if p.early %}<span class="mt-pill" style="background:var(--c-early-bg);color:var(--c-early-tx)">erta −{{ p.early_min }}</span>{% endif %}{% if not p.late and not p.early %}<span class="mt-pill done">o'z vaqtida</span>{% endif %}</td>
+<td class="nowrap">{% if p.is_teacher %}<form method="post" action="/meet/attendance/{{ p.ids[0] }}/teacher" style="display:inline"><input type="hidden" name="flag" value="0"><button class="btn ghost sm">O'qituvchi emas</button></form>
+{% else %}<form method="post" action="/meet/attendance/{{ p.ids[0] }}/teacher" style="display:inline"><input type="hidden" name="flag" value="1"><button class="btn ghost sm">Bu o'qituvchi</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">{{ ic('users') }}<div>Hali hech kim kirmagan yoki davomat olinmagan.</div></div>{% endif %}
+{% if sm.absent %}<div class="mt-warn" style="background:var(--c-bad-bg);color:var(--c-bad-tx);border-color:transparent">{{ ic('alert') }}<div><b>Kelmadi:</b> {{ sm.absent|join(', ') }}</div></div>{% endif %}
+<form method="post" action="/meet/groups/{{ g.id }}/merge" class="row" style="gap:8px;flex-wrap:wrap;align-items:end;margin-top:14px"><input type="hidden" name="back" value="/meet/lessons/{{ l.id }}">
+<div><label class="l">Bir odam, turli nom: bu nom</label><input type="text" name="from_name" list="sn" required></div><div><label class="l">shu odam bilan bir xil</label><input type="text" name="to_name" list="sn" required></div>
+<datalist id="sn">{% for n in student_names %}<option value="{{ n }}">{% endfor %}</datalist><button class="btn sm">Birlashtirish</button></form>
+<div class="hint">Begonani chiqarish tugmasi platformada yo'q: o'qituvchi Meet ichida o'zi chiqaradi. Ko'p odam kirsa yoki yangi nom paydo bo'lsa, faqat xabar beriladi.</div></div>
+{% if report %}<div class="card"><div class="card-h"><h2>{{ ic('file-text') }} Qisqa hisobot</h2>{{ copybtn(report) }}</div><pre style="white-space:pre-wrap;font:inherit;margin:0">{{ report }}</pre></div>{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+(function(){document.querySelectorAll('[data-elapsed-start]').forEach(function(el){var s=el.dataset.elapsedStart;if(!s)return;var t=new Date(s.replace(' ','T')+'+05:00');
+function tick(){var m=Math.max(0,Math.floor((Date.now()-t.getTime())/60000));el.textContent=m+' daq'}tick();setInterval(tick,15000)});})();
+</script>{% endblock %}

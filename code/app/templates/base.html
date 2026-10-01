@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}Telegram Group Post{% endblock %} · {{ 'Kanallarim' if ws == 'channels' else 'Tizim tahlili' if ws == 'system' else 'Group Post' }}</title>
+<title>{% block title %}Telegram Group Post{% endblock %} · {{ 'Kanallarim' if ws == 'channels' else 'Tizim tahlili' if ws == 'system' else 'Majlislar' if ws == 'meet' else 'Group Post' }}</title>
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t)t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}})()</script>
 <link rel="stylesheet" href="/static/style.css">
+{% if ws == 'meet' %}<link rel="stylesheet" href="/static/meet.css">{% endif %}
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23dc2626'/%3E%3Cpath d='M7 15l17-7-3 16-6-4-3 3v-5l8-7-10 6z' fill='white'/%3E%3C/svg%3E">
-</head><body class="{{ 'ws-ch' if ws == 'channels' }}">
+</head><body class="{{ 'ws-ch' if ws == 'channels' else 'ws-meet' if ws == 'meet' }}">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 {% for n, d in ICONS.items() %}<symbol id="i-{{ n }}" viewBox="0 0 24 24">{{ d }}</symbol>{% endfor %}
 </defs></svg>
@@ -13,8 +14,8 @@
 <aside class="side" id="side">
   <div class="dd wsdd">
     <button class="ws-btn" data-dd type="button">
-      <div class="logo">{{ ic('layers' if ws == 'channels' else 'cpu' if ws == 'system' else 'send') }}</div>
-      <div class="t"><b>{{ 'Kanallarim' if ws == 'channels' else 'Tizim tahlili' if ws == 'system' else 'Group Post' }}</b><small>{{ "Kanalni rivojlantirish" if ws == 'channels' else 'Dastur holati va loglar' if ws == 'system' else 'Reklama avtomatlashtirish' }}</small></div>
+      <div class="logo">{{ ic('layers' if ws == 'channels' else 'cpu' if ws == 'system' else 'video' if ws == 'meet' else 'send') }}</div>
+      <div class="t"><b>{{ 'Kanallarim' if ws == 'channels' else 'Tizim tahlili' if ws == 'system' else 'Majlislar' if ws == 'meet' else 'Group Post' }}</b><small>{{ "Kanalni rivojlantirish" if ws == 'channels' else 'Dastur holati va loglar' if ws == 'system' else 'Google Meet darslari' if ws == 'meet' else 'Reklama avtomatlashtirish' }}</small></div>
       {{ ic('chevron-down') }}
     </button>
     <div class="menu">
@@ -22,6 +23,7 @@
       <form method="post" action="/ws/switch"><input type="hidden" name="ws" value="posting"><button class="mi {{ 'cur' if ws == 'posting' }}"><span class="ava">{{ ic('send') }}</span><span class="t"><b>Group Post</b><small>Guruhlarga reklama yuborish</small></span>{% if ws == 'posting' %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>
       <form method="post" action="/ws/switch"><input type="hidden" name="ws" value="channels"><button class="mi {{ 'cur' if ws == 'channels' }}"><span class="ava blue">{{ ic('layers') }}</span><span class="t"><b>Kanallarim</b><small>O'z kanallarni rivojlantirish</small></span>{% if ws == 'channels' %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>
       <form method="post" action="/ws/switch"><input type="hidden" name="ws" value="system"><button class="mi {{ 'cur' if ws == 'system' }}"><span class="ava">{{ ic('cpu') }}</span><span class="t"><b>Tizim tahlili</b><small>Holat, loglar, yo'riqnoma</small></span>{% if ws == 'system' %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>
+      <form method="post" action="/meet/switch"><button class="mi {{ 'cur' if ws == 'meet' }}"><span class="ava mt">{{ ic('video') }}</span><span class="t"><b>Majlislar</b><small>Google Meet darslari va davomat</small></span>{% if ws == 'meet' %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>
     </div>
   </div>
 {% if ws == 'channels' %}
@@ -48,6 +50,25 @@
     <a href="/ch/usage" class="{{ 'active' if p.startswith('/ch/usage') }}">{{ ic('cpu') }} AI sarfi (token)</a>
     <a href="/ch/account" class="{{ 'active' if p.startswith('/ch/account') }}">{{ ic('shield') }} Akkaunt</a>
     <a href="/ch/settings" class="{{ 'active' if p.startswith('/ch/settings') }}">{{ ic('settings') }} Sozlamalar</a>
+  </nav>
+{% elif ws == 'meet' %}
+  <nav class="nav">
+    <a href="/meet" class="{{ 'active' if p == '/meet' }}">{{ ic('home') }} Bosh sahifa</a>
+    <a href="/meet/calendar" class="{{ 'active' if p.startswith('/meet/calendar') }}">{{ ic('calendar') }} Umumiy kalendar</a>
+    <div class="nav-sec">Darslar</div>
+    <a href="/meet/groups" class="{{ 'active' if p.startswith('/meet/groups') }}">{{ ic('users') }} Guruhlar va jadval</a>
+    <a href="/meet/lessons" class="{{ 'active' if p.startswith('/meet/lessons') }}">{{ ic('video') }} Darslar</a>
+    <a href="/meet/teachers" class="{{ 'active' if p.startswith('/meet/teachers') }}">{{ ic('cap') }} O'qituvchilar</a>
+    <div class="nav-sec">Davomat</div>
+    <a href="/meet/reports" class="{{ 'active' if p.startswith('/meet/reports') }}">{{ ic('table') }} Oylik jadval</a>
+    <a href="/meet/stats" class="{{ 'active' if p.startswith('/meet/stats') }}">{{ ic('bar-chart') }} Statistika</a>
+    <a href="/meet/alerts" class="{{ 'active' if p.startswith('/meet/alerts') }}">{{ ic('alert') }} Ogohlantirishlar {% if meet_unseen %}<span class="cnt">{{ meet_unseen }}</span>{% endif %}</a>
+    <div class="nav-sec">Tizim</div>
+    <a href="/meet/diag" class="{{ 'active' if p.startswith('/meet/diag') }}">{{ ic('activity') }} Google diagnostika</a>
+    <a href="/meet/account" class="{{ 'active' if p.startswith('/meet/account') }}">{{ ic('shield') }} Telegram akkaunt</a>
+    <a href="/meet/settings" class="{{ 'active' if p.startswith('/meet/settings') }}">{{ ic('settings') }} Sozlamalar</a>
+    <div class="nav-sec">Yordam</div>
+    <a href="/meet/guide" class="{{ 'active' if p.startswith('/meet/guide') }}">{{ ic('book') }} Yo'riqnoma</a>
   </nav>
 {% elif ws == 'system' %}
   <nav class="nav">
@@ -101,6 +122,8 @@
       <hr><a class="mi" href="/ch/channels">{{ ic('plus') }} <span class="t"><b>Kanal biriktirish / boshqarish</b></span></a>
     </div>
   </div>
+{% elif ws == 'meet' %}
+  <a class="mt-chip {{ 'ok' if g_ok else 'bad' }}" href="/meet/settings" title="Google ulanishi">{{ ic('video') }} {{ 'Google: ' ~ host_email if g_ok else 'Google ulanmagan' }}</a>
 {% elif ws == 'system' %}
 {% else %}
   <div class="dd">
@@ -121,7 +144,7 @@
   </div>
 {% endif %}
   <div class="grow-sp"></div>
-  {% if ws != 'channels' %}<a class="iconbtn" href="/inbox" title="Inbox">{{ ic('inbox') }}{% if unread %}<span class="dotc">{{ unread }}</span>{% endif %}</a>{% endif %}
+  {% if ws != 'channels' and ws != 'meet' %}<a class="iconbtn" href="/inbox" title="Inbox">{{ ic('inbox') }}{% if unread %}<span class="dotc">{{ unread }}</span>{% endif %}</a>{% endif %}
   {% if auth_on %}<form method="post" action="/logout" style="margin:0"><button class="iconbtn" title="Chiqish">{{ ic('log-out') }}</button></form>{% endif %}
 </header>
 <main class="main">

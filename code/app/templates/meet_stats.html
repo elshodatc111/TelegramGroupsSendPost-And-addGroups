@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% from "meet_macros.html" import monthnav %}{% block title %}Statistika{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Statistika</h1><p class="sub">«Dars qancha vaqt o'tdi» Meet'da haqiqiy suhbat boshlangandan tugaguncha hisoblanadi. Oylik: har o'qituvchi necha soat dars o'tdi, nechta guruhga; guruh bo'yicha jami soat.</p></div>{{ monthnav('/meet/stats', ym, prev, nxt) }}</div>
+{% if live %}<div class="card mt-live-card"><div class="card-h"><h2>{{ ic('video') }} Hozir davom etayotgan darslar</h2></div>{% for l in live %}<div class="row" style="gap:20px;padding:6px 0"><b>{{ l.group_title }}</b><span class="mt-elapsed" style="font-size:22px" data-elapsed-start="{{ l.real_start }}">{{ l.elapsed }} daq</span><span class="mut">{{ l.teacher_name }}</span></div>{% endfor %}</div>{% endif %}
+<div class="grid g4"><div class="stat ok"><div class="k">Jami soat</div><div class="v">{{ st.total_hours }}</div></div><div class="stat"><div class="k">O'tgan darslar</div><div class="v">{{ st.counts.get('done', 0) + st.counts.get('live', 0) }}</div></div>
+<div class="stat"><div class="k">Bekor qilingan</div><div class="v">{{ st.counts.get('cancelled', 0) }}</div></div><div class="stat"><div class="k">O'tmagan</div><div class="v">{{ st.counts.get('missed', 0) }}</div></div></div>
+<div class="mt-grid2" style="margin-top:14px"><div class="card"><div class="card-h"><h2>{{ ic('cap') }} O'qituvchilar</h2></div>{% if st.teachers %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>O'qituvchi</th><th>Soat</th><th>Darslar</th><th>Guruhlar</th></tr></thead><tbody>
+{% for t in st.teachers %}<tr><td><b>{{ t.name }}</b></td><td>{{ t.hours }}</td><td>{{ t.lessons }}</td><td>{{ t.groups }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty">Ma'lumot yo'q.</div>{% endif %}</div>
+<div class="card"><div class="card-h"><h2>{{ ic('users') }} Guruhlar</h2></div>{% if st.groups %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Guruh</th><th>Jami soat</th><th>O'tgan</th><th>Rejada</th></tr></thead><tbody>
+{% for g in st.groups %}<tr><td><b>{{ g.title }}</b></td><td>{{ g.hours }}</td><td>{{ g.lessons }}</td><td>{{ g.planned }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty">Ma'lumot yo'q.</div>{% endif %}</div></div>
+{% endblock %}
+{% block scripts %}<script>
+(function(){document.querySelectorAll('[data-elapsed-start]').forEach(function(el){var s=el.dataset.elapsedStart;if(!s)return;var t=new Date(s.replace(' ','T')+'+05:00');
+function tick(){var m=Math.max(0,Math.floor((Date.now()-t.getTime())/60000));el.textContent=m+' daq'}tick();setInterval(tick,15000)});})();
+</script>{% endblock %}

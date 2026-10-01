@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% block title %}Yo'riqnoma{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Yo'riqnoma</h1><p class="sub">Majlislarni birinchi marta sozlash: Google Cloud, Telegram akkaunt, o'qituvchi, jadval va muammolar.</p></div></div>
+<div class="card mt-guide"><div class="card-h"><h2>{{ ic('link') }} 1. Google Cloud sozlamasi (bir marta, ~10 daqiqa)</h2></div>
+<p class="mut small">Domen kerak emas. Shaxsiy Gmail yetadi; kalit faqat shu kompyuterda (shifrlangan) saqlanadi.</p><ol>
+<li><b>Loyiha oching.</b> <code>console.cloud.google.com</code> ga host Gmail bilan kiring → yuqoridagi loyiha tanlagich → <b>New project</b> → nom: <code>TelegramMajlis</code> → <b>Create</b>.</li>
+<li><b>Ikkita API'ni yoqing.</b> <b>APIs &amp; Services → Library</b>: <code>Google Meet REST API</code> → <b>Enable</b>; keyin <code>Google Calendar API</code> → <b>Enable</b>.</li>
+<li><b>OAuth rozilik ekrani.</b> <b>Google Auth Platform</b> (yoki APIs &amp; Services → OAuth consent screen) → <b>Get started</b>: ilova nomi <code>Majlislar</code>, qo'llab-quvvatlash emaili — o'zingiznikи, <b>Audience: External</b>. Email'ni <b>Test users</b> ga qo'shing.</li>
+<li><b>Ruxsatlar (Data Access → Add or remove scopes).</b> Quyidagilarni qo'shing:
+<div style="margin-top:6px">{% for s in scopes %}<div><code>{{ s }}</code></div>{% endfor %}</div></li>
+<li><b>OAuth kalit.</b> <b>Clients → Create client</b> (yoki Credentials → Create credentials → OAuth client ID) → turi: <b>Desktop app</b> → <b>Create</b>. <b>Client ID</b> va <b>Client secret</b> ni nusxalang va <a href="/meet/settings">Sozlamalar</a>ga kiriting. (Desktop turi 127.0.0.1 qaytish manzilini o'zi qabul qiladi: <code>{{ redirect_uri }}</code>.)</li>
+<li><b>Ilovani Production holatiga o'tkazing — MUHIM.</b> <b>Audience → Publish app → Confirm</b>. Aks holda ilova «Testing» holatida qoladi va <b>token 7 kundan keyin o'chadi</b> (darslar to'xtab qoladi). Production'da tasdiqlanmagan ilova ogohlantirish ko'rsatadi: <b>Advanced → Go to Majlislar (unsafe)</b> — bu o'z ilovangiz, xavfsiz. Production'ga o'tgandan keyin Google'ga <b>qayta ulang</b>.</li>
+<li><b>Ulang.</b> <a href="/meet/settings">Sozlamalar → Google'ga ulash</a> → Gmail'ni tanlang → barcha ruxsatlarni belgilab <b>Continue</b>. So'ng <a href="/meet/diag">Google diagnostika</a>ni ishga tushiring: har imkoniyat «Ishlaydi» yoki sababi bilan ko'rinadi.</li></ol>
+<h3>Gmail va 60 daqiqa</h3><p>Shaxsiy Gmail'da Meet uchrashuvi 60 daqiqa bilan cheklanadi. Dars 60 daqiqadan uzun bo'lsa, yaratishda ogohlantirish chiqadi va Tizim tahlilida «Meet limiti: 60 daqiqa (Gmail)» ko'rinadi. Host akkauntni Workspace'ga almashtirish: Sozlamalar → «Uzish» → qayta ulash va host turini Workspace deb belgilang.</p></div>
+<div class="card mt-guide"><div class="card-h"><h2>{{ ic('send') }} 2. Telegram akkaunt</h2></div><ol>
+<li>Group Post → Sozlamalar'da <b>API ID / API HASH</b> kiritilgan bo'lsin (my.telegram.org).</li>
+<li><a href="/meet/account">Majlislar → Telegram akkaunt</a>: <b>alohida</b> raqam kiriting, kodni tasdiqlang (Group Post va Kanallarim raqamlaridan boshqa).</li>
+<li>Bu akkauntni o'quvchilar guruhlariga qo'shing (yozish huquqi bilan). <a href="/meet/groups">Guruhlar</a> sahifasida «Telegramdan tanlash» orqali guruhni biriktiring.</li>
+<li>Admin <b>@username</b> ni Sozlamalarga kiriting: o'qituvchi kechiksa, xabar yetmasa, dars tugasa shu odamga xabar boradi.</li></ol></div>
+<div class="card mt-guide"><div class="card-h"><h2>{{ ic('cap') }} 3. O'qituvchi qo'shish</h2></div><ol>
+<li><a href="/meet/teachers">O'qituvchilar</a>: ism, <b>Gmail</b> (Meet'da avtomatik co-host bo'ladi, kalendar ulashiladi), <b>Telegram @username</b> (havola shaxsiy xabar bilan boradi), telefon, izoh.</li>
+<li>O'qituvchi akkaunti Telegram'da shu @username bilan topilishi va Majlislar akkauntini bloklamagan bo'lishi kerak.</li>
+<li>Guruh sahifasida o'qituvchini tanlang.</li></ol></div>
+<div class="card mt-guide"><div class="card-h"><h2>{{ ic('repeat') }} 4. Jadval</h2></div><ol>
+<li>Guruhni oching → <b>Haftalik jadval</b>: hafta kunlari (odatda 3-6 ta), vaqt (Toshkent), davomiylik → <b>Jadvalga qo'shish</b>.</li>
+<li>Dastur keyingi {{ 7 }} kun (Sozlamalarda o'zgaradi) uchun har dars uchun <b>yangi Meet xonasi</b> (havola ochiq), kalendar yozuvi va co-host yaratadi. Har guruhning o'z Google Calendar'i bor; bosh sahifada hamma guruhlar bitta kalendarda.</li>
+<li>Dars boshlanishidan <b>10 daqiqa oldin</b> o'qituvchiga shaxsiy xabar, <b>5 daqiqa oldin</b> guruhga havola; <b>60 va 10</b> daqiqa oldin guruhga eslatma (Sozlamalarda o'zgaradi).</li>
+<li><b>Bekor qilish / ko'chirish:</b> «Amallar» tugmasi — guruhga va o'qituvchiga avtomatik xabar ketadi, kalendar yangilanadi.</li>
+<li>Begona kirsa, o'qituvchi Meet ichida o'zi chiqaradi. Platformada chiqarish tugmasi va begonani aniqlash tizimi yo'q: faqat «ko'p odam» / «yangi nom» xabari keladi.</li>
+<li>Davomat dars davomida har 30-60 soniyada yangilanadi. Bir odamning turli ismlarini <b>Birlashtirish</b> orqali bog'lang. Yozuv (record) havolasi qo'lda kiritiladi.</li></ol></div>
+<div class="card mt-guide"><div class="card-h"><h2>{{ ic('alert') }} 5. Muammolar</h2></div>
+<h3>«API yoqilmagan» / SERVICE_DISABLED</h3><p>Google Cloud → Library'da Meet REST API va Calendar API yoqilganini tekshiring (2-qadam). Yoqqandan keyin 1-2 daqiqa kuting.</p>
+<h3>Token 7 kundan keyin o'chdi (invalid_grant)</h3><p>OAuth ilovasi «Testing» holatida edi. Audience → <b>Publish app</b>; so'ng Sozlamalarda qayta ulang.</p>
+<h3>«Access blocked / app not verified»</h3><p>Email Test users'da yo'q (Testing) yoki ogohlantirish ekranida <b>Advanced → Go to ... (unsafe)</b> bosilmagan.</p>
+<h3>Co-host qo'shilmadi</h3><p>O'qituvchining Gmail manzili noto'g'ri yoki Google akkaunti yo'q. Diagnostika «co-host» qatoridagi xatoni ko'rsatadi. Co-host bo'lmasa ham o'qituvchi havola orqali kiradi, lekin begonani chiqarish uchun u host (siz) tomonidan Meet ichida tayinlanishi kerak bo'lishi mumkin.</p>
+<h3>Havola Telegram'ga yetmadi</h3><p><a href="/meet/alerts">Ogohlantirishlar</a>da xabar matni va <b>nusxalash</b> tugmasi bor: qo'lda yuboring. Sabab: @username noto'g'ri, o'qituvchi maxfiylik sozlamasi, akkaunt guruhdan chiqarilgan yoki Telegram cheklovi.</p>
+<h3>Davomat ko'rinmayapti</h3><p>Diagnostikada «Davomat API» ni tekshiring. Akkauntsiz mehmonlar «Noma'lum» yoki Meet'dagi nom bilan chiqadi. O'qituvchi aniqlanmasa, dars sahifasida «Bu o'qituvchi» tugmasi bilan belgilang (keyingi darslarda eslab qolinadi).</p>
+<h3>Dars 60 daqiqada to'xtadi</h3><p>Gmail cheklovi. Workspace akkauntga o'ting yoki dars davomiyligini qisqartiring.</p></div>
+{% endblock %}

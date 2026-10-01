@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% block title %}Majlislar sozlamalari{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Sozlamalar</h1><p class="sub">Google ulanishi, host akkaunt, eslatma vaqtlari va davomat chegaralari.</p></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('link') }} Google ulanishi</h2>{% if g_state == 'ok' %}<span class="badge b-good">Ulangan: {{ g_email }}</span>{% elif g_state == 'expired' %}<span class="badge b-bad">Token eskirgan</span>{% else %}<span class="badge b-warn">Ulanmagan</span>{% endif %}</div>
+<div class="mt-grid2"><form method="post" action="/meet/settings/google"><label class="l">OAuth Client ID</label><input type="text" name="client_id" value="{{ client_id }}" placeholder="123456-abc.apps.googleusercontent.com" autocomplete="off">
+<label class="l">OAuth Client Secret</label><input type="password" name="client_secret" placeholder="{{ 'saqlangan (shifrlangan) — o\'zgartirish uchun yangisini kiriting' if has_secret else 'GOCSPX-...' }}" autocomplete="off">
+<div class="hint">Secret Windows DPAPI bilan shifrlab saqlanadi. «Desktop app» turidagi OAuth mijozi kerak (<a href="/meet/guide">Yo'riqnoma</a>).</div><div class="actions" style="margin-top:10px"><button class="btn sec">Kalitni saqlash</button></div></form>
+<div><label class="l">Host akkaunt</label>{% if g_state == 'ok' %}<p style="margin:2px 0 8px"><b>{{ g_email }}</b><br><span class="mut small">ulangan: {{ g_connected_at[:16] }}</span></p>{% else %}<p class="mut">Hozir hech qaysi akkaunt ulanmagan.</p>{% endif %}
+<div class="actions"><a class="btn acc {{ '' if configured else 'disabled' }}" href="/meet/google/connect">{{ ic('link') }} {{ 'Boshqa akkaunt bilan qayta ulash' if g_state == 'ok' else 'Google\'ga ulash' }}</a>
+{% if g_state != 'none' %}<form method="post" action="/meet/google/disconnect" onsubmit="return confirm('Google uzilsinmi?')"><button class="btn ghost">Uzish</button></form>{% endif %}</div>
+<div class="hint">Host akkauntni almashtirish: «Uzish» va qayta ulash (Gmail yoki Workspace). Qaytish manzili: <code>{{ redirect_uri }}</code></div></div></div></div>
+<form method="post" action="/meet/settings">
+<div class="card"><div class="card-h"><h2>Host turi va xona</h2></div><div class="mt-grid2">
+<div><label class="l">Host akkaunt turi</label><select name="host_type"><option value="gmail" {{ 'selected' if v.host_type == 'gmail' }}>Shaxsiy Gmail (60 daqiqa limit)</option><option value="workspace" {{ 'selected' if v.host_type == 'workspace' }}>Google Workspace</option></select><div class="hint">Gmail tanlansa, 60 daqiqadan uzun dars yaratilganda ogohlantiriladi va Tizim tahlilida «Meet limiti: 60 daqiqa (Gmail)» ko'rinadi. Ulanganda avtomatik aniqlanadi.</div></div>
+<div><label class="l">Meet moderatsiyasi</label><select name="moderation"><option value="ON" {{ 'selected' if v.moderation == 'ON' }}>Yoqilgan (co-host boshqaruvi)</option><option value="OFF" {{ 'selected' if v.moderation == 'OFF' }}>O'chirilgan</option></select></div></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('clock') }} Eslatmalar va havola yuborish</h2></div><div class="mt-grid2">
+<div><label class="l">Guruhga 1-eslatma (dars boshlanishiga necha daq. qolganda)</label><input type="number" name="remind_a" value="{{ v.remind_a }}" min="5" max="1440"></div>
+<div><label class="l">Guruhga 2-eslatma (daq.)</label><input type="number" name="remind_b" value="{{ v.remind_b }}" min="1" max="240"></div>
+<div><label class="l">O'qituvchiga havola (shaxsiy xabar, daq. oldin)</label><input type="number" name="teacher_dm_min" value="{{ v.teacher_dm_min }}" min="1" max="180"></div>
+<div><label class="l">Guruhga havola (daq. oldin)</label><input type="number" name="group_link_min" value="{{ v.group_link_min }}" min="1" max="120"></div>
+<div><label class="l">O'qituvchi kechiksa adminga xabar (daq.)</label><input type="number" name="teacher_late_min" value="{{ v.teacher_late_min }}" min="1" max="60"></div>
+<div><label class="l">Admin Telegram @username</label><input type="text" name="admin_username" value="{{ v.admin_username }}" placeholder="@admin"><div class="hint">Bo'sh bo'lsa, xabarlar akkauntning «Saqlangan xabarlar»iga + Windows bildirishnomasiga + Ogohlantirishlar sahifasiga boradi.</div></div></div>
+<div class="row" style="gap:22px;margin-top:10px;flex-wrap:wrap"><label class="row" style="gap:8px"><input type="checkbox" name="remind_on" {{ 'checked' if v.remind_on }}> Guruhga eslatmalar yuborilsin</label>
+<label class="row" style="gap:8px"><input type="checkbox" name="report_on" {{ 'checked' if v.report_on }}> Dars tugagach adminga qisqa hisobot</label>
+<label class="row" style="gap:8px"><input type="checkbox" name="report_to_group" {{ 'checked' if v.report_to_group }}> Hisobot guruhga ham yuborilsin</label></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('users') }} Davomat</h2></div><div class="mt-grid2">
+<div><label class="l">Kech qolgan chegarasi (daq.)</label><input type="number" name="late_min" value="{{ v.late_min }}" min="0" max="180"></div>
+<div><label class="l">Erta chiqqan chegarasi (daq.)</label><input type="number" name="early_min" value="{{ v.early_min }}" min="0" max="180"></div>
+<div><label class="l">Polling oralig'i (30-60 s)</label><input type="number" name="poll_sec" value="{{ v.poll_sec }}" min="30" max="60"></div>
+<div><label class="l">Darslarni necha kun oldin yaratish</label><input type="number" name="horizon_days" value="{{ v.horizon_days }}" min="1" max="30"></div>
+<div><label class="l">Ko'p odam chegarasi (0 = avtomatik)</label><input type="number" name="max_people" value="{{ v.max_people }}" min="0" max="500"><div class="hint">Bir vaqtda shuncha kishidan oshsa, adminga xabar. Avtomatik: o'quvchilar soni + 2.</div></div></div></div>
+<div class="actions"><button class="btn acc">Saqlash</button></div></form>
+{% endblock %}

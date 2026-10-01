@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}Google diagnostika{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Google diagnostika</h1><p class="sub">Test majlis yaratib, har imkoniyat tekshiriladi: token, Meet xonasi, havola ochiqligi, co-host, Calendar, davomat API va 60 daqiqa cheklovi. Bu aniq nima ishlashini bilishning eng ishonchli yo'li.</p></div></div>
+{% if not configured %}<div class="mt-warn">{{ ic('alert') }}<div>OAuth kalit kiritilmagan. <a href="/meet/guide">Yo'riqnoma</a> → <a href="/meet/settings">Sozlamalar</a>.</div></div>
+{% elif g_state != 'ok' %}<div class="mt-warn">{{ ic('alert') }}<div>Google'ga ulanmagan{{ ' (token eskirgan)' if g_state == 'expired' }}. <a href="/meet/settings">Sozlamalar</a>da «Google'ga ulash» ni bosing.</div></div>{% endif %}
+<div class="card"><form method="post" action="/meet/diag/run" data-busy="Tekshirilmoqda..." class="row" style="gap:12px;align-items:end;flex-wrap:wrap">
+<div style="min-width:260px"><label class="l">Co-host sinovi uchun Gmail (ixtiyoriy)</label><input type="text" name="test_email" value="{{ test_email }}" placeholder="{{ teachers[0].gmail if teachers else 'boshqa Gmail manzili' }}" list="tm"><datalist id="tm">{% for t in teachers %}<option value="{{ t.gmail }}">{% endfor %}</datalist>
+<div class="hint">Bo'sh qoldirsangiz, birinchi o'qituvchining Gmail'i ishlatiladi (host o'zini co-host qila olmaydi).</div></div>
+<button class="btn acc" {{ 'disabled' if g_state != 'ok' }}>{{ ic('activity') }} Diagnostikani ishga tushirish</button></form></div>
+{% if last %}<div class="card"><div class="card-h"><h2>Natija · {{ last.at[:16] }}</h2><span class="badge">{{ last.host or '—' }} · {{ 'Gmail' if last.host_type == 'gmail' else 'Workspace' }}</span></div>
+{% for i in last['items'] %}<div class="mt-step"><span class="mt-st {{ i.state }}">{{ {'ok': 'Ishlaydi', 'warn': 'Diqqat', 'fail': 'Xato', 'skip': 'O\'tkazildi', 'info': 'Ma\'lumot'}[i.state] }}</span>
+<div style="flex:1"><b>{{ i.title }}</b>{% if i.ms %} <span class="mut tiny">{{ i.ms }} ms</span>{% endif %}<div class="small mut">{{ i.detail }}</div>{% if i.fix %}<div class="small" style="margin-top:3px">{{ ic('check') }} <b>Tuzatish:</b> {{ i.fix }}</div>{% endif %}</div></div>{% endfor %}</div>
+{% else %}<div class="card"><div class="empty">{{ ic('activity') }}<div>Diagnostika hali ishga tushirilmagan.</div></div></div>{% endif %}
+<div class="card"><div class="card-h"><h2>Meet limiti</h2></div><p style="margin:0">{% if host_type == 'gmail' %}<b>Meet limiti: 60 daqiqa (Gmail).</b> Dars 60 daqiqadan uzun bo'lsa, jadval/dars yaratishda ogohlantiriladi. Vaqtinchalik ikkinchi havola yechimi yo'q.{% else %}Workspace akkaunt tanlangan: Gmail'ning 60 daqiqalik cheklovi ko'rsatilmaydi (tarif limitlarini tekshiring).{% endif %}</p></div>
+{% endblock %}

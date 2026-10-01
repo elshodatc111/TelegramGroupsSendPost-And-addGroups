@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% from "meet_macros.html" import copybtn %}{% block title %}Ogohlantirishlar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Ogohlantirishlar</h1><p class="sub">Xabar yetmasa, havolani shu yerdan qo'lda nusxalab yuborasiz. O'qituvchi kechiksa, ko'p odam kirsa, dars tugasa — hammasi shu yerda.</p></div>
+<form method="post" action="/meet/alerts/seen" style="margin:0"><input type="hidden" name="id" value="all"><button class="btn sec">Hammasini ko'rilgan deb belgilash</button></form></div>
+<div class="card">{% for a in alerts %}<div class="mt-al {{ a.level }} {{ 'seen' if a.seen }}"><span class="dot"></span><div style="flex:1"><div><b>{{ {'send_fail': 'Xabar yetmadi', 'teacher_late': 'O\'qituvchi kechikdi', 'crowd': 'Ko\'p odam', 'unknown': 'Yangi nom', 'report': 'Dars hisoboti', 'provision': 'Meet/Kalendar', 'google_token': 'Google token', 'missed': 'Dars o\'tmadi'}.get(a.kind, a.kind) }}</b> · <span class="mut tiny">{{ a.ts[5:16] }}</span></div>
+<div>{{ a.text }}</div>{% if a.copy_text %}<pre>{{ a.copy_text }}</pre><div style="margin-top:6px">{{ copybtn(a.copy_text, 'Matn va havolani nusxalash') }}</div>{% endif %}
+{% if a.lesson_id %}<a class="tiny" href="/meet/lessons/{{ a.lesson_id }}">Darsni ochish</a>{% endif %}</div>
+{% if not a.seen %}<form method="post" action="/meet/alerts/seen"><input type="hidden" name="id" value="{{ a.id }}"><button class="btn ghost sm">Ko'rildi</button></form>{% endif %}</div>
+{% else %}<div class="empty">{{ ic('check') }}<div>Ogohlantirish yo'q.</div></div>{% endfor %}</div>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% from "meet_macros.html" import chip, pill, copybtn %}{% block title %}Majlislar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Majlislar</h1><p class="sub">Google Meet darslari: har dars uchun yangi xona, o'qituvchiga va guruhga havola, davomat va hisobot. Vaqt mintaqasi: Asia/Tashkent ({{ now_hm }}).</p></div>
+  <div class="actions"><a class="btn acc" href="/meet/groups">{{ ic('plus') }} Guruh va jadval</a><a class="btn sec" href="/meet/diag">{{ ic('activity') }} Google diagnostika</a></div></div>
+{% if not g_ok %}<div class="mt-warn">{{ ic('alert') }}<div><b>Google ulanmagan.</b> Meet xonalari va kalendar yaratilmaydi. <a href="/meet/guide">Yo'riqnoma</a> bo'yicha sozlab, <a href="/meet/settings">Sozlamalar</a>da ulang.</div></div>{% endif %}
+{% if not acc %}<div class="mt-warn">{{ ic('alert') }}<div><b>Telegram akkaunt ulanmagan.</b> Havola va eslatmalar yuborilmaydi. <a href="/meet/account">Akkaunt</a> sahifasidan ulang.</div></div>{% endif %}
+<div class="grid g4">
+  <div class="stat ok"><div class="k">Hozir davom etmoqda</div><div class="v">{{ live|length }}</div></div>
+  <div class="stat"><div class="k">Bugungi darslar</div><div class="v">{{ today_l|length if today_l else 0 }}</div></div>
+  <div class="stat"><div class="k">Guruhlar</div><div class="v">{{ n_groups }}</div></div>
+  <div class="stat"><div class="k">O'qituvchilar</div><div class="v">{{ n_teachers }}</div></div></div>
+{% for l in live %}
+<div class="card mt-live-card" style="margin-top:14px"><div class="card-h"><h2>{{ ic('video') }} {{ l.group_title }} <span class="mt-pill live">Jonli</span></h2><a class="btn sm" href="/meet/lessons/{{ l.id }}">Davomat</a></div>
+  <div class="row" style="gap:28px;flex-wrap:wrap;align-items:flex-end"><div><div class="mut small">Dars qancha vaqt o'tdi</div><div class="mt-elapsed" data-elapsed-start="{{ l.real_start }}" data-elapsed-base="{{ l.elapsed }}">{{ l.elapsed }} daq</div></div>
+  <div><div class="mut small">Rejada</div><b>{{ l.hhmm }}–{{ l.end_hhmm }} ({{ l.duration_min }} daq)</b></div><div><div class="mut small">O'qituvchi</div><b>{{ l.teacher_name or '—' }}</b></div></div></div>
+{% endfor %}
+{% if alerts %}<div class="card" style="margin-top:14px"><div class="card-h"><h2>{{ ic('alert') }} Yangi ogohlantirishlar</h2><a class="btn ghost sm" href="/meet/alerts">Hammasi</a></div>
+{% for a in alerts %}<div class="mt-al {{ a.level }}"><span class="dot"></span><div style="flex:1"><div>{{ a.text }}</div><div class="mut tiny">{{ a.ts[5:16] }}</div></div></div>{% endfor %}</div>{% endif %}
+<div class="card" style="margin-top:14px"><div class="card-h"><h2>{{ ic('calendar') }} Umumiy kalendar · {{ week_label }}</h2>
+  <div class="actions"><a class="btn sec sm" href="/meet?w={{ off - 1 }}">‹</a><a class="btn sec sm" href="/meet">Bu hafta</a><a class="btn sec sm" href="/meet?w={{ off + 1 }}">›</a><a class="btn ghost sm" href="/meet/calendar">Oylik</a></div></div>
+  <div class="mt-week">{% for d in days %}{% set k = d.strftime('%Y-%m-%d') %}
+    <div class="mt-day {{ 'today' if k == today }}"><h4><span>{{ WD_SHORT[d.weekday()] }}</span><span>{{ d.strftime('%d.%m') }}</span></h4>
+      {% for l in by_day[k] %}{{ chip(l) }}{% else %}<span class="mut tiny">—</span>{% endfor %}</div>{% endfor %}</div></div>
+{% if nxt %}<div class="card"><div class="card-h"><h2>{{ ic('clock') }} Yaqin darslar</h2></div><div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Vaqt</th><th>Guruh</th><th>O'qituvchi</th><th>Havola</th><th></th></tr></thead><tbody>
+{% for l in nxt %}<tr><td class="nowrap">{{ l.day[5:] }} {{ l.hhmm }}</td><td><a href="/meet/lessons/{{ l.id }}">{{ l.group_title }}</a></td><td>{{ l.teacher_name or '—' }}</td>
+<td>{% if l.meeting_uri %}<code>{{ l.meeting_uri[8:] }}</code> {{ copybtn(l.meeting_uri, '') }}{% else %}<span class="mut">yo'q</span>{% endif %}</td>
+<td><a class="btn sec sm" href="/meet/lessons/{{ l.id }}">Ochish</a></td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+{% if embed %}<div class="card"><div class="card-h"><h2>Google Calendar (hamma guruhlar)</h2><button class="btn sec sm" type="button" onclick="document.getElementById('gcal').classList.toggle('hide')">Ko'rsatish / yashirish</button></div>
+<div id="gcal" class="hide"><iframe src="https://calendar.google.com/calendar/embed?{{ embed }}&ctz=Asia%2FTashkent&mode=WEEK&showTitle=0" style="border:0;width:100%;height:560px;border-radius:12px" loading="lazy"></iframe>
+<div class="hint">Host Gmail bilan brauzerda Google'ga kirgan bo'lsangiz ko'rinadi.</div></div></div>{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+(function(){document.querySelectorAll('[data-elapsed-start]').forEach(function(el){var s=el.dataset.elapsedStart;if(!s)return;var t=new Date(s.replace(' ','T')+'+05:00');
+function tick(){var m=Math.max(0,Math.floor((Date.now()-t.getTime())/60000));el.textContent=m+' daq'}tick();setInterval(tick,15000)});
+setTimeout(function(){location.reload()},60000);})();
+</script>{% endblock %}

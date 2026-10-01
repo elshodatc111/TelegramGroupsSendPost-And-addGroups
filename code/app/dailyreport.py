@@ -59,6 +59,11 @@ def build(aid: int, day: str) -> bytes:
            [[j["tried_at"], j["ref"], j["title"] or "", j["status"], j["detail"] or ""] for j in joins], [19, 30, 32, 14, 40])
     _sheet(wb.create_sheet("Chiqishlar"), ["Vaqt", "Guruh", "Sabab", "Kim"],
            [[l["ts"], l["title"], l["reason"], "Avtomatik" if l["auto"] else "Qo'lda"] for l in left], [19, 34, 44, 12])
+    try:                                    # Majlislar: shu kundagi darslar varag'i
+        from . import meet_reports
+        meet_reports.add_daily_sheet(wb, day)
+    except Exception:
+        pass
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()

@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% from "meet_macros.html" import chip, monthnav %}{% block title %}Umumiy kalendar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Umumiy kalendar</h1><p class="sub">Hamma guruhlarning darslari bir joyda. Har guruh uchun alohida Google Calendar ham yuritiladi.</p></div>{{ monthnav('/meet/calendar', ym, prev, nxt) }}</div>
+<div class="legend-mt">{% for g in groups %}<span><i class="gc{{ g.id % 8 }}" style="color:#fff;border-radius:6px;padding:1px 8px">{{ g.title }}</i></span>{% endfor %}</div>
+<div class="mt-month">{% for h in WD_SHORT %}<div class="hd">{{ h }}</div>{% endfor %}
+{% for c in cells %}{% if c %}<div class="mt-day {{ 'today' if c == today }}"><h4><span>{{ c[8:] }}</span></h4>{% for l in by_day.get(c, []) %}{{ chip(l) }}{% endfor %}</div>{% else %}<div></div>{% endif %}{% endfor %}</div>
+{% if embed %}<div class="card" style="margin-top:16px"><div class="card-h"><h2>Google Calendar</h2></div>
+<iframe src="https://calendar.google.com/calendar/embed?{{ embed }}&ctz=Asia%2FTashkent&mode=MONTH&showTitle=0" style="border:0;width:100%;height:640px;border-radius:12px" loading="lazy"></iframe></div>{% endif %}
+{% endblock %}

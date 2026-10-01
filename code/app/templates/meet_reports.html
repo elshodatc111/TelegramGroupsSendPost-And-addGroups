@@ -1,14 +1,1 @@
-{% extends "base.html" %}{% from "meet_macros.html" import monthnav %}{% block title %}Oylik davomat{% endblock %}
-{% block content %}
-<div class="page-h"><div><h1>Oylik davomat jadvali</h1><p class="sub">Qatorlarda o'quvchilar, ustunlarda dars sanalari. Rang: qatnashdi, kech qoldi, erta chiqdi, kelmadi. Kech/erta chegarasi Sozlamalarda.</p></div>
-<div class="actions">{{ monthnav('/meet/reports', ym, prev, nxt, ('&group=' ~ gid) if gid else '') }}{% if gid %}<a class="btn acc" href="/meet/reports/export?group={{ gid }}&m={{ ym }}">{{ ic('download') }} Excel</a>{% endif %}</div></div>
-<form method="get" class="card row" style="gap:12px;align-items:end"><input type="hidden" name="m" value="{{ ym }}"><div><label class="l">Telegram guruh</label><select name="group" onchange="this.form.submit()">{% for x in groups %}<option value="{{ x.id }}" {{ 'selected' if gid == x.id }}>{{ x.title }}</option>{% endfor %}</select></div><noscript><button class="btn sec">Ko'rsatish</button></noscript></form>
-{% if grid %}
-<div class="legend-mt">{% for k, v in grid.states.items() %}<span><i class="i-{{ k }}">{{ v[0] }}</i> {{ v[1] }}</span>{% endfor %}</div>
-{% if grid.lessons %}<div class="att-wrap"><table class="att"><thead><tr><th>O'quvchi</th>{% for l in grid.lessons %}<th class="{{ 'x' if l.status in ('cancelled','missed') }}" title="{{ l.status_uz }} · {{ l.hhmm }}–{{ l.end_hhmm }} · {{ l.elapsed }} daq"><a href="/meet/lessons/{{ l.id }}" style="color:inherit">{{ l.day[8:10] }}.{{ l.day[5:7] }}<br><span style="font-weight:400;font-size:11px">{{ l.hhmm }}</span></a></th>{% endfor %}<th>Keldi</th><th>Kech</th><th>Erta</th><th>Kelmadi</th><th>Daq.</th><th>%</th></tr></thead><tbody>
-{% for r in grid.rows %}<tr><td>{{ r.name }}</td>{% for c in r.cells %}<td class="c-{{ c.state }}" title="{{ c.tip }}">{{ c.label }}</td>{% endfor %}<td>{{ r.came }}</td><td>{{ r.late }}</td><td>{{ r.early }}</td><td>{{ r.absent }}</td><td>{{ r.minutes }}</td><td>{{ r.pct ~ '%' if r.pct is not none else '—' }}</td></tr>
-{% else %}<tr><td colspan="{{ grid.lessons|length + 7 }}" class="mut">O'quvchi yo'q: davomat darslardan keyin to'ldiriladi yoki ro'yxatga qo'lda qo'shing.</td></tr>{% endfor %}</tbody>
-<tfoot><tr><td>Qatnashganlar</td>{% for n in grid.col_tot %}<td>{{ n }}</td>{% endfor %}<td colspan="6"></td></tr></tfoot></table></div>
-{% else %}<div class="card"><div class="empty">{{ ic('table') }}<div>Bu oyda dars yo'q.</div></div></div>{% endif %}
-{% else %}<div class="card"><div class="empty">{{ ic('users') }}<div>Avval guruh qo'shing.</div></div></div>{% endif %}
-{% endblock %}
+{# Olib tashlangan: bu shablon kerak emas, o'chirib tashlashingiz mumkin. #}

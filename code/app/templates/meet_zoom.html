@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% from "meet_macros.html" import copybtn, accstate %}{% block title %}Zoom akkauntlar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Zoom akkauntlar</h1><p class="sub">Cheksiz sondagi bepul Zoom akkauntlar puli. Dars boshlanganda bo'sh akkaunt tanlanadi; band bo'lsa keyingisi olinadi. Har akkaunt bir vaqtda bitta majlis o'tkazadi.</p></div>
+<div class="actions"><form method="post" action="/meet/zoom/test-all" data-busy="Tekshirilmoqda..." style="margin:0"><button class="btn sec">{{ ic('refresh') }} Hammasini tekshirish</button></form></div></div>
+{% if new_m %}<div class="card mt-live-card"><div class="card-h"><h2>{{ ic('video') }} Yangi konferensiya tayyor</h2><span class="mut small">{{ new_m.start_at[11:16] }}–{{ new_m.end_at[11:16] }}</span></div>
+<div class="mt-link"><code>{{ new_m.join_url }}</code>{{ copybtn(new_m.join_url, 'Kirish havolasi') }}<a class="btn sec sm" href="{{ new_m.join_url }}" target="_blank" rel="noopener">Kirish</a></div>
+{% if new_m.start_url_plain %}<div class="mt-link" style="margin-top:8px"><span class="mut small">Boshlash (host):</span>{{ copybtn(new_m.start_url_plain, 'Host havolasini nusxalash') }}<a class="btn acc sm" href="{{ new_m.start_url_plain }}" target="_blank" rel="noopener">Boshlash</a></div>{% endif %}
+<form method="post" action="/meet/meetings/{{ new_m.id }}/end" style="margin-top:10px"><button class="btn ghost sm">Tugatish va akkauntni bo'shatish</button></form></div>{% endif %}
+<div class="card"><div class="card-h"><h2>{{ ic('layers') }} Akkauntlar ({{ accs|length }})</h2></div>
+{% if accs %}{% for a in accs %}<div class="mt-step" id="acc{{ a.id }}" style="flex-wrap:wrap">
+<div style="flex:1;min-width:240px"><b>{{ a.label }}</b> {{ accstate(a.st) }}<div class="mut small">{{ a.email }} · {{ 'cheksiz (Pro)' if not a.max_min else a.max_min ~ ' daqiqalik majlis' }}</div>
+<div class="small">{{ a.st.text }}{{ ' · ' ~ a.st.until ~ ' gacha' if a.st.state == 'busy' }}</div>
+{% if a.check %}<div class="mut tiny">Tekshiruv {{ a.check.at[5:16] }}: {% for i in a.check['items'] %}<span class="mt-st {{ i.state }}" style="display:inline-block;flex:none;margin:2px" title="{{ i.detail }}">{{ i.title }}</span>{% endfor %}</div>
+{% for i in a.check['items'] if i.state == 'fail' %}<div class="small" style="color:var(--c-bad-tx)">{{ i.detail }}{% if i.fix %} — {{ i.fix }}{% endif %}</div>{% endfor %}{% endif %}</div>
+<div class="actions" style="align-items:flex-start">
+{% if a.st.state in ('free','soon') %}<form method="post" action="/meet/zoom/{{ a.id }}/new"><button class="btn acc sm">{{ ic('video') }} Yangi konferensiya</button></form>{% endif %}
+{% if a.st.state == 'busy' %}<form method="post" action="/meet/zoom/{{ a.id }}/release" onsubmit="return confirm('Akkaunt bo\'shatilsinmi? Faol majlis tugatiladi.')"><button class="btn sec sm">Bo'shatish</button></form>{% endif %}
+<form method="post" action="/meet/zoom/{{ a.id }}/test" data-busy="..."><button class="btn sec sm">Tekshirish</button></form>
+<a class="btn sec sm" href="/meet/zoom?edit={{ a.id }}">O'zgartirish</a>
+<form method="post" action="/meet/zoom/{{ a.id }}/toggle"><button class="btn ghost sm">{{ 'O\'chirish' if a.enabled else 'Yoqish' }}</button></form>
+<form method="post" action="/meet/zoom/{{ a.id }}/delete" onsubmit="return confirm('Akkaunt o\'chirilsinmi?')"><button class="btn ghost sm">{{ ic('trash') }}</button></form></div></div>{% endfor %}
+{% else %}<div class="empty">{{ ic('video') }}<div>Hali akkaunt yo'q. Quyidagi formadan qo'shing (<a href="/meet/guide">Yo'riqnoma</a>).</div></div>{% endif %}</div>
+<div class="mt-grid2">
+<div class="card"><div class="card-h"><h2>{{ ic('plus') if not edit else ic('edit') }} {{ 'Akkauntni o\'zgartirish' if edit else 'Akkaunt qo\'shish' }}</h2></div>
+<form method="post" action="{{ '/meet/zoom/' ~ edit.id ~ '/update' if edit else '/meet/zoom/add' }}">
+<label class="l">Nomi (ixtiyoriy)</label><input type="text" name="label" value="{{ edit.label if edit else '' }}" placeholder="Masalan: Ali Zoom">
+<label class="l">Zoom email (akkaunt egasi)</label><input type="email" name="email" value="{{ edit.email if edit else '' }}" required>
+<label class="l">Account ID</label><input type="text" name="account_id" value="{{ edit.account_id if edit else '' }}" required autocomplete="off">
+<label class="l">Client ID</label><input type="text" name="client_id" value="{{ edit.client_id if edit else '' }}" required autocomplete="off">
+<label class="l">Client Secret</label><input type="password" name="client_secret" autocomplete="off" {{ '' if edit else 'required' }} placeholder="{{ 'saqlangan (shifrlangan); o\'zgartirish uchun yangisini kiriting' if edit else '' }}">
+<label class="l">Majlis davomiyligi (daq.; bepul: {{ default_min }}, Pro: 0 = cheksiz)</label><input type="number" name="max_min" value="{{ edit.max_min if edit else default_min }}" min="0" max="1440">
+<div class="actions" style="margin-top:12px"><button class="btn acc">{{ 'Saqlash' if edit else 'Qo\'shish va tekshirish' }}</button>{% if edit %}<a class="btn sec" href="/meet/zoom">Bekor qilish</a>{% endif %}</div></form></div>
+<div class="card"><div class="card-h"><h2>{{ ic('layers') }} Ko'plab qo'shish</h2></div>
+<form method="post" action="/meet/zoom/bulk"><label class="l">Har qatorga bitta akkaunt</label><textarea name="text" rows="7" placeholder="email;account_id;client_id;client_secret[;max_min[;nom]]"></textarea>
+<div class="hint">Maydonlar nuqta-vergul (;) bilan ajratiladi. Secret shifrlab saqlanadi. Akkauntlar turli odamlarniki bo'lishi mumkin.</div><div class="actions" style="margin-top:12px"><button class="btn">Hammasini qo'shish</button></div></form></div></div>
+{% endblock %}

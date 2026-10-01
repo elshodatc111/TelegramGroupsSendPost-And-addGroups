@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import auditor, backup, ch_ai, ch_collect, ch_data, ch_insight, ch_plan, ch_report, ch_track, dailyreport, db, discovery, jobops, leaver, meet_sched, meet_track, syscheck
+from . import auditor, backup, ch_ai, ch_collect, ch_data, ch_insight, ch_plan, ch_report, ch_track, dailyreport, db, discovery, jobops, leaver, meet_bot, meet_sched, syscheck
 from .config import CODE_DIR, MEDIA_DIR, log
 from .core import joiner, manager, sender
 from .web import acc_id, page
@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
     if wiped:
         db.set_setting("machine_notice", "Bu boshqa kompyuter: avvalgi akkauntlar va ma'lumotlar tozalandi. Akkauntni qaytadan qo'shib faollashtiring.")
     scan_media()
-    meet_sched.ensure_schema()          # Majlislar (mt_*) jadvallari
+    meet_sched.ensure_schema()          # Majlislar (zoom_*) jadvallari
     db.ex("UPDATE jobs SET status='interrupted', next_at=NULL WHERE status IN ('running','queued')")
     db.ex("UPDATE job_targets SET status='pending' WHERE status='sending'")
     db.ex("UPDATE join_batches SET status='interrupted', next_at=NULL WHERE status IN ('running','queued')")
@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
           sv("dailyreport", dailyreport.loop), sv("discovery", discovery.loop), sv("auditor", auditor.loop),
           sv("ch_collect", ch_collect.loop), sv("ch_plan", ch_plan.loop), sv("ch_learn", ch_ai.learn_loop), sv("backup", backup.loop),
           sv("ch_track", ch_track.loop), sv("ch_insight", ch_insight.loop), sv("ch_report", ch_report.loop),
-          sv("meet_sched", meet_sched.loop), sv("meet_track", meet_track.loop)]
+          sv("meet_sched", meet_sched.loop), sv("meet_bot", meet_bot.loop)]
     log.info("Dastur ishga tushdi")
     yield
     for t in bg:

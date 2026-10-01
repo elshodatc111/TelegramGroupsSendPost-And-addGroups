@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}Guruhlar{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Guruhlar va jadval</h1><p class="sub">Har Telegram guruh uchun o'qituvchi, haftalik jadval va alohida Google Calendar. Guruhga Majlislar Telegram akkaunti a'zo bo'lishi kerak.</p></div>
+<div class="page-h"><div><h1>Guruhlar va jadval</h1><p class="sub">Har Telegram guruh uchun o'qituvchi va haftalik jadval. Guruhga Majlislar Telegram akkaunti a'zo bo'lishi kerak.</p></div>
   <div class="actions"><a class="btn acc" href="/meet/groups?scan=1">{{ ic('search') }} Telegramdan tanlash</a></div></div>
 {% if not acc %}<div class="mt-warn">{{ ic('alert') }}<div>Avval <a href="/meet/account"><b>Telegram akkaunt</b></a>ni ulang.</div></div>{% endif %}
 {% if scanned %}<div class="card" style="border-color:var(--acc)"><div class="card-h"><h2>Akkaunt a'zo bo'lgan guruhlar</h2></div>
@@ -9,8 +9,8 @@
 <div class="actions" style="margin-top:12px"><button class="btn">Tanlanganlarni qo'shish</button></div></form>{% else %}<div class="empty">Yangi guruh topilmadi.</div>{% endif %}</div>{% endif %}
 <div class="card"><div class="card-h"><h2>{{ ic('users') }} Guruhlar ({{ groups|length }})</h2>
 <form method="post" action="/meet/groups/add" class="actions" style="display:flex"><input type="text" name="ref" placeholder="@guruh yoki ID" required style="width:190px"><button class="btn sec sm">Qo'lda qo'shish</button></form></div>
-{% if groups %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Guruh</th><th>O'qituvchi</th><th>Jadval</th><th>Keyingi dars</th><th>Kalendar</th><th></th></tr></thead><tbody>
+{% if groups %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Guruh</th><th>O'qituvchi</th><th>Jadval</th><th>Keyingi dars</th><th></th></tr></thead><tbody>
 {% for g in groups %}<tr><td><a href="/meet/groups/{{ g.id }}"><b>{{ g.title }}</b></a>{% if not g.active %} <span class="mt-pill">o'chiq</span>{% endif %}<div class="mut tiny">{{ '@' ~ g.username if g.username else g.tg_id }}</div></td>
-<td>{{ g.teacher_name or '—' }}</td><td>{{ g.n_sched }} ta / hafta</td><td>{{ g.next or '—' }}</td><td>{{ 'bor' if g.calendar_id else '—' }}</td><td><a class="btn sec sm" href="/meet/groups/{{ g.id }}">Ochish</a></td></tr>{% endfor %}</tbody></table></div>
+<td>{{ g.teacher_name or '—' }}</td><td>{{ g.n_sched }} ta / hafta</td><td>{{ g.next or '—' }}</td><td><a class="btn sec sm" href="/meet/groups/{{ g.id }}">Ochish</a></td></tr>{% endfor %}</tbody></table></div>
 {% else %}<div class="empty">{{ ic('users') }}<div>Guruh yo'q. «Telegramdan tanlash» ni bosing.</div></div>{% endif %}</div>
 {% endblock %}

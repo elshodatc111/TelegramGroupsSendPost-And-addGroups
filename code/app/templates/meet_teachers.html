@@ -1,19 +1,18 @@
 {% extends "base.html" %}{% block title %}O'qituvchilar{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>O'qituvchilar</h1><p class="sub">Gmail manzili Meet'da avtomatik co-host qilish va kalendarni ulashish uchun, @username — havolani Telegram orqali shaxsiy xabar bilan yuborish uchun kerak. O'qituvchilar guruhlarga biriktiriladi.</p></div></div>
+<div class="page-h"><div><h1>O'qituvchilar</h1><p class="sub">O'qituvchi Telegram botga <b>/start</b> yuborib ulanadi{% if bot_user %} (<b>@{{ bot_user }}</b>){% endif %}: bot uni @username bo'yicha taniydi. Dars havolalari, eslatmalar va «Davom etasizmi?» so'rovi shu bot orqali boradi. O'qituvchiga Zoom akkaunt kerak emas.</p></div></div>
 <div class="card"><div class="card-h"><h2>{{ ic('plus') }} {{ 'O\'qituvchini tahrirlash' if edit else 'Yangi o\'qituvchi' }}</h2></div>
 <form method="post" action="/meet/teachers/save"><input type="hidden" name="id" value="{{ edit.id if edit }}">
 <div class="mt-grid2"><div><label class="l">Ism</label><input type="text" name="name" required value="{{ edit.name if edit }}"></div>
-<div><label class="l">Gmail</label><input type="text" name="gmail" placeholder="ustoz@gmail.com" value="{{ edit.gmail if edit }}"></div>
-<div><label class="l">Telegram @username</label><input type="text" name="tg_username" placeholder="@ustoz" value="{{ edit.tg_username if edit }}"></div>
+<div><label class="l">Telegram @username (shart)</label><input type="text" name="tg_username" placeholder="@ustoz" required value="{{ edit.tg_username if edit }}"></div>
 <div><label class="l">Telefon</label><input type="text" name="phone" placeholder="+998901234567" value="{{ edit.phone if edit }}"></div>
-<div><label class="l">Meet'dagi nomi (ixtiyoriy)</label><input type="text" name="meet_name" placeholder="Meet'da qanday ko'rinadi" value="{{ edit.meet_name if edit }}"><div class="hint">O'qituvchi Meet'ga kirganini (kechikish ogohlantirishi uchun) aniqlashga yordam beradi.</div></div>
 <div><label class="l">Izoh</label><input type="text" name="note" value="{{ edit.note if edit }}"></div></div>
 <div class="actions" style="margin-top:14px"><button class="btn">Saqlash</button>{% if edit %}<a class="btn sec" href="/meet/teachers">Bekor qilish</a>{% endif %}</div></form></div>
 <div class="card"><div class="card-h"><h2>{{ ic('cap') }} Ro'yxat ({{ teachers|length }})</h2></div>
-{% if teachers %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Ism</th><th>Gmail</th><th>Telegram</th><th>Telefon</th><th>Guruhlar</th><th>Izoh</th><th></th></tr></thead><tbody>
-{% for t in teachers %}<tr><td><b>{{ t.name }}</b></td><td>{{ t.gmail or '—' }}</td><td>{{ '@' ~ t.tg_username if t.tg_username else '—' }}</td><td>{{ t.phone or '—' }}</td><td>{{ t.groups|join(', ') or '—' }}</td><td>{{ t.note }}</td>
-<td class="nowrap"><a class="btn sec sm" href="/meet/teachers?edit={{ t.id }}">{{ ic('edit') }}</a>
+{% if teachers %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Ism</th><th>Telegram</th><th>Bot</th><th>Telefon</th><th>Guruhlar</th><th>Izoh</th><th></th></tr></thead><tbody>
+{% for t in teachers %}<tr><td><b>{{ t.name }}</b></td><td>@{{ t.tg_username }}</td><td>{% if t.chat_id %}<span class="mt-pill done">ulangan</span>{% else %}<span class="mt-pill planned">/start kutilmoqda</span>{% endif %}</td><td>{{ t.phone or '—' }}</td><td>{{ t.groups|join(', ') or '—' }}</td><td>{{ t.note }}</td>
+<td class="nowrap">{% if t.chat_id %}<form method="post" action="/meet/teachers/{{ t.id }}/test" style="display:inline"><button class="btn sec sm">Sinov xabari</button></form>{% endif %}
+<a class="btn sec sm" href="/meet/teachers?edit={{ t.id }}">{{ ic('edit') }}</a>
 <form method="post" action="/meet/teachers/{{ t.id }}/delete" style="display:inline" onsubmit="return confirm('O\'qituvchi o\'chirilsinmi? Guruhlardan ajratiladi.')"><button class="btn ghost sm">{{ ic('trash') }}</button></form></td></tr>{% endfor %}</tbody></table></div>
 {% else %}<div class="empty">{{ ic('cap') }}<div>Hali o'qituvchi yo'q.</div></div>{% endif %}</div>
 {% endblock %}

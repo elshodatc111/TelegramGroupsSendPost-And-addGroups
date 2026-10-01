@@ -301,11 +301,11 @@ async def run_all() -> dict:
         items += await check_worker()
     except Exception as e:
         items.append(item("Kuzatuv havolasi", "Cloudflare Worker", FAIL, str(e)[:200], key="worker"))
-    try:                                    # Majlislar (Google Meet): holat qatorlari
+    try:                                    # Majlislar (Zoom): holat qatorlari
         from . import meet_sched
         items += meet_sched.health_items()
     except Exception as e:
-        items.append(item("Majlislar (Google Meet)", "Tekshiruv", FAIL, f"{type(e).__name__}: {e}", "Loglarni ko'ring.", key="meet"))
+        items.append(item("Majlislar (Zoom)", "Tekshiruv", FAIL, f"{type(e).__name__}: {e}", "Loglarni ko'ring.", key="meet"))
     lg = log_summary()
     if lg["errors"]:
         top = lg["rows"][0] if lg["rows"] else None

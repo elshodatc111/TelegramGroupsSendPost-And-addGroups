@@ -117,3 +117,9 @@ table.att th:first-child{background:var(--side1);color:#fff}
 .mt-live-card{border:2px solid var(--pri);background:linear-gradient(135deg,var(--pri-soft),var(--surface))}
 .mt-elapsed{font-size:30px;font-weight:800;color:var(--pri2);letter-spacing:-.02em}
 .mt-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.mt-bad{background:var(--c-bad-bg);color:var(--c-bad-tx);border-color:transparent}
+.mt-pill.zs-free{background:var(--c-ok-bg);color:var(--c-ok-tx)}
+.mt-pill.zs-soon{background:var(--c-late-bg);color:var(--c-late-tx)}
+.mt-pill.zs-busy{background:var(--acc);color:var(--acc-tx)}
+.mt-pill.zs-disabled{background:var(--c-off-bg);color:var(--c-off-tx)}
+.mt-pill.zs-error{background:var(--c-bad-bg);color:var(--c-bad-tx)}

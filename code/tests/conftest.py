@@ -25,8 +25,7 @@ MOCK_PORT = _free_port()
 os.environ["TGP_DATA_DIR"] = DATA
 os.environ["TGP_DB"] = DB
 base = f"http://127.0.0.1:{MOCK_PORT}"
-os.environ.update(TGP_GOOGLE_TOKEN=base + "/token", TGP_GOOGLE_USERINFO=base + "/userinfo", TGP_GOOGLE_MEET=base + "/meet",
-                  TGP_GOOGLE_CAL=base + "/cal", TGP_GOOGLE_AUTH=base + "/auth")
+os.environ.update(TGP_ZOOM_API=base + "/v2", TGP_ZOOM_OAUTH=base + "/oauth/token", TGP_BOT_API=base)
 if DB == "mysql":
     import pymysql
     c = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="", autocommit=True)
@@ -36,9 +35,9 @@ if DB == "mysql":
 
 @pytest.fixture(scope="session")
 def mock():
-    import mock_google
-    srv = mock_google.serve(MOCK_PORT)
-    yield mock_google
+    import mock_zoom
+    srv = mock_zoom.serve(MOCK_PORT)
+    yield mock_zoom
     srv.should_exit = True
 
 
@@ -47,6 +46,8 @@ def app_env(mock):
     from app import db
     db.init()
     from app import meet_sched
+    # eski Google Meet jadvallarini ham yaratib qo'yamiz: ensure_schema ularni o'chirishi kerak
+    db.ex("CREATE TABLE IF NOT EXISTS mt_teachers(id INTEGER PRIMARY KEY, name TEXT)") if DB != "mysql" else None
     meet_sched.ensure_schema()
     yield
     shutil.rmtree(DATA, ignore_errors=True)
@@ -54,10 +55,10 @@ def app_env(mock):
 
 @pytest.fixture()
 def clean(app_env, mock):
-    """Har sinovdan oldin Majlislar jadvallari va soxta Google holati tozalanadi."""
-    from app import db, meet_sched as S
-    for t in ("mt_attendance", "mt_lessons", "mt_schedule", "mt_groups", "mt_teachers", "mt_alerts", "mt_settings"):
+    from app import db, meet_sched as S, meet_zoom as Z
+    for t in ("zoom_alerts", "zoom_meetings", "zoom_lessons", "zoom_schedule", "zoom_groups", "zoom_teachers", "zoom_accounts", "zoom_settings"):
         db.ex(f"DELETE FROM {t}")
+    Z._tokens.clear()
     mock.reset()
     yield S
 

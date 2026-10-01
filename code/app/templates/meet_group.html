@@ -1,14 +1,13 @@
 {% extends "base.html" %}{% from "meet_macros.html" import pill, copybtn, actions %}{% block title %}{{ g.title }}{% endblock %}
 {% block content %}
 <div class="page-h"><div><h1>{{ g.title }}</h1><p class="sub">{{ '@' ~ g.username if g.username else 'Telegram ID ' ~ g.tg_id }} · O'qituvchi: <b>{{ g.teacher_name or 'tanlanmagan' }}</b></p></div>
-<div class="actions"><a class="btn sec" href="/meet/reports?group={{ g.id }}">{{ ic('table') }} Davomat jadvali</a>
-<form method="post" action="/meet/groups/{{ g.id }}/calendar" style="margin:0"><button class="btn sec">{{ ic('calendar') }} {{ 'Kalendar bor' if g.calendar_id else 'Kalendar yaratish' }}</button></form></div></div>
+<div class="actions"></div></div>
 <div class="mt-grid2">
 <div class="card"><div class="card-h"><h2>{{ ic('cap') }} O'qituvchi va holat</h2></div>
 <form method="post" action="/meet/groups/{{ g.id }}/save"><label class="l">O'qituvchi</label><select name="teacher_id"><option value="">— tanlanmagan —</option>{% for t in teachers %}<option value="{{ t.id }}" {{ 'selected' if t.id == g.teacher_id }}>{{ t.name }}{{ ' (@' ~ t.tg_username ~ ')' if t.tg_username }}</option>{% endfor %}</select>
 <label class="l">Izoh</label><input type="text" name="note" value="{{ g.note or '' }}"><label class="row" style="gap:8px;margin-top:10px"><input type="checkbox" name="active" {{ 'checked' if g.active }}> Faol (darslar yaratiladi, eslatmalar yuboriladi)</label>
 <div class="actions" style="margin-top:12px"><button class="btn">Saqlash</button></div></form>
-<hr style="border:0;border-top:1px solid var(--bd);margin:16px 0"><form method="post" action="/meet/groups/{{ g.id }}/delete" onsubmit="return confirm('Guruh, jadval, darslar va davomat o\'chiriladi. Davom etasizmi?')"><button class="btn ghost sm">{{ ic('trash') }} Guruhni o'chirish</button></form></div>
+<hr style="border:0;border-top:1px solid var(--bd);margin:16px 0"><form method="post" action="/meet/groups/{{ g.id }}/delete" onsubmit="return confirm('Guruh, jadval va darslar o\'chiriladi. Davom etasizmi?')"><button class="btn ghost sm">{{ ic('trash') }} Guruhni o'chirish</button></form></div>
 <div class="card"><div class="card-h"><h2>{{ ic('repeat') }} Haftalik jadval</h2><form method="post" action="/meet/groups/{{ g.id }}/generate" style="margin:0"><button class="btn sec sm">{{ ic('refresh') }} Darslarni yaratish</button></form></div>
 {% if scheds %}<div class="tbl-wrap"><table class="aj-tbl mini-tbl"><tbody>{% for s in scheds %}<tr><td><b>{{ WD[s.weekday] }}</b></td><td>{{ s.start_time }}</td><td>{{ s.duration_min }} daq</td><td>{{ s.teacher_name or '' }}</td><td>{{ 'faol' if s.active else 'to\'xtatilgan' }}</td>
 <td class="nowrap"><form method="post" action="/meet/schedule/{{ s.id }}/toggle" style="display:inline"><button class="btn ghost sm">{{ 'To\'xtatish' if s.active else 'Yoqish' }}</button></form>
@@ -19,22 +18,15 @@
 <div class="chips" style="display:flex;gap:8px;flex-wrap:wrap">{% for d in WD %}<label class="chip"><input type="checkbox" name="weekday" value="{{ loop.index0 }}"> {{ d[:3] }}</label>{% endfor %}</div>
 <div class="row" style="gap:12px;flex-wrap:wrap"><div><label class="l">Boshlanish vaqti</label><input type="time" name="start_time" value="19:00" required></div><div><label class="l">Davomiylik (daq)</label><input type="number" name="duration" value="60" min="10" max="480" required></div>
 <div><label class="l">O'qituvchi (bo'sh = guruhniki)</label><select name="teacher_id"><option value="">guruhniki</option>{% for t in teachers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div></div>
-{% if gmail_limit %}<div class="hint">Gmail akkauntda Meet 60 daqiqa bilan cheklanadi; uzunroq dars yaratilganda ogohlantiriladi.</div>{% endif %}
+{% if seg_note %}<div class="hint">{{ seg_note }}</div>{% endif %}
 <div class="actions" style="margin-top:10px"><button class="btn acc">Jadvalga qo'shish</button></div></form></div></div>
 <div class="card"><div class="card-h"><h2>{{ ic('clock') }} Kelgusi darslar</h2></div>
-{% if up %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Vaqt</th><th>Holat</th><th>O'qituvchi</th><th>Meet havolasi</th><th></th></tr></thead><tbody>
+{% if up %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Vaqt</th><th>Holat</th><th>O'qituvchi</th><th>Zoom havolasi</th><th></th></tr></thead><tbody>
 {% for l in up %}<tr><td class="nowrap"><a href="/meet/lessons/{{ l.id }}"><b>{{ l.wd }} {{ l.day[5:] }} {{ l.hhmm }}</b></a> <span class="mut tiny">{{ l.duration_min }} daq</span></td><td>{{ pill(l) }}{% if l.moved_from %} <span class="mut tiny">(ko'chirilgan)</span>{% endif %}</td><td>{{ l.teacher_name or '—' }}</td>
-<td>{% if l.meeting_uri %}<code>{{ l.meeting_uri[8:] }}</code> {{ copybtn(l.meeting_uri, '') }}{% else %}<span class="mut">yo'q</span>{% endif %}{% if l.warn %}<div class="mut tiny" style="color:#b45309">{{ l.warn }}</div>{% endif %}</td>
+<td>{% if l.join_url %}<code>{{ l.join_url[8:] }}</code> {{ copybtn(l.join_url, '') }}{% else %}<span class="mut">yo'q</span>{% endif %}{% if l.warn %}<div class="mut tiny" style="color:#b45309">{{ l.warn }}</div>{% endif %}</td>
 <td style="text-align:right">{{ actions(l, '/meet/groups/' ~ g.id) }}</td></tr>{% endfor %}</tbody></table></div>
 {% else %}<div class="empty"><div>Kelgusi dars yo'q.</div></div>{% endif %}
 <form method="post" action="/meet/groups/{{ g.id }}/extra" class="row" style="gap:10px;flex-wrap:wrap;margin-top:12px;align-items:end"><div><label class="l">Qo'shimcha dars: sana</label><input type="date" name="day" required></div><div><label class="l">Vaqt</label><input type="time" name="time" required></div><div><label class="l">Davomiylik</label><input type="number" name="duration" value="60" min="10" max="480" style="width:90px"></div><div><label class="l">O'qituvchi</label><select name="teacher_id"><option value="">guruhniki</option>{% for t in teachers %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div><button class="btn sec sm">Qo'shish</button></form></div>
-<div class="card"><div class="card-h"><h2>O'tgan darslar</h2></div>{% if past %}<div class="tbl-wrap"><table class="aj-tbl mini-tbl"><thead><tr><th>Vaqt</th><th>Holat</th><th>O'tgan vaqt</th><th>Eng ko'pi</th><th></th></tr></thead><tbody>
-{% for l in past %}<tr><td>{{ l.day[5:] }} {{ l.hhmm }}</td><td>{{ pill(l) }}</td><td>{{ l.elapsed }} daq</td><td>{{ l.peak or 0 }}</td><td><a class="btn sec sm" href="/meet/lessons/{{ l.id }}">Davomat</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty">Hali dars o'tmagan.</div>{% endif %}</div>
-<div class="card" id="roster"><div class="card-h"><h2>{{ ic('users') }} O'quvchilar ro'yxati ({{ roster|length }})</h2></div>
-<p class="mut small">O'quvchi ismi Meet'dagi nom bilan olinadi. Bir odam turli nom bilan kirsa, ularni shu yerda birlashtiring. Ro'yxatdagi, lekin darsga kirmaganlar «kelmadi» deb ko'rinadi.</p>
-<div class="chips" style="display:flex;gap:6px;flex-wrap:wrap">{% for n in roster %}<span class="chip">{{ n }}</span>{% endfor %}</div>
-<div class="mt-grid2" style="margin-top:12px"><form method="post" action="/meet/groups/{{ g.id }}/merge"><label class="l">Ismlarni birlashtirish: bu nom…</label><input type="text" name="from_name" list="rn" required><label class="l">…shu odam bilan bir xil</label><input type="text" name="to_name" list="rn" required><datalist id="rn">{% for n in roster %}<option value="{{ n }}">{% endfor %}</datalist>
-<div class="actions" style="margin-top:8px"><button class="btn sm">Birlashtirish</button></div></form>
-<form method="post" action="/meet/groups/{{ g.id }}/roster"><label class="l">Ro'yxatga qo'lda qo'shish (hali kelmagan o'quvchi)</label><input type="text" name="name" placeholder="Ism Familiya"><div class="actions" style="margin-top:8px"><button class="btn sec sm">Qo'shish</button></div></form></div>
-{% if aliases %}<div class="hint" style="margin-top:10px">Birlashtirilgan nomlar: {% for k, v in aliases.items() %}<form method="post" action="/meet/groups/{{ g.id }}/unmerge" style="display:inline"><input type="hidden" name="raw_name" value="{{ k }}"><span class="chip">{{ k }} → {{ v }} <button class="btn ghost sm" style="padding:0 6px">×</button></span></form> {% endfor %}</div>{% endif %}</div>
+<div class="card"><div class="card-h"><h2>O'tgan darslar</h2></div>{% if past %}<div class="tbl-wrap"><table class="aj-tbl mini-tbl"><thead><tr><th>Vaqt</th><th>Holat</th><th>Davomiylik</th><th></th></tr></thead><tbody>
+{% for l in past %}<tr><td>{{ l.day[5:] }} {{ l.hhmm }}</td><td>{{ pill(l) }}</td><td>{{ l.duration_min }} daq</td><td><a class="btn sec sm" href="/meet/lessons/{{ l.id }}">Ochish</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty">Hali dars o'tmagan.</div>{% endif %}</div>
 {% endblock %}

@@ -1,39 +1,35 @@
 {% extends "base.html" %}{% block title %}Yo'riqnoma{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Yo'riqnoma</h1><p class="sub">Majlislarni birinchi marta sozlash: Google Cloud, Telegram akkaunt, o'qituvchi, jadval va muammolar.</p></div></div>
-<div class="card mt-guide"><div class="card-h"><h2>{{ ic('link') }} 1. Google Cloud sozlamasi (bir marta, ~10 daqiqa)</h2></div>
-<p class="mut small">Domen kerak emas. Shaxsiy Gmail yetadi; kalit faqat shu kompyuterda (shifrlangan) saqlanadi.</p><ol>
-<li><b>Loyiha oching.</b> <code>console.cloud.google.com</code> ga host Gmail bilan kiring → yuqoridagi loyiha tanlagich → <b>New project</b> → nom: <code>TelegramMajlis</code> → <b>Create</b>.</li>
-<li><b>Ikkita API'ni yoqing.</b> <b>APIs &amp; Services → Library</b>: <code>Google Meet REST API</code> → <b>Enable</b>; keyin <code>Google Calendar API</code> → <b>Enable</b>.</li>
-<li><b>OAuth rozilik ekrani.</b> <b>Google Auth Platform</b> (yoki APIs &amp; Services → OAuth consent screen) → <b>Get started</b>: ilova nomi <code>Majlislar</code>, qo'llab-quvvatlash emaili — o'zingiznikи, <b>Audience: External</b>. Email'ni <b>Test users</b> ga qo'shing.</li>
-<li><b>Ruxsatlar (Data Access → Add or remove scopes).</b> Quyidagilarni qo'shing:
-<div style="margin-top:6px">{% for s in scopes %}<div><code>{{ s }}</code></div>{% endfor %}</div></li>
-<li><b>OAuth kalit.</b> <b>Clients → Create client</b> (yoki Credentials → Create credentials → OAuth client ID) → turi: <b>Desktop app</b> → <b>Create</b>. <b>Client ID</b> va <b>Client secret</b> ni nusxalang va <a href="/meet/settings">Sozlamalar</a>ga kiriting. (Desktop turi 127.0.0.1 qaytish manzilini o'zi qabul qiladi: <code>{{ redirect_uri }}</code>.)</li>
-<li><b>Ilovani Production holatiga o'tkazing — MUHIM.</b> <b>Audience → Publish app → Confirm</b>. Aks holda ilova «Testing» holatida qoladi va <b>token 7 kundan keyin o'chadi</b> (darslar to'xtab qoladi). Production'da tasdiqlanmagan ilova ogohlantirish ko'rsatadi: <b>Advanced → Go to Majlislar (unsafe)</b> — bu o'z ilovangiz, xavfsiz. Production'ga o'tgandan keyin Google'ga <b>qayta ulang</b>.</li>
-<li><b>Ulang.</b> <a href="/meet/settings">Sozlamalar → Google'ga ulash</a> → Gmail'ni tanlang → barcha ruxsatlarni belgilab <b>Continue</b>. So'ng <a href="/meet/diag">Google diagnostika</a>ni ishga tushiring: har imkoniyat «Ishlaydi» yoki sababi bilan ko'rinadi.</li></ol>
-<h3>Gmail va 60 daqiqa</h3><p>Shaxsiy Gmail'da Meet uchrashuvi 60 daqiqa bilan cheklanadi. Dars 60 daqiqadan uzun bo'lsa, yaratishda ogohlantirish chiqadi va Tizim tahlilida «Meet limiti: 60 daqiqa (Gmail)» ko'rinadi. Host akkauntni Workspace'ga almashtirish: Sozlamalar → «Uzish» → qayta ulash va host turini Workspace deb belgilang.</p></div>
-<div class="card mt-guide"><div class="card-h"><h2>{{ ic('send') }} 2. Telegram akkaunt</h2></div><ol>
-<li>Group Post → Sozlamalar'da <b>API ID / API HASH</b> kiritilgan bo'lsin (my.telegram.org).</li>
-<li><a href="/meet/account">Majlislar → Telegram akkaunt</a>: <b>alohida</b> raqam kiriting, kodni tasdiqlang (Group Post va Kanallarim raqamlaridan boshqa).</li>
-<li>Bu akkauntni o'quvchilar guruhlariga qo'shing (yozish huquqi bilan). <a href="/meet/groups">Guruhlar</a> sahifasida «Telegramdan tanlash» orqali guruhni biriktiring.</li>
-<li>Admin <b>@username</b> ni Sozlamalarga kiriting: o'qituvchi kechiksa, xabar yetmasa, dars tugasa shu odamga xabar boradi.</li></ol></div>
-<div class="card mt-guide"><div class="card-h"><h2>{{ ic('cap') }} 3. O'qituvchi qo'shish</h2></div><ol>
-<li><a href="/meet/teachers">O'qituvchilar</a>: ism, <b>Gmail</b> (Meet'da avtomatik co-host bo'ladi, kalendar ulashiladi), <b>Telegram @username</b> (havola shaxsiy xabar bilan boradi), telefon, izoh.</li>
-<li>O'qituvchi akkaunti Telegram'da shu @username bilan topilishi va Majlislar akkauntini bloklamagan bo'lishi kerak.</li>
-<li>Guruh sahifasida o'qituvchini tanlang.</li></ol></div>
-<div class="card mt-guide"><div class="card-h"><h2>{{ ic('repeat') }} 4. Jadval</h2></div><ol>
-<li>Guruhni oching → <b>Haftalik jadval</b>: hafta kunlari (odatda 3-6 ta), vaqt (Toshkent), davomiylik → <b>Jadvalga qo'shish</b>.</li>
-<li>Dastur keyingi {{ 7 }} kun (Sozlamalarda o'zgaradi) uchun har dars uchun <b>yangi Meet xonasi</b> (havola ochiq), kalendar yozuvi va co-host yaratadi. Har guruhning o'z Google Calendar'i bor; bosh sahifada hamma guruhlar bitta kalendarda.</li>
-<li>Dars boshlanishidan <b>10 daqiqa oldin</b> o'qituvchiga shaxsiy xabar, <b>5 daqiqa oldin</b> guruhga havola; <b>60 va 10</b> daqiqa oldin guruhga eslatma (Sozlamalarda o'zgaradi).</li>
-<li><b>Bekor qilish / ko'chirish:</b> «Amallar» tugmasi — guruhga va o'qituvchiga avtomatik xabar ketadi, kalendar yangilanadi.</li>
-<li>Begona kirsa, o'qituvchi Meet ichida o'zi chiqaradi. Platformada chiqarish tugmasi va begonani aniqlash tizimi yo'q: faqat «ko'p odam» / «yangi nom» xabari keladi.</li>
-<li>Davomat dars davomida har 30-60 soniyada yangilanadi. Bir odamning turli ismlarini <b>Birlashtirish</b> orqali bog'lang. Yozuv (record) havolasi qo'lda kiritiladi.</li></ol></div>
+<div class="page-h"><div><h1>Yo'riqnoma</h1><p class="sub">Majlislarni birinchi marta sozlash: Zoom akkauntlar, o'qituvchilar boti, Telegram akkaunt, o'qituvchi, jadval, 40 daqiqalik zanjir va muammolar.</p></div></div>
+<div class="card mt-guide"><div class="card-h"><h2>{{ ic('link') }} 1. Zoom akkaunt (har biri uchun ~5 daqiqa, bepul)</h2></div>
+<p class="mut small">Har bir Zoom akkaunt uchun alohida «Server-to-Server OAuth» ilova yaratiladi. Pul to'lash kerak emas. Akkauntlar turli odamlarniki bo'lishi mumkin: har birining egasi quyidagi qadamlarni bajarib, sizga 4 ta qiymat beradi.</p><ol>
+<li><b>Marketplace'ga kiring.</b> <code>marketplace.zoom.us</code> → o'ng yuqorida <b>Develop → Build App</b> (akkaunt egasining Zoom emaili bilan).</li>
+<li><b>Ilova turi:</b> <b>Server-to-Server OAuth App</b> → <b>Create</b> → nom: <code>Majlislar</code>.</li>
+<li><b>Ma'lumot:</b> <b>App Credentials</b> sahifasidan <b>Account ID</b>, <b>Client ID</b>, <b>Client Secret</b> ni nusxalang.</li>
+<li><b>Ruxsatlar (Scopes → Add Scopes):</b> <div style="margin-top:6px">{% for s in scopes %}<div><code>{{ s }}</code></div>{% endfor %}</div><div class="hint">Zoom ba'zan boshqacha nom ishlatadi; xato matnida kerakli scope ko'rsatiladi: shuni qo'shing.</div></li>
+<li><b>Faollashtiring:</b> <b>Activation → Activate your app</b>.</li>
+<li><b>Platformaga qo'shing:</b> <a href="/meet/zoom">Zoom akkauntlar</a> → «Akkaunt qo'shish»: Zoom email, Account ID, Client ID, Client Secret. Ko'p akkaunt bo'lsa «Ko'plab qo'shish»: har qatorga <code>email;account_id;client_id;client_secret</code>.</li>
+<li><b>Tekshiring:</b> «Tekshirish» yoki «Hammasini tekshirish». Yashil bo'lsa tayyor.</li></ol></div>
+<div class="card mt-guide"><div class="card-h"><h2>{{ ic('send') }} 2. O'qituvchilar boti</h2></div><ol>
+<li>Telegram'da <b>@BotFather</b> → <code>/newbot</code> → nom va username bering → token oling.</li>
+<li><a href="/meet/settings">Sozlamalar</a> → «Bot tokeni» ga qo'yib saqlang.</li>
+<li>Har o'qituvchi botga kirib <code>/start</code> bosadi: bot uni @username orqali taniydi va ulaydi. Shundan keyin u «Bugungi darslar», «Haftalik jadval», «Guruhlar», «Hozirgi dars» menyusini oladi.</li></ol></div>
+<div class="card mt-guide"><div class="card-h"><h2>{{ ic('users') }} 3. Telegram akkaunt, o'qituvchi, guruh va jadval</h2></div><ol>
+<li><a href="/meet/account">Telegram akkaunt</a>: guruhlarga havola yuboradigan alohida akkaunt (telefon + kod). Akkaunt o'quvchilar guruhlarida a'zo bo'lishi kerak.</li>
+<li><a href="/meet/teachers">O'qituvchilar</a>: ism, @username (majburiy), telefon, izoh.</li>
+<li><a href="/meet/groups">Guruhlar</a>: Telegram guruhlarni qo'shing va o'qituvchini biriktiring.</li>
+<li>Guruh sahifasida <b>haftalik jadval</b>: hafta kunlari (3–6 ta), vaqt, davomiylik. Dars bekor qilish/ko'chirish tugmalari guruhga va o'qituvchiga avtomatik xabar yuboradi, kalendar yangilanadi.</li></ol></div>
+<div class="card mt-guide"><div class="card-h"><h2>{{ ic('clock') }} 4. Dars qanday o'tadi (40 daqiqalik zanjir)</h2></div><ol>
+<li>Dars boshlanishidan 20 va 10 daqiqa oldin o'qituvchiga botda «darsingiz bor» xabari keladi; 10 daqiqada <b>Darsni boshlash</b> tugmasi (host havolasi) ham bo'ladi. Zoom akkaunti yoki host kaliti kerak emas.</li>
+<li>Guruhga 60 va 10 daqiqa oldin eslatma, 5 daqiqa oldin Zoom havolasi yuboriladi.</li>
+<li>Bepul majlis 40 daqiqada tugaydi. Tugashiga 3 daqiqa qolganda, dars hali tugamagan bo'lsa, o'qituvchiga bitta «Davom etasizmi?» xabari (✅ Davom etish / ❌ Bekor qilish) boradi.</li>
+<li>«Davom etish» bosilsa boshqa bo'sh akkauntdan yangi majlis ochiladi, yangi havolalar o'qituvchiga va guruhga yuboriladi. Keyingi so'rov yangi majlis tugashidan 3 daqiqa oldin keladi. «Bekor qilish» yoki javobsizlik zanjirni to'xtatadi. 2–3 daqiqalik uzilish normal.</li>
+<li>Hamma akkauntlar band bo'lsa, platformada qizil ogohlantirish chiqadi va adminga xabar boradi.</li></ol></div>
 <div class="card mt-guide"><div class="card-h"><h2>{{ ic('alert') }} 5. Muammolar</h2></div>
-<h3>«API yoqilmagan» / SERVICE_DISABLED</h3><p>Google Cloud → Library'da Meet REST API va Calendar API yoqilganini tekshiring (2-qadam). Yoqqandan keyin 1-2 daqiqa kuting.</p>
-<h3>Token 7 kundan keyin o'chdi (invalid_grant)</h3><p>OAuth ilovasi «Testing» holatida edi. Audience → <b>Publish app</b>; so'ng Sozlamalarda qayta ulang.</p>
-<h3>«Access blocked / app not verified»</h3><p>Email Test users'da yo'q (Testing) yoki ogohlantirish ekranida <b>Advanced → Go to ... (unsafe)</b> bosilmagan.</p>
-<h3>Co-host qo'shilmadi</h3><p>O'qituvchining Gmail manzili noto'g'ri yoki Google akkaunti yo'q. Diagnostika «co-host» qatoridagi xatoni ko'rsatadi. Co-host bo'lmasa ham o'qituvchi havola orqali kiradi, lekin begonani chiqarish uchun u host (siz) tomonidan Meet ichida tayinlanishi kerak bo'lishi mumkin.</p>
-<h3>Havola Telegram'ga yetmadi</h3><p><a href="/meet/alerts">Ogohlantirishlar</a>da xabar matni va <b>nusxalash</b> tugmasi bor: qo'lda yuboring. Sabab: @username noto'g'ri, o'qituvchi maxfiylik sozlamasi, akkaunt guruhdan chiqarilgan yoki Telegram cheklovi.</p>
-<h3>Davomat ko'rinmayapti</h3><p>Diagnostikada «Davomat API» ni tekshiring. Akkauntsiz mehmonlar «Noma'lum» yoki Meet'dagi nom bilan chiqadi. O'qituvchi aniqlanmasa, dars sahifasida «Bu o'qituvchi» tugmasi bilan belgilang (keyingi darslarda eslab qolinadi).</p>
-<h3>Dars 60 daqiqada to'xtadi</h3><p>Gmail cheklovi. Workspace akkauntga o'ting yoki dars davomiyligini qisqartiring.</p></div>
+<h3>«Invalid client / token xatosi»</h3><p class="mut small">Account ID, Client ID yoki Secret xato yoki ilova faollashtirilmagan.</p>
+<h3>«scope» xatosi</h3><p class="mut small">Ilovaga xato matnida ko'rsatilgan scope'ni qo'shing va qayta tekshiring.</p>
+<h3>Majlis ochiladi, lekin 40 daqiqada uziladi</h3><p class="mut small">Bu bepul Zoom cheklovi; tizim buni «Davom etasizmi?» zanjiri bilan hal qiladi.</p>
+<h3>O'qituvchiga xabar bormayapti</h3><p class="mut small">U botga /start yubormagan yoki @username noto'g'ri yozilgan. Ogohlantirishlar sahifasidan havolani qo'lda nusxalang.</p>
+<h3>Guruhga xabar bormayapti</h3><p class="mut small"><a href="/meet/account">Telegram akkaunt</a> ulanganini va guruhga yozish huquqi borligini tekshiring.</p>
+<h3>Hamma akkauntlar band</h3><p class="mut small"><a href="/meet/zoom">Zoom akkauntlar</a> sahifasida yangi akkaunt qo'shing yoki «Bo'shatish» ni bosing.</p></div>
 {% endblock %}

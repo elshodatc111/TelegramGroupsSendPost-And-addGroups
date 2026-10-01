@@ -1,15 +1,22 @@
-"""Majlislar (Google Meet darslari): sxema, sozlamalar, o'qituvchi/guruh/jadval, darslarni yaratish,
-Google Calendar, Telegram xabarlari, ogohlantirishlar va eslatma sikli.
+"""Majlislar (Zoom darslari): sxema, sozlamalar, o'qituvchi/guruh/jadval, Zoom akkauntlar puli,
+40 daqiqalik majlis zanjiri, Telegram xabarlari, ogohlantirishlar va fon sikli.
 
-Bu modul Group Post / Kanallarim jadvallariga tegmaydi: faqat mt_* jadvallari va workspace='meet' akkaunti.
+Bu modul Group Post / Kanallarim jadvallariga tegmaydi: faqat zoom_* jadvallari va workspace='meet' akkaunti.
 Vaqt: hamma joyda Asia/Tashkent (bazada oddiy "YYYY-MM-DD HH:MM:SS" matn, Toshkent vaqti).
+
+Ish tartibi (qisqacha):
+  jadval -> dars (zoom_lessons) -> dars boshlanishidan ~30 daq oldin bo'sh Zoom akkauntdan 1-majlis (zoom_meetings, seq=1)
+  -> o'qituvchiga bot orqali (20 va 10 daq oldin eslatma + «Darsni boshlash» havolasi), guruhga 5 daq oldin havola
+  -> majlis tugashiga 3 daq qolganda (dars hali tugamagan bo'lsa) o'qituvchiga bir marta «Davom etish / Bekor qilish»
+  -> «Davom etish» bosilsa boshqa bo'sh akkauntdan yangi majlis yaratilib, havola o'qituvchiga va guruhga yuboriladi; sikl takrorlanadi
+  -> «Bekor qilish» yoki javob bo'lmasa jarayon to'xtaydi.
 """
 import asyncio
 import json
 import re
 from datetime import datetime, timedelta, timezone
 
-from . import db, meet_google as G, notify, schema_ch
+from . import db, meet_zoom as Z, notify, schema_ch
 from .config import log
 
 try:
@@ -22,7 +29,8 @@ WEEKDAYS = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba",
 WD_SHORT = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
 STATUS_UZ = {"planned": "Rejalashtirilgan", "live": "Davom etmoqda", "done": "O'tdi", "missed": "O'tmadi",
              "cancelled": "Bekor qilindi"}
-GMAIL_LIMIT_MIN = 60
+BUSY_AFTER_MIN = 4        # majlis tugagandan keyin akkaunt yana shuncha daqiqa band hisoblanadi (Zoom 40 daq hisobi kechikishi)
+BUSY_BEFORE_MIN = 2
 
 
 # ---------------------------------------------------------------- vaqt
@@ -38,59 +46,56 @@ def parse(s: str) -> datetime:
     return datetime.strptime(s[:19], "%Y-%m-%d %H:%M:%S")
 
 
-def from_utc(s: str) -> datetime:
-    """Google RFC3339 (UTC) -> Toshkent vaqti (naive)."""
-    s = re.sub(r"(\.\d{6})\d+", r"\1", s.strip()).replace("Z", "+00:00")
-    dt = datetime.fromisoformat(s)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(TZ).replace(tzinfo=None)
-
-
-# ---------------------------------------------------------------- sxema (mt_*)
+# ---------------------------------------------------------------- sxema (zoom_*)
 T = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
 TABLES = [
-    f"""CREATE TABLE IF NOT EXISTS mt_teachers(
-        id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), gmail VARCHAR(255), tg_username VARCHAR(64), phone VARCHAR(40),
-        note TEXT, meet_name VARCHAR(255), active INT DEFAULT 1, created_at VARCHAR(32)) {T}""",
-    f"""CREATE TABLE IF NOT EXISTS mt_groups(
+    f"""CREATE TABLE IF NOT EXISTS zoom_accounts(
+        id INT AUTO_INCREMENT PRIMARY KEY, label VARCHAR(120), email VARCHAR(190), account_id VARCHAR(120), client_id VARCHAR(120),
+        client_secret TEXT, max_min INT DEFAULT 40, enabled INT DEFAULT 1, status VARCHAR(12) DEFAULT 'new', last_err TEXT,
+        last_ok VARCHAR(19), last_used VARCHAR(19), cool_until VARCHAR(19), plan VARCHAR(40), note TEXT, created_at VARCHAR(32),
+        UNIQUE KEY u_za(email)) {T}""",
+    f"""CREATE TABLE IF NOT EXISTS zoom_teachers(
+        id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), tg_username VARCHAR(64), phone VARCHAR(40), note TEXT,
+        chat_id BIGINT, bot_linked_at VARCHAR(19), active INT DEFAULT 1, created_at VARCHAR(32)) {T}""",
+    f"""CREATE TABLE IF NOT EXISTS zoom_groups(
         id INT AUTO_INCREMENT PRIMARY KEY, tg_id BIGINT, title VARCHAR(500), username VARCHAR(120), teacher_id INT,
-        calendar_id VARCHAR(255), active INT DEFAULT 1, note TEXT, created_at VARCHAR(32),
-        INDEX idx_mtg(active)) {T}""",
-    f"""CREATE TABLE IF NOT EXISTS mt_schedule(
+        active INT DEFAULT 1, note TEXT, created_at VARCHAR(32), INDEX idx_zg(active)) {T}""",
+    f"""CREATE TABLE IF NOT EXISTS zoom_schedule(
         id INT AUTO_INCREMENT PRIMARY KEY, group_id INT NOT NULL, weekday INT, start_time VARCHAR(5), duration_min INT,
-        teacher_id INT, active INT DEFAULT 1, created_at VARCHAR(32), INDEX idx_mts(group_id)) {T}""",
-    f"""CREATE TABLE IF NOT EXISTS mt_lessons(
+        teacher_id INT, active INT DEFAULT 1, created_at VARCHAR(32), INDEX idx_zs(group_id)) {T}""",
+    f"""CREATE TABLE IF NOT EXISTS zoom_lessons(
         id INT AUTO_INCREMENT PRIMARY KEY, group_id INT NOT NULL, schedule_id INT, slot_day VARCHAR(10), teacher_id INT,
-        start_at VARCHAR(19), end_at VARCHAR(19), duration_min INT, status VARCHAR(16) DEFAULT 'planned',
-        space_name VARCHAR(80), meeting_uri VARCHAR(255), meeting_code VARCHAR(40), cal_event_id VARCHAR(255),
-        cohost_ok INT DEFAULT 0, record_url VARCHAR(600), flags LONGTEXT, real_start VARCHAR(19), real_end VARCHAR(19),
-        peak INT DEFAULT 0, warn_text TEXT, note TEXT, cancel_reason TEXT, moved_from VARCHAR(19), prov_at VARCHAR(19),
-        prov_err TEXT, created_at VARCHAR(32),
-        UNIQUE KEY u_mtl(schedule_id, slot_day), INDEX idx_mtl_s(start_at), INDEX idx_mtl_g(group_id, start_at)) {T}""",
-    f"""CREATE TABLE IF NOT EXISTS mt_attendance(
-        id INT AUTO_INCREMENT PRIMARY KEY, lesson_id INT NOT NULL, part_name VARCHAR(190), raw_name VARCHAR(255),
-        person VARCHAR(255), kind VARCHAR(10), user_id VARCHAR(80), first_in VARCHAR(19), last_out VARCHAR(19),
-        total_sec INT DEFAULT 0, in_now INT DEFAULT 0, sessions_json LONGTEXT, sig VARCHAR(120), is_teacher INT DEFAULT 0,
-        updated_at VARCHAR(19), UNIQUE KEY u_mta(lesson_id, part_name), INDEX idx_mta_l(lesson_id)) {T}""",
-    f"""CREATE TABLE IF NOT EXISTS mt_settings(`key` VARCHAR(80) PRIMARY KEY, value LONGTEXT) {T}""",
-    f"""CREATE TABLE IF NOT EXISTS mt_alerts(
+        start_at VARCHAR(19), end_at VARCHAR(19), duration_min INT, status VARCHAR(16) DEFAULT 'planned', flags LONGTEXT,
+        stopped INT DEFAULT 0, note TEXT, cancel_reason TEXT, moved_from VARCHAR(19), prov_err TEXT, prov_at VARCHAR(19),
+        created_at VARCHAR(32), UNIQUE KEY u_zl(schedule_id, slot_day), INDEX idx_zl_s(start_at), INDEX idx_zl_g(group_id, start_at)) {T}""",
+    f"""CREATE TABLE IF NOT EXISTS zoom_meetings(
+        id INT AUTO_INCREMENT PRIMARY KEY, lesson_id INT, account_id INT, seq INT DEFAULT 1, start_at VARCHAR(19), end_at VARCHAR(19),
+        zoom_id VARCHAR(40), join_url VARCHAR(700), start_url TEXT, passcode VARCHAR(40), topic VARCHAR(255),
+        state VARCHAR(10) DEFAULT 'active', prompt VARCHAR(10) DEFAULT 'none', flags LONGTEXT, adhoc INT DEFAULT 0,
+        created_by VARCHAR(12), created_at VARCHAR(19), INDEX idx_zm_a(account_id, start_at), INDEX idx_zm_l(lesson_id)) {T}""",
+    f"""CREATE TABLE IF NOT EXISTS zoom_settings(`key` VARCHAR(80) PRIMARY KEY, value LONGTEXT) {T}""",
+    f"""CREATE TABLE IF NOT EXISTS zoom_alerts(
         id INT AUTO_INCREMENT PRIMARY KEY, ts VARCHAR(19), kind VARCHAR(24), level VARCHAR(8) DEFAULT 'warn', lesson_id INT,
         group_id INT, text TEXT, copy_text TEXT, seen INT DEFAULT 0, dedupe VARCHAR(160),
-        UNIQUE KEY u_mtal(dedupe), INDEX idx_mtal(seen, ts)) {T}""",
+        UNIQUE KEY u_zal(dedupe), INDEX idx_zal(seen, ts)) {T}""",
 ]
-TABLE_NAMES = ["mt_teachers", "mt_groups", "mt_schedule", "mt_lessons", "mt_attendance", "mt_settings", "mt_alerts"]
+TABLE_NAMES = ["zoom_accounts", "zoom_teachers", "zoom_groups", "zoom_schedule", "zoom_lessons", "zoom_meetings", "zoom_settings", "zoom_alerts"]
+OLD_TABLES = ["mt_teachers", "mt_groups", "mt_schedule", "mt_lessons", "mt_attendance", "mt_settings", "mt_alerts"]   # eski Google Meet bo'limi
 _ready = False
 
 
 def ensure_schema():
-    """Majlislar jadvallarini yaratadi (mavjud bo'lsa tegmaydi). Dastur ishga tushganda va birinchi so'rovda chaqiriladi."""
+    """Majlislar jadvallarini yaratadi (mavjud bo'lsa tegmaydi) va eski Google Meet (mt_*) jadvallarini olib tashlaydi."""
     global _ready
     if db.IS_MYSQL:
         from . import mysqldb
+        for t in OLD_TABLES:
+            mysqldb.raw(f"DROP TABLE IF EXISTS {t}")
         for st in TABLES:
             mysqldb.raw(st)
     else:
+        for t in OLD_TABLES:
+            db.ex(f"DROP TABLE IF EXISTS {t}")
         for st in TABLES:
             create, idx = schema_ch._to_sqlite(st)
             db.ex(create)
@@ -106,22 +111,24 @@ def ready():
 
 # ---------------------------------------------------------------- sozlamalar
 DEFAULTS = {
-    "host_type": "gmail",        # gmail | workspace
-    "moderation": "ON",          # Meet moderatsiya (co-host boshqaruvi)
-    "late_min": 10, "early_min": 10,
     "remind_a": 60, "remind_b": 10,            # guruhga eslatmalar (daqiqa oldin)
-    "teacher_dm_min": 10, "group_link_min": 5,  # havola yuborish (o'qituvchiga / guruhga)
-    "teacher_late_min": 5,
-    "poll_sec": 45, "horizon_days": 7, "max_people": 0,
-    "remind_on": 1, "report_on": 1, "report_to_group": 0,
+    "group_link_min": 5,                       # guruhga havola (daqiqa oldin)
+    "t_remind_a": 20, "t_remind_b": 10,        # o'qituvchiga bot eslatmalari; ikkinchisida boshlash havolasi ham boradi
+    "create_lead_min": 30,                     # majlisni dars boshlanishidan necha daqiqa oldin yaratish
+    "prompt_before_min": 3,                    # majlis tugashiga necha daqiqa qolganda «Davom etasizmi?»
+    "min_remaining": 2,                        # dars tugashiga shundan kam qolsa «Davom etasizmi?» yuborilmaydi
+    "seg_default_min": 40,                     # yangi akkaunt uchun standart majlis davomiyligi (bepul: 40, Pro: 0=cheksiz)
+    "horizon_days": 7,
+    "remind_on": 1,
     "admin_username": "",
+    "bot_token": "",
 }
-SECRET_KEYS = {"google_client_secret", "g_refresh", "g_access"}
+SECRET_KEYS = {"bot_token"}
 
 
 def get(key, default=None):
     from . import secure
-    r = db.one("SELECT value FROM mt_settings WHERE key=?", (key,))
+    r = db.one("SELECT value FROM zoom_settings WHERE key=?", (key,))
     if not r or r["value"] is None:
         return default
     v = r["value"]
@@ -136,11 +143,11 @@ def put(key, value):
     value = "" if value is None else str(value)
     if key in SECRET_KEYS and value:
         value = secure.enc(value)
-    db.ex("INSERT INTO mt_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+    db.ex("INSERT INTO zoom_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
 
 
 def drop(key):
-    db.ex("DELETE FROM mt_settings WHERE key=?", (key,))
+    db.ex("DELETE FROM zoom_settings WHERE key=?", (key,))
 
 
 def cfg(key):
@@ -170,83 +177,93 @@ def jput(key, value):
 
 # ---------------------------------------------------------------- o'qituvchilar
 _UN = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
-_MAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def teachers(active_only=False):
-    sql = "SELECT * FROM mt_teachers" + (" WHERE active=1" if active_only else "") + " ORDER BY name"
+    sql = "SELECT * FROM zoom_teachers" + (" WHERE active=1" if active_only else "") + " ORDER BY name"
     return [dict(r) for r in db.q(sql)]
 
 
 def teacher(tid):
-    r = db.one("SELECT * FROM mt_teachers WHERE id=?", (tid,)) if tid else None
+    r = db.one("SELECT * FROM zoom_teachers WHERE id=?", (tid,)) if tid else None
     return dict(r) if r else None
+
+
+def teacher_by_username(un: str):
+    un = (un or "").lstrip("@").lower()
+    if not un:
+        return None
+    for t in teachers():
+        if (t.get("tg_username") or "").lower() == un:
+            return t
+    return None
 
 
 def save_teacher(form: dict, tid=None) -> str | None:
     """Xato matnini qaytaradi (yoki None — saqlandi)."""
     name = (form.get("name") or "").strip()
-    gmail = (form.get("gmail") or "").strip().lower()
     un = (form.get("tg_username") or "").strip().lstrip("@")
     if not name:
         return "Ism kiritilmagan"
-    if gmail and not _MAIL.match(gmail):
-        return "Gmail manzili noto'g'ri"
-    if un and not _UN.match(un):
+    if not un:
+        return "Telegram @username kiritilishi shart (bot o'qituvchini shu orqali taniydi)"
+    if not _UN.match(un):
         return "Telegram @username noto'g'ri (5-32 ta lotin harf, raqam yoki _)"
-    vals = (name, gmail, un, (form.get("phone") or "").strip(), (form.get("note") or "").strip(),
-            (form.get("meet_name") or "").strip())
+    other = teacher_by_username(un)
+    if other and other["id"] != tid:
+        return f"Bu @username boshqa o'qituvchida ({other['name']}) bor"
+    vals = (name, un, (form.get("phone") or "").strip(), (form.get("note") or "").strip())
     if tid:
-        db.ex("UPDATE mt_teachers SET name=?, gmail=?, tg_username=?, phone=?, note=?, meet_name=? WHERE id=?", vals + (tid,))
+        old = teacher(tid)
+        db.ex("UPDATE zoom_teachers SET name=?, tg_username=?, phone=?, note=? WHERE id=?", vals + (tid,))
+        if old and (old.get("tg_username") or "").lower() != un.lower():                 # @username almashsa bot qayta bog'lanadi
+            db.ex("UPDATE zoom_teachers SET chat_id=NULL, bot_linked_at=NULL WHERE id=?", (tid,))
     else:
-        db.ex("INSERT INTO mt_teachers(name,gmail,tg_username,phone,note,meet_name,active,created_at) VALUES(?,?,?,?,?,?,1,?)",
-              vals + (fmt(now()),))
+        db.ex("INSERT INTO zoom_teachers(name,tg_username,phone,note,active,created_at) VALUES(?,?,?,?,1,?)", vals + (fmt(now()),))
     return None
 
 
 def delete_teacher(tid):
-    db.ex("UPDATE mt_groups SET teacher_id=NULL WHERE teacher_id=?", (tid,))
-    db.ex("UPDATE mt_schedule SET teacher_id=NULL WHERE teacher_id=?", (tid,))
-    db.ex("UPDATE mt_lessons SET teacher_id=NULL WHERE teacher_id=? AND status IN ('planned','live')", (tid,))
-    db.ex("DELETE FROM mt_teachers WHERE id=?", (tid,))
+    db.ex("UPDATE zoom_groups SET teacher_id=NULL WHERE teacher_id=?", (tid,))
+    db.ex("UPDATE zoom_schedule SET teacher_id=NULL WHERE teacher_id=?", (tid,))
+    db.ex("UPDATE zoom_lessons SET teacher_id=NULL WHERE teacher_id=? AND status IN ('planned','live')", (tid,))
+    db.ex("DELETE FROM zoom_teachers WHERE id=?", (tid,))
 
 
 # ---------------------------------------------------------------- guruhlar
 def groups(active_only=False):
-    sql = ("SELECT g.*, t.name teacher_name FROM mt_groups g LEFT JOIN mt_teachers t ON t.id=g.teacher_id"
+    sql = ("SELECT g.*, t.name teacher_name FROM zoom_groups g LEFT JOIN zoom_teachers t ON t.id=g.teacher_id"
            + (" WHERE g.active=1" if active_only else "") + " ORDER BY g.title")
     return [dict(r) for r in db.q(sql)]
 
 
 def group(gid):
-    r = db.one("SELECT g.*, t.name teacher_name FROM mt_groups g LEFT JOIN mt_teachers t ON t.id=g.teacher_id WHERE g.id=?", (gid,)) if gid else None
+    r = db.one("SELECT g.*, t.name teacher_name FROM zoom_groups g LEFT JOIN zoom_teachers t ON t.id=g.teacher_id WHERE g.id=?", (gid,)) if gid else None
     return dict(r) if r else None
 
 
 def add_group(tg_id, title, username="", teacher_id=None) -> int:
-    old = db.one("SELECT id FROM mt_groups WHERE tg_id=?", (tg_id,)) if tg_id else None
+    old = db.one("SELECT id FROM zoom_groups WHERE tg_id=?", (tg_id,)) if tg_id else None
     if old:
         return old["id"]
-    return db.ex("INSERT INTO mt_groups(tg_id,title,username,teacher_id,active,created_at) VALUES(?,?,?,?,1,?)",
+    return db.ex("INSERT INTO zoom_groups(tg_id,title,username,teacher_id,active,created_at) VALUES(?,?,?,?,1,?)",
                  (tg_id, title, username or "", teacher_id, fmt(now())))
 
 
-def delete_group(gid):
-    """Guruh, jadvali, darslari va davomati (Google Calendar xato bo'lsa ham) o'chiriladi."""
-    ids = [r["id"] for r in db.q("SELECT id FROM mt_lessons WHERE group_id=?", (gid,))]
-    for lid in ids:
-        db.ex("DELETE FROM mt_attendance WHERE lesson_id=?", (lid,))
-    db.ex("DELETE FROM mt_lessons WHERE group_id=?", (gid,))
-    db.ex("DELETE FROM mt_schedule WHERE group_id=?", (gid,))
-    db.ex("DELETE FROM mt_alerts WHERE group_id=?", (gid,))
-    drop(f"alias_{gid}")
-    drop(f"roster_{gid}")
-    db.ex("DELETE FROM mt_groups WHERE id=?", (gid,))
+async def delete_group(gid):
+    """Guruh, jadvali va darslari o'chiriladi; band majlislar Zoom'dan ham o'chiriladi."""
+    for r in db.q("SELECT id FROM zoom_lessons WHERE group_id=?", (gid,)):
+        await _drop_meetings(r["id"])
+        db.ex("DELETE FROM zoom_meetings WHERE lesson_id=?", (r["id"],))
+    db.ex("DELETE FROM zoom_lessons WHERE group_id=?", (gid,))
+    db.ex("DELETE FROM zoom_schedule WHERE group_id=?", (gid,))
+    db.ex("DELETE FROM zoom_alerts WHERE group_id=?", (gid,))
+    db.ex("DELETE FROM zoom_groups WHERE id=?", (gid,))
 
 
 # ---------------------------------------------------------------- jadval
 def schedules(gid):
-    return [dict(r) for r in db.q("SELECT s.*, t.name teacher_name FROM mt_schedule s LEFT JOIN mt_teachers t ON t.id=s.teacher_id "
+    return [dict(r) for r in db.q("SELECT s.*, t.name teacher_name FROM zoom_schedule s LEFT JOIN zoom_teachers t ON t.id=s.teacher_id "
                                   "WHERE s.group_id=? ORDER BY s.weekday, s.start_time", (gid,))]
 
 
@@ -267,28 +284,301 @@ def add_schedule(gid, weekdays, start_time, duration, teacher_id=None) -> tuple[
     if errs:
         return errs, warns
     for w in wds:
-        if not db.one("SELECT 1 FROM mt_schedule WHERE group_id=? AND weekday=? AND start_time=?", (gid, w, start_time)):
-            db.ex("INSERT INTO mt_schedule(group_id,weekday,start_time,duration_min,teacher_id,active,created_at) VALUES(?,?,?,?,?,1,?)",
+        if not db.one("SELECT 1 FROM zoom_schedule WHERE group_id=? AND weekday=? AND start_time=?", (gid, w, start_time)):
+            db.ex("INSERT INTO zoom_schedule(group_id,weekday,start_time,duration_min,teacher_id,active,created_at) VALUES(?,?,?,?,?,1,?)",
                   (gid, w, start_time, duration, teacher_id, fmt(now())))
-    n = db.one("SELECT COUNT(*) c FROM mt_schedule WHERE group_id=? AND active=1", (gid,))["c"]
+    n = db.one("SELECT COUNT(*) c FROM zoom_schedule WHERE group_id=? AND active=1", (gid,))["c"]
     if not 3 <= n <= 6:
         warns.append(f"Haftasiga {n} ta dars bor (odatda 3-6 ta bo'ladi). Agar shunday kerak bo'lsa, davom eting.")
-    w60 = duration_warning(duration)
-    if w60:
-        warns.append(w60)
+    w = duration_note(duration)
+    if w:
+        warns.append(w)
     return [], warns
 
 
-def duration_warning(minutes: int) -> str:
-    if cfg("host_type") == "gmail" and minutes > GMAIL_LIMIT_MIN:
-        return (f"Dars {minutes} daqiqa, Gmail akkauntda Meet uchrashuvi 60 daqiqa bilan cheklanadi: "
-                f"{GMAIL_LIMIT_MIN} daqiqadan keyin Meet o'zi tugatadi (Workspace akkaunt kerak).")
-    return ""
+def duration_note(minutes: int) -> str:
+    """Bepul akkauntlarda dars necha bo'lakka bo'linishini aytadi (ma'lumot uchun)."""
+    free = [a for a in accounts(True) if a["max_min"]]
+    if not free or minutes <= min(a["max_min"] for a in free):
+        return ""
+    m = min(a["max_min"] for a in free)
+    n = -(-minutes // m)
+    return f"Dars {minutes} daqiqa: bepul Zoom akkauntlarda {m} daqiqalik {n} ta majlisga bo'linadi (har bo'lak oxirida o'qituvchidan «Davom etasizmi?» so'raladi)."
+
+
+# ---------------------------------------------------------------- Zoom akkauntlar puli
+def _acc_public(r) -> dict:
+    d = dict(r)
+    d["has_secret"] = bool(d.get("client_secret"))
+    d.pop("client_secret", None)
+    return d
+
+
+def accounts(enabled_only=False) -> list[dict]:
+    sql = "SELECT * FROM zoom_accounts" + (" WHERE enabled=1" if enabled_only else "") + " ORDER BY id"
+    return [_acc_public(r) for r in db.q(sql)]
+
+
+def account_raw(aid) -> dict | None:
+    r = db.one("SELECT * FROM zoom_accounts WHERE id=?", (aid,)) if aid else None
+    return dict(r) if r else None
+
+
+_MAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def add_account(label, email, account_id, client_id, client_secret, max_min=None) -> tuple[int | None, str | None]:
+    from . import secure
+    email = (email or "").strip().lower()
+    account_id, client_id, client_secret = (account_id or "").strip(), (client_id or "").strip(), (client_secret or "").strip()
+    if not _MAIL.match(email):
+        return None, f"Zoom email noto'g'ri: {email or '—'}"
+    if not (account_id and client_id and client_secret):
+        return None, f"{email}: Account ID, Client ID va Client Secret to'liq kiritilishi kerak"
+    if db.one("SELECT 1 FROM zoom_accounts WHERE LOWER(email)=?", (email,)):
+        return None, f"{email}: bu akkaunt allaqachon qo'shilgan"
+    try:
+        mm = int(max_min) if str(max_min or "").strip() != "" else cfg("seg_default_min")
+    except ValueError:
+        return None, "Majlis davomiyligi raqam bo'lishi kerak (0 = cheklovsiz)"
+    mm = max(0, min(1440, mm))
+    aid = db.ex("INSERT INTO zoom_accounts(label,email,account_id,client_id,client_secret,max_min,enabled,status,created_at) VALUES(?,?,?,?,?,?,1,'new',?)",
+                ((label or "").strip() or email, email, account_id, client_id, secure.enc(client_secret), mm, fmt(now())))
+    return aid, None
+
+
+def update_account(aid, label, email, account_id, client_id, client_secret, max_min) -> str | None:
+    from . import secure
+    a = account_raw(aid)
+    if not a:
+        return "Akkaunt topilmadi"
+    email = (email or "").strip().lower()
+    if not _MAIL.match(email):
+        return "Zoom email noto'g'ri"
+    other = db.one("SELECT id FROM zoom_accounts WHERE LOWER(email)=? AND id<>?", (email, aid))
+    if other:
+        return "Bu email boshqa akkauntda bor"
+    try:
+        mm = max(0, min(1440, int(max_min)))
+    except (TypeError, ValueError):
+        return "Majlis davomiyligi raqam bo'lishi kerak (0 = cheklovsiz)"
+    sec = a["client_secret"] if not (client_secret or "").strip() else secure.enc(client_secret.strip())
+    db.ex("UPDATE zoom_accounts SET label=?, email=?, account_id=?, client_id=?, client_secret=?, max_min=?, status='new', last_err=NULL, cool_until=NULL WHERE id=?",
+          ((label or "").strip() or email, email, (account_id or "").strip() or a["account_id"], (client_id or "").strip() or a["client_id"], sec, mm, aid))
+    return None
+
+
+def bulk_add(text: str) -> tuple[int, list[str]]:
+    """Har qatorda: email ; account_id ; client_id ; client_secret [; davomiylik [; nom]]  (ajratgich: ; yoki | yoki tab)."""
+    n, errs = 0, []
+    for ln, line in enumerate((text or "").splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        p = [x.strip() for x in re.split(r"[;|\t]", line)]
+        if len(p) < 4:
+            errs.append(f"{ln}-qator: kamida 4 ta qiymat kerak (email; account_id; client_id; client_secret)")
+            continue
+        aid, err = add_account(p[5] if len(p) > 5 else "", p[0], p[1], p[2], p[3], p[4] if len(p) > 4 else None)
+        if err:
+            errs.append(f"{ln}-qator: {err}")
+        else:
+            n += 1
+    return n, errs
+
+
+def set_account_ok(aid, plan=""):
+    db.ex("UPDATE zoom_accounts SET status='ok', last_err=NULL, last_ok=?, cool_until=NULL, plan=COALESCE(NULLIF(?,''),plan) WHERE id=?", (fmt(now()), plan, aid))
+
+
+def set_account_err(aid, err: str, cool_min=10):
+    db.ex("UPDATE zoom_accounts SET status='error', last_err=?, cool_until=? WHERE id=?",
+          (err[:600], fmt(now() + timedelta(minutes=cool_min)), aid))
+
+
+async def delete_account(aid) -> str | None:
+    if db.one("SELECT 1 FROM zoom_meetings WHERE account_id=? AND state='active'", (aid,)):
+        return "Akkauntda faol majlis bor: avval «Bo'shatish» ni bosing yoki majlis tugashini kuting"
+    db.ex("DELETE FROM zoom_accounts WHERE id=?", (aid,))
+    return None
+
+
+# ---------------------------------------------------------------- majlislar (segmentlar)
+def meeting(mid) -> dict | None:
+    r = db.one("SELECT * FROM zoom_meetings WHERE id=?", (mid,)) if mid else None
+    return dict(r) if r else None
+
+
+def mflags(m) -> dict:
+    try:
+        return json.loads(m.get("flags") or "{}")
+    except Exception:
+        return {}
+
+
+def set_mflag(mid, key, val):
+    m = meeting(mid)
+    f = mflags(m or {})
+    f[key] = val
+    db.ex("UPDATE zoom_meetings SET flags=? WHERE id=?", (json.dumps(f, ensure_ascii=False), mid))
+
+
+def start_url_of(m) -> str:
+    from . import secure
+    v = m.get("start_url") or ""
+    if secure.is_encrypted(v):
+        return secure.dec(v) or ""
+    return v
+
+
+def meetings_of(lid, include_deleted=False) -> list[dict]:
+    sql = "SELECT * FROM zoom_meetings WHERE lesson_id=?" + ("" if include_deleted else " AND state<>'deleted'") + " ORDER BY seq, id"
+    return [dict(r) for r in db.q(sql, (lid,))]
+
+
+def account_busy(aid, a: datetime, b: datetime, ignore_mid=None) -> dict | None:
+    """Akkaunt [a, b] oralig'ida band bo'lsa, shu majlisni qaytaradi."""
+    for r in db.q("SELECT * FROM zoom_meetings WHERE account_id=? AND state='active'", (aid,)):
+        m = dict(r)
+        if ignore_mid and m["id"] == ignore_mid:
+            continue
+        ms, me = parse(m["start_at"]) - timedelta(minutes=BUSY_BEFORE_MIN), parse(m["end_at"]) + timedelta(minutes=BUSY_AFTER_MIN)
+        if ms < b and me > a:
+            return m
+    return None
+
+
+def account_status(a: dict, t: datetime | None = None) -> dict:
+    """Akkaunt holati: free | busy | soon | disabled | error."""
+    t = t or now()
+    if not a["enabled"]:
+        return {"state": "disabled", "text": "O'chirilgan", "until": ""}
+    cur = account_busy(a["id"], t, t + timedelta(seconds=1))
+    if cur:
+        les = lesson(cur["lesson_id"]) if cur.get("lesson_id") else None
+        g = group(les["group_id"]) if les else None
+        what = (g["title"] if g else None) or cur.get("topic") or "majlis"
+        return {"state": "busy", "text": f"Band: {what}", "until": cur["end_at"][11:16], "meeting_id": cur["id"]}
+    nxt = account_busy(a["id"], t, t + timedelta(minutes=cfg("create_lead_min") + 10))
+    if a.get("status") == "error" and a.get("cool_until") and parse(a["cool_until"]) > t:
+        return {"state": "error", "text": "Xato: " + (a.get("last_err") or "")[:120], "until": ""}
+    if nxt:
+        return {"state": "soon", "text": f"Bo'sh, {nxt['start_at'][11:16]} da band bo'ladi", "until": nxt["start_at"][11:16]}
+    return {"state": "free", "text": "Bo'sh", "until": ""}
+
+
+def pool_summary() -> dict:
+    t = now()
+    accs = accounts()
+    sts = [account_status(a, t) for a in accs]
+    en = [s for a, s in zip(accs, sts) if a["enabled"]]
+    return {"total": len(accs), "enabled": len(en), "free": sum(1 for s in en if s["state"] in ("free", "soon")),
+            "busy": sum(1 for s in en if s["state"] == "busy"), "error": sum(1 for s in en if s["state"] == "error")}
+
+
+def pool_problems() -> list[dict]:
+    """Veb-platformada qizil ogohlantirish: bo'sh akkaunt yetishmagan darslar va davom ettirish kutayotganlar."""
+    out = []
+    for r in db.q("SELECT id, group_id, start_at, prov_err FROM zoom_lessons WHERE status IN ('planned','live') AND prov_err LIKE 'BAND%' AND end_at>? ORDER BY start_at",
+                  (fmt(now()),)):
+        g = group(r["group_id"]) or {}
+        out.append({"lesson_id": r["id"], "text": f"«{g.get('title', '?')}» {r['start_at'][5:16]} darsi uchun bo'sh Zoom akkaunt yo'q — barcha akkauntlar band", "kind": "busy"})
+    for r in db.q("SELECT * FROM zoom_meetings WHERE state<>'deleted' AND lesson_id IS NOT NULL AND prompt='yes' AND flags LIKE '%pending_continue%'"):
+        m = dict(r)
+        if mflags(m).get("pending_continue"):
+            les = lesson(m["lesson_id"]) or {}
+            g = group(les.get("group_id")) or {}
+            out.append({"lesson_id": m["lesson_id"], "text": f"«{g.get('title', '?')}» darsini davom ettirish uchun bo'sh Zoom akkaunt yo'q — barcha akkauntlar band", "kind": "busy"})
+    return out
+
+
+def _candidates(start: datetime, lesson_end: datetime | None, exclude=(), only=None) -> list[dict]:
+    """Akkauntlarni tanlash tartibi: cheksiz (Pro) akkaunt uzun dars uchun, so'ng eng uzoq ishlatilmagani."""
+    t = now()
+    accs = []
+    for r in db.q("SELECT * FROM zoom_accounts WHERE enabled=1 ORDER BY id"):
+        a = dict(r)
+        if a["id"] in exclude or (only and a["id"] != only):
+            continue
+        if not only and a.get("cool_until") and parse(a["cool_until"]) > t:
+            continue
+        accs.append(a)
+    long_need = bool(lesson_end and (lesson_end - start).total_seconds() / 60 > 40)
+    accs.sort(key=lambda a: (0 if (a["max_min"] == 0) == long_need else 1, a.get("last_used") or ""))
+    return accs
+
+
+async def create_segment(les: dict | None, seq: int, start: datetime, *, topic: str = "", adhoc=False, only_account=None,
+                         exclude=(), created_by="auto") -> tuple[int | None, str]:
+    """Bo'sh akkauntdan yangi Zoom majlisi yaratadi. (meeting_id, xato) qaytaradi.
+    Xato 'BAND' bilan boshlansa — hamma akkauntlar band; 'XATO' bilan boshlansa — Zoom/akkaunt xatosi."""
+    from . import secure
+    lend = parse(les["end_at"]) if les else None
+    grp = group(les["group_id"]) if les else None
+    topic = topic or (f"{grp['title']} — dars" if grp else "Majlis")
+    accs = _candidates(start, lend, exclude, only_account)
+    if not accs:
+        return None, "XATO: yoqilgan Zoom akkaunt yo'q (Zoom akkauntlar sahifasida qo'shing)"
+    errors, busy_n = [], 0
+    for a in accs:
+        mm = a["max_min"] or 0
+        if mm:
+            end = start + timedelta(minutes=mm)
+        else:
+            end = lend or (start + timedelta(minutes=120))
+            if end <= start:
+                end = start + timedelta(minutes=60)
+        if account_busy(a["id"], start, end):
+            busy_n += 1
+            continue
+        lim_end = min(end, lend) if (lend and mm) else end
+        dur = max(10, int((lim_end - start).total_seconds() // 60))
+        try:
+            d = await Z.create_meeting(a, topic + (f" ({seq}-qism)" if seq > 1 else ""), start, dur if not adhoc else (mm or 120))
+        except Z.ZoomError as e:
+            set_account_err(a["id"], e.short())
+            errors.append(f"{a['label']}: {e.short()}")
+            continue
+        mid = db.ex("INSERT INTO zoom_meetings(lesson_id,account_id,seq,start_at,end_at,zoom_id,join_url,start_url,passcode,topic,state,prompt,flags,adhoc,created_by,created_at) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,'active','none','{}',?,?,?)",
+                    (les["id"] if les else None, a["id"], seq, fmt(start), fmt(end), str(d["id"]), d["join_url"],
+                     secure.enc(d.get("start_url") or "") if d.get("start_url") else "", d.get("password") or "", topic, 1 if adhoc else 0, created_by, fmt(now())))
+        db.ex("UPDATE zoom_accounts SET last_used=? WHERE id=?", (fmt(now()), a["id"]))
+        set_account_ok(a["id"])
+        return mid, ""
+    if errors and busy_n == 0:
+        return None, "XATO: " + " | ".join(errors)[:700]
+    if errors:
+        return None, "BAND: qolgan akkauntlar band; xatolar: " + " | ".join(errors)[:500]
+    return None, f"BAND: barcha Zoom akkauntlar band ({busy_n} ta)"
+
+
+async def _drop_meetings(lid, delete_remote=True):
+    """Darsning faol majlislarini Zoom'dan o'chiradi va 'deleted' deb belgilaydi."""
+    for m in meetings_of(lid):
+        if delete_remote and m.get("zoom_id") and m["state"] == "active":
+            a = account_raw(m["account_id"])
+            if a:
+                await Z.delete_meeting(a, m["zoom_id"])
+        db.ex("UPDATE zoom_meetings SET state='deleted' WHERE id=?", (m["id"],))
+
+
+async def release_account(aid) -> int:
+    """Akkauntni qo'lda bo'shatish: faol majlislar tugatilgan deb belgilanadi (Zoom'da ham tugatishga urinadi)."""
+    a = account_raw(aid)
+    n = 0
+    for r in db.q("SELECT * FROM zoom_meetings WHERE account_id=? AND state='active'", (aid,)):
+        m = dict(r)
+        if a and m.get("zoom_id"):
+            await Z.end_meeting(a, m["zoom_id"])
+        db.ex("UPDATE zoom_meetings SET state='ended' WHERE id=?", (m["id"],))
+        n += 1
+    return n
 
 
 # ---------------------------------------------------------------- darslar
 def lesson(lid):
-    r = db.one("SELECT * FROM mt_lessons WHERE id=?", (lid,)) if lid else None
+    r = db.one("SELECT * FROM zoom_lessons WHERE id=?", (lid,)) if lid else None
     return dict(r) if r else None
 
 
@@ -302,34 +592,35 @@ def flags(les) -> dict:
 def set_flag(lid, key, val):
     f = flags(lesson(lid) or {})
     f[key] = val
-    db.ex("UPDATE mt_lessons SET flags=? WHERE id=?", (json.dumps(f, ensure_ascii=False), lid))
+    db.ex("UPDATE zoom_lessons SET flags=? WHERE id=?", (json.dumps(f, ensure_ascii=False), lid))
 
 
 def lesson_teacher(les):
     return teacher(les.get("teacher_id")) or teacher((group(les["group_id"]) or {}).get("teacher_id"))
 
 
-def elapsed_min(les) -> int:
-    """«Dars qancha vaqt o'tdi»: Meet haqiqatan boshlangandan beri (davom etayotgan bo'lsa hozirgacha)."""
-    if not les.get("real_start"):
-        return 0
-    end = parse(les["real_end"]) if les.get("real_end") else now()
-    return max(0, int((end - parse(les["real_start"])).total_seconds() // 60))
-
-
-def decorate(les: dict) -> dict:
+def decorate(les: dict, with_meetings=True) -> dict:
     g = group(les["group_id"]) or {}
     t = lesson_teacher(les)
     s, e = parse(les["start_at"]), parse(les["end_at"])
     les.update(group_title=g.get("title", "?"), teacher_name=(t or {}).get("name", ""), day=s.strftime("%Y-%m-%d"),
                hhmm=s.strftime("%H:%M"), end_hhmm=e.strftime("%H:%M"), wd=WD_SHORT[s.weekday()],
-               status_uz=STATUS_UZ.get(les["status"], les["status"]), elapsed=elapsed_min(les),
-               warn=les.get("warn_text") or "", fl=flags(les))
+               status_uz=STATUS_UZ.get(les["status"], les["status"]), fl=flags(les))
+    if with_meetings:
+        ms = meetings_of(les["id"])
+        for m in ms:
+            m["start_url_plain"] = start_url_of(m)
+            a = account_raw(m["account_id"])
+            m["account_label"] = (a or {}).get("label", "?")
+        act = [m for m in ms if m["state"] == "active"]
+        les["meetings"] = ms
+        les["cur"] = act[-1] if act else None
+        les["join_url"] = (act[-1] if act else {}).get("join_url", "")
     return les
 
 
 def lessons_between(a: str, b: str, group_id=None, statuses=None):
-    sql, args = "SELECT * FROM mt_lessons WHERE start_at>=? AND start_at<?", [a, b]
+    sql, args = "SELECT * FROM zoom_lessons WHERE start_at>=? AND start_at<?", [a, b]
     if group_id:
         sql += " AND group_id=?"
         args.append(group_id)
@@ -339,13 +630,13 @@ def lessons_between(a: str, b: str, group_id=None, statuses=None):
     return [decorate(dict(r)) for r in db.q(sql + " ORDER BY start_at", args)]
 
 
-async def generate(group_id=None, provision_now=True) -> int:
+async def generate(group_id=None) -> int:
     """Faol jadvallardan keyingi `horizon_days` kun uchun darslar yaratadi (mavjud bo'lsa tegmaydi)."""
     ready()
     horizon = max(1, cfg("horizon_days"))
     today = now().replace(hour=0, minute=0, second=0, microsecond=0)
-    created = []
-    sql = ("SELECT s.* FROM mt_schedule s JOIN mt_groups g ON g.id=s.group_id WHERE s.active=1 AND g.active=1"
+    n = 0
+    sql = ("SELECT s.* FROM zoom_schedule s JOIN zoom_groups g ON g.id=s.group_id WHERE s.active=1 AND g.active=1"
            + (" AND s.group_id=?" if group_id else ""))
     for s in db.q(sql, (group_id,) if group_id else ()):
         for d in range(horizon + 1):
@@ -353,159 +644,94 @@ async def generate(group_id=None, provision_now=True) -> int:
             if day.weekday() != s["weekday"]:
                 continue
             start = datetime.strptime(f"{day:%Y-%m-%d} {s['start_time']}", "%Y-%m-%d %H:%M")
-            if start < now() - timedelta(minutes=5):
+            end = start + timedelta(minutes=s["duration_min"])
+            if end < now():
                 continue
             slot = f"{day:%Y-%m-%d}"
-            if db.one("SELECT 1 FROM mt_lessons WHERE schedule_id=? AND slot_day=?", (s["id"], slot)):
+            if db.one("SELECT 1 FROM zoom_lessons WHERE schedule_id=? AND slot_day=?", (s["id"], slot)):
                 continue
-            end = start + timedelta(minutes=s["duration_min"])
-            lid = db.ex("INSERT INTO mt_lessons(group_id,schedule_id,slot_day,teacher_id,start_at,end_at,duration_min,status,flags,created_at) "
-                        "VALUES(?,?,?,?,?,?,?,'planned','{}',?)",
-                        (s["group_id"], s["id"], slot, s["teacher_id"], fmt(start), fmt(end), s["duration_min"], fmt(now())))
-            created.append(lid)
-    if provision_now:
-        for lid in created:
-            await provision(lid)
-    return len(created)
+            db.ex("INSERT INTO zoom_lessons(group_id,schedule_id,slot_day,teacher_id,start_at,end_at,duration_min,status,flags,created_at) "
+                  "VALUES(?,?,?,?,?,?,?,'planned','{}',?)",
+                  (s["group_id"], s["id"], slot, s["teacher_id"], fmt(start), fmt(end), s["duration_min"], fmt(now())))
+            n += 1
+    return n
 
 
 def add_extra_lesson(gid, start: datetime, duration: int, teacher_id=None) -> int:
     end = start + timedelta(minutes=duration)
-    return db.ex("INSERT INTO mt_lessons(group_id,schedule_id,slot_day,teacher_id,start_at,end_at,duration_min,status,flags,created_at) "
+    return db.ex("INSERT INTO zoom_lessons(group_id,schedule_id,slot_day,teacher_id,start_at,end_at,duration_min,status,flags,created_at) "
                  "VALUES(?,NULL,?,?,?,?,?,'planned','{}',?)",
                  (gid, f"{start:%Y-%m-%d}", teacher_id, fmt(start), fmt(end), duration, fmt(now())))
 
 
-# ---------------------------------------------------------------- Google: Meet xonasi + Calendar
-def _event_body(les, grp, t) -> dict:
-    s, e = parse(les["start_at"]), parse(les["end_at"])
-    desc = [f"Meet havolasi: {les['meeting_uri']}"] if les.get("meeting_uri") else []
-    if t:
-        desc.append(f"O'qituvchi: {t['name']}")
-    desc.append("Telegram Group Post · Majlislar")
-    return {"summary": f"{grp['title']} — dars", "description": "\n".join(desc), "location": les.get("meeting_uri") or "",
-            "start": {"dateTime": s.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tashkent"},
-            "end": {"dateTime": e.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tashkent"},
-            "reminders": {"useDefault": False, "overrides": [{"method": "popup", "minutes": 10}]}}
-
-
-async def ensure_calendar(grp) -> str:
-    """Har Telegram guruh uchun alohida Google Calendar."""
-    if grp.get("calendar_id"):
-        return grp["calendar_id"]
-    cal = await G.create_calendar(f"{grp['title']} — darslar")
-    db.ex("UPDATE mt_groups SET calendar_id=? WHERE id=?", (cal["id"], grp["id"]))
-    grp["calendar_id"] = cal["id"]
-    t = teacher(grp.get("teacher_id"))
-    if t and t.get("gmail"):
-        try:
-            await G.share_calendar(cal["id"], t["gmail"], "reader")
-        except G.GoogleError as e:
-            log.info("Kalendarni o'qituvchi bilan ulashib bo'lmadi: %s", e)
-    return cal["id"]
-
-
+# ---------------------------------------------------------------- 1-majlisni yaratish
 async def provision(lid) -> tuple[bool, str]:
-    """Darsga yangi Meet xonasi (havola ochiq), o'qituvchini co-host qilish va kalendar yozuvi."""
+    """Darsning birinchi Zoom majlisini yaratadi (bo'sh akkauntdan). Muvaffaqiyatsiz bo'lsa sababini saqlaydi."""
     les = lesson(lid)
     if not les or les["status"] in ("cancelled", "done", "missed"):
         return False, "Dars topilmadi yoki yakunlangan"
-    if not G.connected():
-        return False, "Google ulanmagan"
+    if meetings_of(lid):
+        return True, "Majlis allaqachon yaratilgan"
     grp = group(les["group_id"])
-    t = lesson_teacher(les)
-    warns = []
-    try:
-        if not les.get("space_name"):
-            sp = await G.create_space(cfg("moderation"))
-            db.ex("UPDATE mt_lessons SET space_name=?, meeting_uri=?, meeting_code=? WHERE id=?",
-                  (sp["name"], sp.get("meetingUri", ""), sp.get("meetingCode", ""), lid))
-            les.update(space_name=sp["name"], meeting_uri=sp.get("meetingUri", ""))
-            if t and t.get("gmail"):
-                try:
-                    await G.add_cohost(sp["name"], t["gmail"])
-                    db.ex("UPDATE mt_lessons SET cohost_ok=1 WHERE id=?", (lid,))
-                except G.GoogleError as e:
-                    warns.append(f"O'qituvchi ({t['gmail']}) co-host qilinmadi: {e.short()}")
-            elif t:
-                warns.append("O'qituvchida Gmail kiritilmagan: co-host qo'shilmadi")
-            else:
-                warns.append("Dars uchun o'qituvchi tanlanmagan")
-        w60 = duration_warning(les["duration_min"])
-        if w60:
-            warns.append(w60)
-        if not les.get("cal_event_id"):
-            cid = await ensure_calendar(grp)
-            ev = await G.insert_event(cid, _event_body(les, grp, t))
-            db.ex("UPDATE mt_lessons SET cal_event_id=? WHERE id=?", (ev["id"], lid))
-        db.ex("UPDATE mt_lessons SET warn_text=?, prov_err=NULL, prov_at=? WHERE id=?", ("\n".join(warns), fmt(now()), lid))
-        return True, "Tayyor"
-    except G.GoogleError as e:
-        db.ex("UPDATE mt_lessons SET prov_err=?, prov_at=? WHERE id=?", (e.full()[:900], fmt(now()), lid))
-        add_alert("provision", f"«{grp['title']}» {les['start_at'][:16]} darsi uchun Meet/Kalendar yaratilmadi: {e.short()}",
-                  lesson_id=lid, group_id=grp["id"], dedupe=f"prov:{lid}:{(les.get('prov_at') or '')[:13]}")
-        return False, e.short()
+    s = parse(les["start_at"])
+    start = max(now(), s - timedelta(minutes=max(0, cfg("group_link_min"))))      # 40 daqiqalik hisob guruhga havola ketganda boshlanadi
+    mid, err = await create_segment(les, 1, start)
+    if mid:
+        db.ex("UPDATE zoom_lessons SET prov_err=NULL, prov_at=? WHERE id=?", (fmt(now()), lid))
+        return True, "Zoom majlisi tayyor"
+    db.ex("UPDATE zoom_lessons SET prov_err=?, prov_at=? WHERE id=?", (err[:900], fmt(now()), lid))
+    is_busy = err.startswith("BAND")
+    mins = int((s - now()).total_seconds() // 60)
+    await alert("pool_busy" if is_busy else "zoom_error",
+                (f"«{grp['title']}» {les['start_at'][11:16]} darsi ({mins} daqiqadan keyin) uchun Zoom majlisi yaratilmadi: "
+                 + (err.split(": ", 1)[1] if ": " in err else err)),
+                level="error", lesson_id=lid, group_id=grp["id"], dedupe=f"prov:{lid}:{err[:4]}:{now():%Y%m%d%H}{now().minute // 15}")
+    return False, err
 
 
 async def retry_provision():
-    """Havolasi yo'q yoki kalendarga yozilmagan yaqin darslarni 10 daqiqada bir urinib ko'radi."""
-    if not G.connected():
-        return
-    lim = fmt(now() + timedelta(days=max(1, cfg("horizon_days")) + 1))
-    for r in db.q("SELECT id, prov_at FROM mt_lessons WHERE status='planned' AND (space_name IS NULL OR space_name='' OR cal_event_id IS NULL OR cal_event_id='') "
-                  "AND start_at>? AND start_at<?", (fmt(now()), lim)):
-        if r["prov_at"] and now() - parse(r["prov_at"]) < timedelta(minutes=10):
+    """Boshlanishiga `create_lead_min` daqiqa qolgan (yoki boshlangan) darslarga majlis yaratadi; muvaffaqiyatsiz bo'lsa qayta urinadi."""
+    t = now()
+    lead = fmt(t + timedelta(minutes=cfg("create_lead_min")))
+    for r in db.q("SELECT id, prov_at FROM zoom_lessons WHERE status IN ('planned','live') AND start_at<=? AND end_at>? ORDER BY start_at", (lead, fmt(t))):
+        if meetings_of(r["id"]):
+            continue
+        if r["prov_at"] and t - parse(r["prov_at"]) < timedelta(seconds=45):
             continue
         await provision(r["id"])
 
 
+# ---------------------------------------------------------------- bekor qilish / ko'chirish
 async def cancel_lesson(lid, reason="") -> str:
     les = lesson(lid)
     if not les or les["status"] in ("cancelled", "done"):
         return "Bu darsni bekor qilib bo'lmaydi"
     grp, t = group(les["group_id"]), lesson_teacher(les)
-    db.ex("UPDATE mt_lessons SET status='cancelled', cancel_reason=? WHERE id=?", (reason.strip(), lid))
-    cal_note = ""
-    if les.get("cal_event_id") and grp.get("calendar_id") and G.connected():
-        try:
-            await G.delete_event(grp["calendar_id"], les["cal_event_id"])
-            db.ex("UPDATE mt_lessons SET cal_event_id=NULL WHERE id=?", (lid,))
-        except G.GoogleError as e:
-            cal_note = f" (kalendar yangilanmadi: {e.short()})"
+    await _drop_meetings(lid)
+    db.ex("UPDATE zoom_lessons SET status='cancelled', cancel_reason=?, prov_err=NULL WHERE id=?", (reason.strip(), lid))
     s = parse(les["start_at"])
     text = f"❌ {s:%d.%m} kuni soat {s:%H:%M} dagi dars bekor qilindi." + (f"\nSabab: {reason.strip()}" if reason.strip() else "")
     await notify_lesson_people(les, grp, t, text, "cancel")
-    return "Dars bekor qilindi" + cal_note
+    return "Dars bekor qilindi"
 
 
 async def move_lesson(lid, new_start: datetime, duration=None) -> str:
     les = lesson(lid)
-    if not les or les["status"] in ("cancelled", "done", "live"):
+    if not les or les["status"] in ("cancelled", "done"):
         return "Bu darsni ko'chirib bo'lmaydi"
     grp, t = group(les["group_id"]), lesson_teacher(les)
     dur = int(duration or les["duration_min"])
     old = parse(les["start_at"])
+    await _drop_meetings(lid)
     end = new_start + timedelta(minutes=dur)
-    db.ex("UPDATE mt_lessons SET start_at=?, end_at=?, duration_min=?, status='planned', moved_from=?, flags='{}' WHERE id=?",
+    db.ex("UPDATE zoom_lessons SET start_at=?, end_at=?, duration_min=?, status='planned', stopped=0, moved_from=?, flags='{}', prov_err=NULL, prov_at=NULL WHERE id=?",
           (fmt(new_start), fmt(end), dur, les.get("moved_from") or fmt(old), lid))
-    les = lesson(lid)
-    cal_note = ""
-    w60 = duration_warning(dur)
-    db.ex("UPDATE mt_lessons SET warn_text=? WHERE id=?", (w60, lid))
-    if les.get("cal_event_id") and grp.get("calendar_id") and G.connected():
-        try:
-            await G.patch_event(grp["calendar_id"], les["cal_event_id"], _event_body(les, grp, t))
-        except G.GoogleError as e:
-            cal_note = f" (kalendar yangilanmadi: {e.short()})"
-    elif G.connected():
-        await provision(lid)
-    text = (f"🔄 Dars ko'chirildi: {old:%d.%m %H:%M} → {new_start:%d.%m %H:%M}."
-            + (f"\n🔗 Havola o'sha: {les['meeting_uri']}" if les.get("meeting_uri") else ""))
-    await notify_lesson_people(les, grp, t, text, "move")
-    return "Dars ko'chirildi" + (" · " + w60 if w60 else "") + cal_note
+    text = f"🔄 Dars ko'chirildi: {old:%d.%m %H:%M} → {new_start:%d.%m %H:%M}. Yangi havola dars boshlanishidan oldin yuboriladi."
+    await notify_lesson_people(lesson(lid), grp, t, text, "move")
+    return "Dars ko'chirildi"
 
 
-# ---------------------------------------------------------------- Telegram
+# ---------------------------------------------------------------- Telegram (Majlislar akkaunti: guruhlarga va admin)
 class TgFail(Exception):
     pass
 
@@ -584,12 +810,13 @@ async def tg_resolve(ref: str) -> dict:
             "username": getattr(ent, "username", None) or ""}
 
 
+# ---------------------------------------------------------------- ogohlantirishlar
 def add_alert(kind, text, level="warn", lesson_id=None, group_id=None, copy=None, dedupe=None) -> int | None:
     """Ogohlantirishni yozadi (dedupe bo'yicha takrorlanmaydi). Yangi yozilsa id qaytaradi."""
     ready()
-    if dedupe and db.one("SELECT 1 FROM mt_alerts WHERE dedupe=?", (dedupe,)):
+    if dedupe and db.one("SELECT 1 FROM zoom_alerts WHERE dedupe=?", (dedupe,)):
         return None
-    aid = db.ex("INSERT INTO mt_alerts(ts,kind,level,lesson_id,group_id,text,copy_text,seen,dedupe) VALUES(?,?,?,?,?,?,?,0,?)",
+    aid = db.ex("INSERT INTO zoom_alerts(ts,kind,level,lesson_id,group_id,text,copy_text,seen,dedupe) VALUES(?,?,?,?,?,?,?,0,?)",
                 (fmt(now()), kind, level, lesson_id, group_id, text[:1500], copy, dedupe))
     try:
         notify.event("warn" if level != "info" else "info", "majlis", text)
@@ -616,118 +843,281 @@ async def tg_admin(text: str) -> bool:
         return False
 
 
-async def _deliver(les, grp, target, text, flag, who) -> bool:
-    """Xabarni yuboradi; yetmasa adminga ogohlantirish + havolani qo'lda nusxalash uchun matn saqlanadi."""
+def _bot():
+    from . import meet_bot
+    return meet_bot
+
+
+async def to_teacher(les, grp, t, text_html: str, flag_key: str, buttons=None, copy_text="") -> bool:
+    """O'qituvchiga bot orqali yuboradi; yetmasa adminga ogohlantirish (+ qo'lda nusxalash uchun matn)."""
     try:
-        await tg_send(target, text)
-        set_flag(les["id"], flag, fmt(now()))
+        if not t:
+            raise _bot().BotFail("dars uchun o'qituvchi tanlanmagan")
+        await _bot().send_teacher(t, text_html, buttons)
         return True
-    except TgFail as e:
-        set_flag(les["id"], flag, "fail " + fmt(now()))
-        await alert("send_fail", f"«{grp['title']}» {les['start_at'][11:16]} darsi: {who}ga xabar yetmadi — {e}. Havolani qo'lda yuboring.",
-                    level="error", lesson_id=les["id"], group_id=grp["id"], copy=text, dedupe=f"sf:{les['id']}:{flag}")
+    except _bot().BotFail as e:
+        await alert("send_fail", f"«{grp['title']}» {les['start_at'][11:16]} darsi: o'qituvchiga bot orqali xabar yetmadi — {e}. Havolani qo'lda yuboring.",
+                    level="error", lesson_id=les["id"], group_id=grp["id"], copy=copy_text or re.sub(r"<[^>]+>", "", text_html), dedupe=f"sf:{les['id']}:{flag_key}")
         return False
 
 
-async def notify_lesson_people(les, grp, t, text, kind):
-    """Bekor qilish / ko'chirish: guruhga va o'qituvchiga."""
-    if grp.get("tg_id"):
-        try:
-            await tg_send(int(grp["tg_id"]), text)
-        except TgFail as e:
-            await alert("send_fail", f"«{grp['title']}» guruhiga xabar yetmadi ({kind}): {e}", level="error", lesson_id=les["id"],
-                        group_id=grp["id"], copy=text, dedupe=f"sf:{les['id']}:{kind}:g")
-    if t and t.get("tg_username"):
-        try:
-            await tg_send("@" + t["tg_username"], text)
-        except TgFail as e:
-            await alert("send_fail", f"O'qituvchi {t['name']} ga xabar yetmadi ({kind}): {e}", level="error", lesson_id=les["id"],
-                        group_id=grp["id"], copy=text, dedupe=f"sf:{les['id']}:{kind}:t")
+async def to_group(les, grp, text: str, flag_key: str) -> bool:
+    if not grp.get("tg_id"):
+        return False
+    try:
+        await tg_send(int(grp["tg_id"]), text)
+        return True
+    except TgFail as e:
+        await alert("send_fail", f"«{grp['title']}» guruhiga xabar yetmadi ({flag_key}): {e}. Havolani qo'lda nusxalab yuboring.",
+                    level="error", lesson_id=les["id"] if les else None, group_id=grp["id"], copy=text, dedupe=f"sf:{les['id'] if les else 0}:{flag_key}:g")
+        return False
 
 
-def msg_teacher_link(les, grp, mins):
-    when = f"{mins} daqiqadan keyin" if mins > 0 else "boshlandi"
-    return (f"📚 Dars {when}: {grp['title']}\n🕒 {les['start_at'][11:16]}–{les['end_at'][11:16]}\n🔗 {les['meeting_uri']}\n\n"
-            f"Begona kirsa, Meet ichida o'zingiz chiqarasiz.")
+async def notify_lesson_people(les, grp, t, text: str, kind: str):
+    """Bekor qilish / ko'chirish: guruhga (Telegram akkaunt) va o'qituvchiga (bot)."""
+    await to_group(les, grp, text, kind)
+    await to_teacher(les, grp, t, Z.esc(text), kind + ":t")
 
 
-def msg_group_link(les, grp, t, mins):
-    when = f"{mins} daqiqadan keyin boshlanadi" if mins > 0 else "boshlandi"
-    return (f"📚 Dars {when}.\n🕒 {les['start_at'][11:16]} ({les['duration_min']} daqiqa)"
-            + (f"\n👩‍🏫 O'qituvchi: {t['name']}" if t else "") + f"\n🔗 Kirish: {les['meeting_uri']}")
+# ---------------------------------------------------------------- xabar matnlari
+def fmt_when(les) -> str:
+    return f"{les['start_at'][11:16]}–{les['end_at'][11:16]}"
 
 
-def msg_group_remind(les, mins):
+def msg_teacher_remind(les, grp, mins) -> str:
+    return (f"⏰ <b>{mins} daqiqadan keyin</b> darsingiz bor\n👥 Guruh: <b>{Z.esc(grp['title'])}</b>\n🕒 {fmt_when(les)} ({les['duration_min']} daqiqa)")
+
+
+def msg_teacher_link(les, grp, m, mins, cont=False) -> tuple[str, list]:
+    head = ("🔄 <b>Dars davom etmoqda: yangi Zoom majlisi</b>" if cont
+            else f"▶️ <b>Dars {max(0, mins)} daqiqadan keyin</b> boshlanadi" if mins > 0 else "▶️ <b>Dars boshlanmoqda</b>")
+    txt = (f"{head}\n👥 Guruh: <b>{Z.esc(grp['title'])}</b>\n🕒 {fmt_when(les)}\n"
+           f"⏱ Majlis taxminan {m['end_at'][11:16]} gacha ishlaydi (bepul Zoom 40 daqiqa).\n\n"
+           f"«Darsni boshlash» tugmasi sizni Zoom'da host qilib kiritadi. O'quvchilarga havola alohida yuboriladi.")
+    su = start_url_of(m)
+    buttons = []
+    if su:
+        buttons.append([{"text": "▶️ Darsni boshlash (host)", "url": su}])
+    buttons.append([{"text": "🔗 O'quvchilar havolasi", "url": m["join_url"]}])
+    return txt, buttons
+
+
+def msg_group_link(les, grp, t, m, cont=False) -> str:
+    head = "🔄 Dars davom etmoqda. Yangi havola (oldingisi tez orada tugaydi):" if cont else "📚 Dars boshlanadi."
+    return (f"{head}\n🕒 {fmt_when(les)}" + (f"\n👩‍🏫 O'qituvchi: {t['name']}" if t else "") + f"\n🔗 Kirish: {m['join_url']}")
+
+
+def msg_group_remind(les, mins) -> str:
     return f"⏰ Eslatma: soat {les['start_at'][11:16]} da dars bor ({mins} daqiqadan keyin)."
 
 
-async def send_now(lid, who: str) -> str:
+async def send_links(les, grp, t, m, cont=False, who=("teacher", "group")) -> dict:
+    """Majlis havolalarini yuboradi: o'qituvchiga (bot) va/yoki guruhga (Telegram akkaunt)."""
+    res = {}
+    mins = int((parse(les["start_at"]) - now()).total_seconds() // 60)
+    if "teacher" in who:
+        txt, btn = msg_teacher_link(les, grp, m, mins, cont)
+        plain = f"{grp['title']} {fmt_when(les)}\nBoshlash (host): {start_url_of(m)}\nO'quvchilar: {m['join_url']}"
+        res["teacher"] = await to_teacher(les, grp, t, txt, f"link{m['seq']}", btn, copy_text=plain)
+    if "group" in who:
+        res["group"] = await to_group(les, grp, msg_group_link(les, grp, t, m, cont), f"glink{m['seq']}")
+    return res
+
+
+async def resend(lid, who: str) -> str:
     """Qo'lda (qayta) yuborish: who = 'teacher' | 'group'."""
     les = lesson(lid)
-    if not les or not les.get("meeting_uri"):
-        return "Dars uchun havola hali yo'q"
+    ms = [m for m in meetings_of(lid) if m["state"] == "active"]
+    if not les or not ms:
+        return "Dars uchun faol Zoom majlisi hali yo'q"
+    m = ms[-1]
     grp, t = group(les["group_id"]), lesson_teacher(les)
-    mins = int((parse(les["start_at"]) - now()).total_seconds() // 60)
     if who == "teacher":
-        if not t or not t.get("tg_username"):
-            return "O'qituvchining Telegram @username si kiritilmagan"
-        ok = await _deliver(les, grp, "@" + t["tg_username"], msg_teacher_link(les, grp, mins), "t_link", "o'qituvchi")
+        if not t:
+            return "Dars uchun o'qituvchi tanlanmagan"
+        ok = (await send_links(les, grp, t, m, cont=m["seq"] > 1, who=("teacher",))).get("teacher")
     else:
         if not grp.get("tg_id"):
             return "Guruhning Telegram ID si yo'q"
-        ok = await _deliver(les, grp, int(grp["tg_id"]), msg_group_link(les, grp, t, mins), "g_link", "guruh")
+        ok = (await send_links(les, grp, t, m, cont=m["seq"] > 1, who=("group",))).get("group")
     return "Yuborildi" if ok else "Yuborilmadi (Ogohlantirishlar sahifasiga qarang)"
 
 
-# ---------------------------------------------------------------- eslatma sikli
-async def process_reminders():
-    """Havola yuborish (o'qituvchiga -10, guruhga -5), guruh eslatmalari (-60, -10) va o'qituvchi kechikishi."""
-    t_now = now()
-    a, b = cfg("remind_a"), cfg("remind_b")
-    horizon = fmt(t_now + timedelta(minutes=max(a, b, cfg("teacher_dm_min"), cfg("group_link_min")) + 2))
-    rows = db.q("SELECT * FROM mt_lessons WHERE status IN ('planned','live') AND start_at<=? AND end_at>=?", (horizon, fmt(t_now)))
-    for r in rows:
+# ---------------------------------------------------------------- davom ettirish (40 daqiqalik zanjir)
+async def continue_lesson(mid, source="teacher") -> tuple[bool, str]:
+    """Joriy majlis (mid) tugagach dars davom etishi uchun boshqa bo'sh akkauntdan yangi majlis yaratadi, havolalarni yuboradi."""
+    m = meeting(mid)
+    if not m or not m.get("lesson_id"):
+        return False, "Majlis topilmadi"
+    les = lesson(m["lesson_id"])
+    if not les or les["status"] in ("cancelled", "missed"):
+        return False, "Dars bekor qilingan"
+    if any(x["seq"] > m["seq"] and x["state"] != "deleted" for x in meetings_of(les["id"])):
+        return True, "Dars allaqachon davom ettirilgan"
+    t = now()
+    if parse(les["end_at"]) - t < timedelta(minutes=cfg("min_remaining")):
+        db.ex("UPDATE zoom_meetings SET prompt='no' WHERE id=?", (mid,))
+        return False, "Dars vaqti tugagan"
+    grp, teacher_ = group(les["group_id"]), lesson_teacher(les)
+    if les["status"] == "done":                                   # kech bosilgan bo'lsa ham dars hali tugamagan: qayta ochamiz
+        db.ex("UPDATE zoom_lessons SET status='live' WHERE id=?", (les["id"],))
+    nid, err = await create_segment(les, m["seq"] + 1, t, exclude=())
+    db.ex("UPDATE zoom_meetings SET prompt='yes' WHERE id=?", (mid,))
+    if not nid:
+        set_mflag(mid, "pending_continue", fmt(t))
+        await alert("pool_busy" if err.startswith("BAND") else "zoom_error",
+                    f"«{grp['title']}» darsini davom ettirish uchun Zoom majlisi yaratilmadi: {err.split(': ', 1)[-1]}. Avtomatik qayta uriniladi.",
+                    level="error", lesson_id=les["id"], group_id=grp["id"], dedupe=f"cont:{mid}:{err[:4]}:{t:%H%M}")
+        return False, err
+    set_mflag(mid, "pending_continue", "")
+    db.ex("UPDATE zoom_lessons SET prov_err=NULL WHERE id=?", (les["id"],))
+    new = meeting(nid)
+    set_mflag(nid, "sent", fmt(t))
+    await send_links(les, grp, teacher_, new, cont=True)
+    return True, "Yangi Zoom majlisi yaratildi, havolalar yuborildi"
+
+
+async def stop_lesson(mid) -> str:
+    """O'qituvchi «Bekor qilish» bosdi: dars bu majlis bilan tugaydi (davom etilmaydi)."""
+    m = meeting(mid)
+    if m:
+        db.ex("UPDATE zoom_meetings SET prompt='no' WHERE id=?", (mid,))
+        if m.get("lesson_id"):
+            db.ex("UPDATE zoom_lessons SET stopped=1 WHERE id=?", (m["lesson_id"],))
+    return "Dars davom ettirilmaydi"
+
+
+async def adhoc_meeting(aid, topic="") -> tuple[int | None, str]:
+    """Tanlangan akkauntda darsga bog'lanmagan majlis (havolasini nusxalash uchun)."""
+    a = account_raw(aid)
+    if not a:
+        return None, "Akkaunt topilmadi"
+    mid, err = await create_segment(None, 1, now(), topic=topic or f"Majlis ({a['label']})", adhoc=True, only_account=aid, created_by="admin")
+    return mid, err
+
+
+# ---------------------------------------------------------------- fon sikli
+async def process_lessons():
+    t = now()
+    # 1) tugagan majlislar
+    for r in db.q("SELECT * FROM zoom_meetings WHERE state='active'"):
+        m = dict(r)
+        if t > parse(m["end_at"]) + timedelta(minutes=1):
+            db.ex("UPDATE zoom_meetings SET state='ended' WHERE id=?", (m["id"],))
+    # 2) davom ettirish kutayotganlarni qayta urinish
+    for r in db.q("SELECT * FROM zoom_meetings WHERE lesson_id IS NOT NULL AND prompt='yes' AND state<>'deleted' AND flags LIKE '%pending_continue%'"):
+        m = dict(r)
+        if mflags(m).get("pending_continue"):
+            await continue_lesson(m["id"], "retry")
+    # 3) darslar
+    lim = fmt(t + timedelta(minutes=max(cfg("remind_a"), cfg("t_remind_a")) + 2))
+    for r in db.q("SELECT * FROM zoom_lessons WHERE status IN ('planned','live') AND start_at<=? AND end_at>=?", (lim, fmt(t - timedelta(hours=1)))):
         les = dict(r)
-        fl = flags(les)
         grp = group(les["group_id"])
         if not grp or not grp.get("active"):
             continue
-        t = lesson_teacher(les)
-        mins = (parse(les["start_at"]) - t_now).total_seconds() / 60
-        if les.get("meeting_uri"):
-            if mins <= cfg("teacher_dm_min") and "t_link" not in fl:
-                if t and t.get("tg_username"):
-                    await _deliver(les, grp, "@" + t["tg_username"], msg_teacher_link(les, grp, max(0, round(mins))), "t_link", "o'qituvchi")
-                else:
-                    set_flag(les["id"], "t_link", "yo'q")
-                    await alert("send_fail", f"«{grp['title']}» {les['start_at'][11:16]} darsi: o'qituvchining @username si yo'q, havola yuborilmadi.",
-                                level="error", lesson_id=les["id"], group_id=grp["id"], copy=msg_teacher_link(les, grp, max(0, round(mins))),
-                                dedupe=f"sf:{les['id']}:t_link")
-            if mins <= cfg("group_link_min") and "g_link" not in fl and grp.get("tg_id"):
-                await _deliver(les, grp, int(grp["tg_id"]), msg_group_link(les, grp, t, max(0, round(mins))), "g_link", "guruh")
-        elif mins <= cfg("teacher_dm_min") and "no_link" not in fl:
-            set_flag(les["id"], "no_link", fmt(t_now))
-            await alert("provision", f"«{grp['title']}» {les['start_at'][11:16]} darsi boshlanishiga {max(0, round(mins))} daqiqa, lekin Meet havolasi yo'q"
-                        + (f" ({les.get('prov_err')})" if les.get("prov_err") else " (Google ulanmagan bo'lishi mumkin)") + ".",
-                        level="error", lesson_id=les["id"], group_id=grp["id"], dedupe=f"nolink:{les['id']}")
+        tch = lesson_teacher(les)
+        fl = flags(les)
+        mins = (parse(les["start_at"]) - t).total_seconds() / 60
+        ms = [m for m in meetings_of(les["id"])]
+        act = [m for m in ms if m["state"] == "active"]
+        # o'qituvchiga eslatmalar (20 va 10 daq oldin) — bot
+        if mins > 0 and les["status"] == "planned":
+            ta, tb = cfg("t_remind_a"), cfg("t_remind_b")
+            if "t_a" not in fl and tb < mins <= ta:
+                set_flag(les["id"], "t_a", fmt(t))
+                await to_teacher(les, grp, tch, msg_teacher_remind(les, grp, max(1, round(mins))), "t_a")
+            elif "t_b" not in fl and mins <= tb and not act:
+                set_flag(les["id"], "t_b", fmt(t))
+                await to_teacher(les, grp, tch, msg_teacher_remind(les, grp, max(1, round(mins))), "t_b")
+        # guruhga eslatmalar (60 va 10 daq oldin)
         if cfg("remind_on") and grp.get("tg_id") and mins > 0:
-            if "g_b" not in fl and mins <= b:
-                await _deliver(les, grp, int(grp["tg_id"]), msg_group_remind(les, max(1, round(mins))), "g_b", "guruh")
+            a_, b_ = cfg("remind_a"), cfg("remind_b")
+            if "g_b" not in fl and mins <= b_:
+                set_flag(les["id"], "g_b", fmt(t))
                 if "g_a" not in fl:
                     set_flag(les["id"], "g_a", "o'tkazildi")
-            elif "g_a" not in fl and mins <= a and mins > b:
-                await _deliver(les, grp, int(grp["tg_id"]), msg_group_remind(les, max(1, round(mins))), "g_a", "guruh")
-        late = -mins
-        if late >= cfg("teacher_late_min") and "t_late" not in fl and "t_in" not in fl and les["status"] in ("planned", "live"):
-            set_flag(les["id"], "t_late", fmt(t_now))
-            who = t["name"] if t else "O'qituvchi"
-            await alert("teacher_late", f"«{grp['title']}» darsi {les['start_at'][11:16]} da boshlanishi kerak edi, {who} {int(late)} daqiqadan beri Meet'da yo'q.",
-                        level="error", lesson_id=les["id"], group_id=grp["id"], dedupe=f"tl:{les['id']}")
+                await to_group(les, grp, msg_group_remind(les, max(1, round(mins))), "g_b")
+            elif "g_a" not in fl and b_ < mins <= a_:
+                set_flag(les["id"], "g_a", fmt(t))
+                await to_group(les, grp, msg_group_remind(les, max(1, round(mins))), "g_a")
+        # havolalar (1-majlis): o'qituvchiga -10 daq, guruhga -5 daq; keyingi majlislar darhol yuboriladi
+        for m in act:
+            mf = mflags(m)
+            if m["seq"] == 1:
+                if "t_sent" not in mf and mins <= cfg("t_remind_b"):
+                    set_mflag(m["id"], "t_sent", fmt(t))
+                    txt, btn = msg_teacher_link(les, grp, m, max(0, round(mins)))
+                    await to_teacher(les, grp, tch, txt, f"link{m['seq']}", btn,
+                                     copy_text=f"{grp['title']} {fmt_when(les)}\nBoshlash (host): {start_url_of(m)}\nO'quvchilar: {m['join_url']}")
+                if "g_sent" not in mf and mins <= cfg("group_link_min"):
+                    set_mflag(m["id"], "g_sent", fmt(t))
+                    await to_group(les, grp, msg_group_link(les, grp, tch, m), f"glink{m['seq']}")
+            # davom etish so'rovi (tugashiga prompt_before_min qolganda, dars hali tugamagan bo'lsa), bir marta
+            if m["prompt"] == "none":
+                remaining = (parse(les["end_at"]) - parse(m["end_at"])).total_seconds() / 60
+                to_end = (parse(m["end_at"]) - t).total_seconds() / 60
+                if les["stopped"] or remaining < cfg("min_remaining"):
+                    db.ex("UPDATE zoom_meetings SET prompt='na' WHERE id=?", (m["id"],))
+                elif to_end <= cfg("prompt_before_min"):
+                    await prompt_continue(les, grp, tch, m)
+        # kutilgan davom ettirish javobi muddati o'tdi
+        for m in ms:
+            if m["prompt"] == "sent" and t > parse(m["end_at"]) + timedelta(minutes=6):
+                db.ex("UPDATE zoom_meetings SET prompt='expired' WHERE id=?", (m["id"],))
+        # holat
+        if les["status"] == "planned" and act and t >= parse(les["start_at"]) - timedelta(minutes=cfg("group_link_min")):
+            db.ex("UPDATE zoom_lessons SET status='live' WHERE id=?", (les["id"],))
+        await finish_check(les["id"])
+
+
+async def prompt_continue(les, grp, tch, m):
+    """Tugashiga 3 daqiqa qolganda o'qituvchiga bir marta: «Davom etasizmi?» (Davom etish / Bekor qilish)."""
+    until = m["end_at"][11:16]
+    txt = (f"⏳ <b>{Z.esc(grp['title'])}</b> darsining Zoom majlisi <b>{until}</b> da tugaydi (~{cfg('prompt_before_min')} daqiqa).\n"
+           f"Dars {les['end_at'][11:16]} gacha rejalashtirilgan. Darsni davom ettirasizmi?")
+    buttons = [[{"text": "✅ Davom etish", "callback_data": f"z:y:{m['id']}"}, {"text": "❌ Bekor qilish", "callback_data": f"z:n:{m['id']}"}]]
+    if not tch or not tch.get("chat_id"):
+        db.ex("UPDATE zoom_meetings SET prompt='na' WHERE id=?", (m["id"],))
+        await alert("send_fail", f"«{grp['title']}» darsi: o'qituvchi botga ulanmagan, «Davom etasizmi?» so'rovi yuborilmadi. "
+                    f"Davom ettirish kerak bo'lsa, dars sahifasidagi «Davom ettirish» tugmasini bosing.", level="error",
+                    lesson_id=les["id"], group_id=grp["id"], dedupe=f"pr:{m['id']}")
+        return
+    try:
+        res = await _bot().send_teacher(tch, txt, buttons)
+        db.ex("UPDATE zoom_meetings SET prompt='sent' WHERE id=?", (m["id"],))
+        set_mflag(m["id"], "prompt_msg", [res.get("chat", {}).get("id") if isinstance(res, dict) else None, res.get("message_id") if isinstance(res, dict) else None])
+    except _bot().BotFail as e:
+        db.ex("UPDATE zoom_meetings SET prompt='na' WHERE id=?", (m["id"],))
+        await alert("send_fail", f"«{grp['title']}» darsi: «Davom etasizmi?» so'rovi o'qituvchiga yetmadi — {e}. Davom ettirish kerak bo'lsa, dars sahifasidagi tugmani bosing.",
+                    level="error", lesson_id=les["id"], group_id=grp["id"], dedupe=f"pr:{m['id']}")
+
+
+async def finish_check(lid):
+    """Dars holatini yangilaydi: tugagan bo'lsa 'done', majlissiz o'tib ketgan bo'lsa 'missed'."""
+    les = lesson(lid)
+    if not les or les["status"] not in ("planned", "live"):
+        return
+    t = now()
+    ms = [m for m in meetings_of(lid) if m["state"] != "deleted"]
+    end = parse(les["end_at"])
+    if not ms:
+        if t > end:
+            db.ex("UPDATE zoom_lessons SET status='missed' WHERE id=?", (lid,))
+            grp = group(les["group_id"]) or {}
+            await alert("missed", f"«{grp.get('title', '?')}» {les['start_at'][5:16]} darsi uchun Zoom majlisi yaratilmadi, dars o'tmadi deb belgilandi.",
+                        level="error", lesson_id=lid, group_id=les["group_id"], dedupe=f"missed:{lid}")
+        return
+    last = ms[-1]
+    if last["state"] == "active":
+        return
+    if t > end or last["prompt"] in ("no", "expired", "na") or les["stopped"]:
+        db.ex("UPDATE zoom_lessons SET status='done' WHERE id=?", (lid,))
 
 
 async def loop():
-    """Fon sikli (supervise ostida): darslarni oldindan yaratish, havola va eslatmalar."""
-    await asyncio.sleep(15)
+    """Fon sikli (supervise ostida): darslarni oldindan yaratish, majlis ochish, havola/eslatma va davom ettirish so'rovlari."""
+    await asyncio.sleep(10)
     last_gen = datetime.min
     while True:
         try:
@@ -736,72 +1126,84 @@ async def loop():
                 await generate()
                 last_gen = now()
             await retry_provision()
-            await process_reminders()
+            await process_lessons()
             put("sched_beat", fmt(now()))
         except asyncio.CancelledError:
             raise
         except Exception:
             log.exception("meet_sched.loop")
-            notify.event("error", "majlis", "Majlislar eslatma siklida xato (loglarga qarang)")
-        await asyncio.sleep(30)
+            notify.event("error", "majlis", "Majlislar siklida xato (loglarga qarang)")
+        await asyncio.sleep(20)
+
+
+# ---------------------------------------------------------------- kalendar (ICS eksport)
+def ics(lessons: list[dict], name="Majlislar") -> str:
+    def esc(s):
+        return str(s).replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Telegram Group Post//Majlislar//UZ", f"X-WR-CALNAME:{esc(name)}", "X-WR-TIMEZONE:Asia/Tashkent"]
+    for l in lessons:
+        if l["status"] == "cancelled":
+            continue
+        s, e = parse(l["start_at"]), parse(l["end_at"])
+        lines += ["BEGIN:VEVENT", f"UID:zoom-lesson-{l['id']}@majlislar", f"DTSTAMP:{now():%Y%m%dT%H%M%S}",
+                  f"DTSTART;TZID=Asia/Tashkent:{s:%Y%m%dT%H%M%S}", f"DTEND;TZID=Asia/Tashkent:{e:%Y%m%dT%H%M%S}",
+                  f"SUMMARY:{esc(l['group_title'] + ' — dars')}", f"DESCRIPTION:{esc((l.get('teacher_name') or '') and 'O`qituvchi: ' + l['teacher_name'])}", "END:VEVENT"]
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines) + "\r\n"
 
 
 # ---------------------------------------------------------------- Tizim tahlili uchun
 def health_items() -> list[dict]:
     """syscheck.run_all() ga bitta chaqiruv bilan qo'shiladi."""
     ready()
-    g = "Majlislar (Google Meet)"
+    g = "Majlislar (Zoom)"
 
     def it(title, state, detail="", fix="", key=None):
         return {"group": g, "title": title, "state": state, "detail": detail, "fix": fix, "key": key or title}
     out = []
-    st = get("g_state", "none")
-    if not get("google_client_id"):
-        out.append(it("Google ulanishi", "info", "Sozlanmagan", "Majlislar → Sozlamalar: OAuth Client ID/Secret kiriting (Yo'riqnomaga qarang).", "meet_google"))
-    elif st == "ok":
-        exp = float(get("g_exp", "0") or 0)
-        out.append(it("Google token", "ok", f"{get('g_email', '?')} ulangan; ulangan sana {str(get('g_connected_at', ''))[:16]}; "
-                      f"access token {'amal qiladi' if exp > datetime.now().timestamp() else 'keyingi so`rovda yangilanadi'}", key="meet_token"))
-    elif st == "expired":
-        out.append(it("Google token", "fail", "Token eskirgan yoki bekor qilingan (invalid_grant)",
-                      "Majlislar → Sozlamalar → «Google'ga ulash». OAuth ilovasi «Testing» holatida bo'lsa token 7 kunda o'chadi: Production'ga o'tkazing.", "meet_token"))
+    ps = pool_summary()
+    if ps["total"] == 0:
+        out.append(it("Zoom akkauntlar", "info", "Hali qo'shilmagan", "Majlislar → Zoom akkauntlar: akkaunt qo'shing (Yo'riqnoma 1-qism).", "zoom_pool"))
     else:
-        out.append(it("Google token", "warn", "Google'ga ulanmagan", "Majlislar → Sozlamalar → «Google'ga ulash».", "meet_token"))
-    host = cfg("host_type")
-    out.append(it("Meet limiti", "info" if host == "gmail" else "ok",
-                  "Meet limiti: 60 daqiqa (Gmail)" if host == "gmail" else "Workspace: 60 daqiqalik Gmail cheklovi yo'q (tarifga qarang)", key="meet_limit"))
-    long_sched = db.one("SELECT COUNT(*) c FROM mt_schedule WHERE active=1 AND duration_min>?", (GMAIL_LIMIT_MIN,))["c"]
-    if host == "gmail" and long_sched:
-        out.append(it("60 daqiqadan uzun darslar", "warn", f"{long_sched} ta jadval qatori 60 daqiqadan uzun",
-                      "Gmail'da Meet 60 daqiqada tugaydi. Davomiylikni qisqartiring yoki Workspace akkauntga o'ting.", "meet_long"))
-    last = get("last_poll_at")
-    live = db.one("SELECT COUNT(*) c FROM mt_lessons WHERE status='live'")["c"]
-    soon = db.q("SELECT l.start_at, g.title FROM mt_lessons l JOIN mt_groups g ON g.id=l.group_id WHERE l.status IN ('planned','live') AND l.start_at<? AND l.end_at>? ORDER BY l.start_at LIMIT 5",
+        st = "ok" if ps["free"] > 0 else "warn"
+        out.append(it("Zoom akkauntlar", st, f"jami {ps['total']}, bo'sh {ps['free']}, band {ps['busy']}, xato {ps['error']}",
+                      "" if ps["free"] else "Hamma akkauntlar band: akkaunt qo'shing yoki jadvalni tekshiring.", "zoom_pool"))
+    errs = [a for a in accounts(True) if a.get("status") == "error"]
+    if errs:
+        out.append(it("Zoom akkaunt xatolari", "fail" if len(errs) == len(accounts(True)) else "warn",
+                      "; ".join(f"{a['label']}: {(a.get('last_err') or '')[:80]}" for a in errs[:3]),
+                      "Majlislar → Zoom akkauntlar → «Tekshirish»: sababi ko'rsatiladi.", "zoom_err"))
+    pp = pool_problems()
+    if pp:
+        out.append(it("Bo'sh akkaunt yetishmayapti", "fail", pp[0]["text"], "Zoom akkaunt qo'shing yoki darslar vaqtini o'zgartiring.", "zoom_busy"))
+    tok = get("bot_token")
+    if not tok:
+        out.append(it("O'qituvchilar boti", "info", "Bot tokeni kiritilmagan", "Majlislar → Sozlamalar: @BotFather dan olingan tokenni kiriting.", "zoom_bot"))
+    else:
+        err = get("bot_err")
+        ts = teachers(True)
+        linked = sum(1 for t_ in ts if t_.get("chat_id"))
+        out.append(it("O'qituvchilar boti", "fail" if err else "ok", (f"@{get('bot_username', '?')}; o'qituvchilar ulangan: {linked}/{len(ts)}" if not err else f"Xato: {err}"),
+                      "Token to'g'ri ekanini va internetni tekshiring." if err else ("Ulanmagan o'qituvchilar botga /start bosishi kerak." if linked < len(ts) else ""), "zoom_bot"))
+    live = db.one("SELECT COUNT(*) c FROM zoom_lessons WHERE status='live'")["c"]
+    soon = db.q("SELECT l.start_at, g.title FROM zoom_lessons l JOIN zoom_groups g ON g.id=l.group_id WHERE l.status IN ('planned','live') AND l.start_at<? AND l.end_at>? ORDER BY l.start_at LIMIT 5",
                 (fmt(now() + timedelta(hours=24)), fmt(now())))
-    stale = bool(last and live and now() - parse(last) > timedelta(seconds=max(180, cfg("poll_sec") * 4)))
-    out.append(it("Oxirgi polling", "warn" if stale else "ok" if last else "info",
-                  f"{last[:19]}" + (f", xato: {get('last_poll_err')}" if get("last_poll_err") else "") if last else "Hali dars bo'lmagan",
-                  "Fon jarayoni to'xtagan bo'lishi mumkin: dasturni qayta ishga tushiring." if stale else "", "meet_poll"))
-    errs = int(get("poll_err_24", "0") or 0)
-    out.append(it("Polling xatolari (24 soat)", "ok" if errs == 0 else "warn" if errs < 10 else "fail",
-                  f"{errs} ta" + (f"; oxirgisi: {get('last_poll_err')}" if get("last_poll_err") else ""),
-                  "" if errs == 0 else "Google ulanishi va Meet API yoqilganini tekshiring (Majlislar → Google diagnostika).", "meet_perr"))
-    out.append(it("Faol majlislar", "info", f"hozir davom etayotgan: {live}; 24 soat ichida: {len(soon)}"
-                  + ("; " + ", ".join(f"{s['title']} {s['start_at'][11:16]}" for s in soon) if soon else ""), key="meet_live"))
-    unseen = db.one("SELECT COUNT(*) c FROM mt_alerts WHERE seen=0 AND kind='send_fail'")["c"]
+    out.append(it("Faol majlislar", "info", f"hozir davom etayotgan darslar: {live}; 24 soat ichida: {len(soon)}"
+                  + ("; " + ", ".join(f"{s['title']} {s['start_at'][11:16]}" for s in soon) if soon else ""), key="zoom_live"))
+    unseen = db.one("SELECT COUNT(*) c FROM zoom_alerts WHERE seen=0 AND kind='send_fail'")["c"]
     if unseen:
-        out.append(it("Yetmagan xabarlar", "warn", f"{unseen} ta xabar Telegramga yetmagan", "Majlislar → Ogohlantirishlar: havolani qo'lda nusxalab yuboring.", "meet_sendfail"))
+        out.append(it("Yetmagan xabarlar", "warn", f"{unseen} ta xabar yetmagan", "Majlislar → Ogohlantirishlar: havolani qo'lda nusxalab yuboring.", "zoom_sendfail"))
     if not meet_account():
-        out.append(it("Telegram akkaunt (Majlislar)", "info", "Ulanmagan", "Majlislar → Akkaunt.", "meet_tg"))
+        out.append(it("Telegram akkaunt (Majlislar)", "info", "Ulanmagan", "Majlislar → Telegram akkaunt.", "zoom_tg"))
     else:
         from .core import manager
         svc = manager.services.get(meet_account()["id"])
         out.append(it("Telegram akkaunt (Majlislar)", "ok" if svc and svc.info else "fail", f"+{svc.info['phone']}" if svc and svc.info else "Ulanmagan",
-                      "" if svc and svc.info else "Majlislar → Akkaunt: qayta ulang.", "meet_tg"))
+                      "" if svc and svc.info else "Majlislar → Telegram akkaunt: qayta ulang.", "zoom_tg"))
     try:
         from . import syscheck
-        beats = {r["name"]: r for r in db.q("SELECT * FROM sys_beat WHERE name IN ('meet_sched','meet_track')")}
-        for nm, title in (("meet_sched", "Majlislar: eslatmalar"), ("meet_track", "Majlislar: davomat kuzatuvi")):
+        beats = {r["name"]: r for r in db.q("SELECT * FROM sys_beat WHERE name IN ('meet_sched','meet_bot')")}
+        for nm, title in (("meet_sched", "Majlislar: jadval va eslatmalar"), ("meet_bot", "Majlislar: o'qituvchilar boti")):
             tk, b = syscheck.TASKS.get(nm), beats.get(nm)
             if tk is None:
                 out.append(it(title, "info", "Kuzatilmayapti", key=nm))

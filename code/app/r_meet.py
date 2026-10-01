@@ -1,5 +1,5 @@
-"""Majlislar bo'limi route'lari (Google Meet darslari): bosh sahifa, guruhlar, jadval, darslar, davomat, hisobotlar,
-o'qituvchilar, ogohlantirishlar, Google diagnostika, sozlamalar, akkaunt, yo'riqnoma."""
+"""Majlislar bo'limi route'lari (Zoom darslari): bosh sahifa, o'z kalendar, guruhlar va jadval, darslar, o'qituvchilar,
+Zoom akkauntlar puli, ogohlantirishlar, Zoom diagnostika, sozlamalar (o'qituvchilar boti), Telegram akkaunt, yo'riqnoma."""
 import json
 from datetime import datetime, timedelta
 
@@ -7,7 +7,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from markupsafe import Markup
 
-from . import db, meet_google as G, meet_reports as R, meet_sched as S, meet_track as T, web
+from . import db, meet_bot as B, meet_reports as R, meet_sched as S, meet_zoom as Z, web
 from .config import log
 from .core import manager
 from .web import go, page
@@ -31,8 +31,10 @@ def _safe(next_: str, default="/meet") -> str:
 
 def mpage(request: Request, name: str, **ctx):
     S.ready()
-    ctx.update(meet_unseen=db.one("SELECT COUNT(*) c FROM mt_alerts WHERE seen=0 AND level<>'info'")["c"],
-               g_ok=G.connected(), host_email=S.get("g_email", ""), WD=S.WEEKDAYS, WD_SHORT=S.WD_SHORT)
+    ps = S.pool_summary()
+    ctx.update(meet_unseen=db.one("SELECT COUNT(*) c FROM zoom_alerts WHERE seen=0 AND level<>'info'")["c"],
+               pool=ps, problems=S.pool_problems(), bot_ok=bool(S.get("bot_token")) and not S.get("bot_err"),
+               WD=S.WEEKDAYS, WD_SHORT=S.WD_SHORT)
     return page(request, name, **ctx)
 
 
@@ -52,6 +54,16 @@ def _int(v, default=None):
         return default
 
 
+def _acc_rows() -> list[dict]:
+    t = S.now()
+    rows = []
+    for a in S.accounts():
+        a["st"] = S.account_status(a, t)
+        a["check"] = S.jget(f"zcheck_{a['id']}", None)
+        rows.append(a)
+    return rows
+
+
 # ================================================================ bo'lim almashtirish
 @router.post("/meet/switch")
 async def meet_switch():
@@ -60,7 +72,7 @@ async def meet_switch():
     return resp
 
 
-# ================================================================ bosh sahifa + umumiy kalendar
+# ================================================================ bosh sahifa + o'z kalendar
 def _week_days(offset: int):
     today = S.now().replace(hour=0, minute=0, second=0, microsecond=0)
     mon = today - timedelta(days=today.weekday()) + timedelta(weeks=offset)
@@ -77,39 +89,47 @@ async def meet_home(request: Request):
     for l in ls:
         by_day.setdefault(l["day"], []).append(l)
     live = S.lessons_between(S.fmt(today - timedelta(days=1)), S.fmt(today + timedelta(days=2)), statuses=["live"])
-    today_l = by_day.get(today.strftime("%Y-%m-%d")) if off == 0 else S.lessons_between(S.fmt(today), S.fmt(today + timedelta(days=1)))
-    nxt = [l for l in S.lessons_between(S.fmt(S.now()), S.fmt(S.now() + timedelta(days=3)), statuses=["planned"])][:6]
-    alerts = [dict(r) for r in db.q("SELECT * FROM mt_alerts WHERE seen=0 ORDER BY id DESC LIMIT 6")]
-    cals = [g for g in S.groups(True) if g.get("calendar_id")]
-    embed = "&".join("src=" + g["calendar_id"] for g in cals)
-    return mpage(request, "meet_home.html", days=days, by_day=by_day, today=today.strftime("%Y-%m-%d"), off=off, live=live,
-                 today_l=today_l, nxt=nxt, alerts=alerts, embed=embed, n_groups=len(S.groups(True)), n_teachers=len(S.teachers(True)),
-                 acc=S.meet_account(), now_hm=S.now().strftime("%H:%M"), week_label=f"{days[0]:%d.%m} – {days[-1]:%d.%m.%Y}")
+    today_l = S.lessons_between(S.fmt(today), S.fmt(today + timedelta(days=1)))
+    nxt = S.lessons_between(S.fmt(S.now()), S.fmt(S.now() + timedelta(days=3)), statuses=["planned"])[:6]
+    alerts = [dict(r) for r in db.q("SELECT * FROM zoom_alerts WHERE seen=0 ORDER BY id DESC LIMIT 6")]
+    return mpage(request, "meet_home.html", days=days, by_day=by_day, today=today.strftime("%Y-%m-%d"), off=off, live=live, today_l=today_l, nxt=nxt,
+                 alerts=alerts, n_groups=len(S.groups(True)), n_teachers=len(S.teachers(True)), accs=_acc_rows(), acc=S.meet_account(),
+                 now_hm=S.now().strftime("%H:%M"), week_label=f"{days[0]:%d.%m} – {days[-1]:%d.%m.%Y}")
 
 
 @router.get("/meet/calendar")
 async def meet_calendar(request: Request):
     ym = _ym(request)
+    gid = _int(request.query_params.get("group"))
     a, b = R.month_bounds(ym)
-    ls = S.lessons_between(a, b)
+    ls = S.lessons_between(a, b, gid)
     by_day = {}
     for l in ls:
         by_day.setdefault(l["day"], []).append(l)
     first = datetime.strptime(ym + "-01", "%Y-%m-%d")
-    pad = first.weekday()
     ndays = (datetime.strptime(b, "%Y-%m-%d %H:%M:%S") - first).days
-    cells = [None] * pad + [(first + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(ndays)]
+    cells = [None] * first.weekday() + [(first + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(ndays)]
     cells += [None] * (-len(cells) % 7)
-    cals = [g for g in S.groups(True) if g.get("calendar_id")]
     return mpage(request, "meet_calendar.html", ym=ym, prev=R.shift_month(ym, -1), nxt=R.shift_month(ym, 1), cells=cells, by_day=by_day,
-                 today=S.now().strftime("%Y-%m-%d"), groups=S.groups(True), embed="&".join("src=" + g["calendar_id"] for g in cals))
+                 today=S.now().strftime("%Y-%m-%d"), groups=S.groups(True), gid=gid)
 
 
-@router.get("/meet/api/live")
-async def meet_api_live():
+@router.get("/meet/calendar.ics")
+async def meet_calendar_ics(request: Request):
     S.ready()
-    ls = S.lessons_between(S.fmt(S.now() - timedelta(days=1)), S.fmt(S.now() + timedelta(days=1)), statuses=["live"])
-    return JSONResponse([{"id": l["id"], "group": l["group_title"], "elapsed": l["elapsed"], "real_start": l["real_start"], "peak": l["peak"]} for l in ls])
+    gid = _int(request.query_params.get("group"))
+    ls = S.lessons_between(S.fmt(S.now() - timedelta(days=14)), S.fmt(S.now() + timedelta(days=120)), gid)
+    g = S.group(gid) if gid else None
+    return Response(S.ics(ls, g["title"] if g else "Majlislar (hamma guruhlar)"), media_type="text/calendar; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="majlislar.ics"'})
+
+
+@router.get("/meet/api/state")
+async def meet_api_state():
+    S.ready()
+    return JSONResponse({"pool": S.pool_summary(), "problems": S.pool_problems(),
+                         "live": [{"id": l["id"], "group": l["group_title"]} for l in
+                                  S.lessons_between(S.fmt(S.now() - timedelta(days=1)), S.fmt(S.now() + timedelta(days=1)), statuses=["live"])]})
 
 
 # ================================================================ o'qituvchilar
@@ -117,10 +137,11 @@ async def meet_api_live():
 async def teachers_page(request: Request):
     S.ready()
     ts = S.teachers()
+    gs = S.groups()
     for t in ts:
-        t["groups"] = [g["title"] for g in S.groups() if g.get("teacher_id") == t["id"]]
+        t["groups"] = [g["title"] for g in gs if g.get("teacher_id") == t["id"]]
     edit = S.teacher(_int(request.query_params.get("edit")))
-    return mpage(request, "meet_teachers.html", teachers=ts, edit=edit)
+    return mpage(request, "meet_teachers.html", teachers=ts, edit=edit, bot_user=S.get("bot_username", ""))
 
 
 @router.post("/meet/teachers/save")
@@ -130,13 +151,25 @@ async def teachers_save(request: Request):
     err = S.save_teacher(f, tid)
     if err:
         return go("/meet/teachers" + (f"?edit={tid}" if tid else ""), err=err)
-    return go("/meet/teachers", msg="O'qituvchi saqlandi")
+    return go("/meet/teachers", msg="O'qituvchi saqlandi. U botga /start yuborib ulanadi")
 
 
 @router.post("/meet/teachers/{tid}/delete")
 async def teachers_delete(tid: int):
     S.delete_teacher(tid)
     return go("/meet/teachers", msg="O'qituvchi o'chirildi (guruhlardan ajratildi)")
+
+
+@router.post("/meet/teachers/{tid}/test")
+async def teachers_test(tid: int):
+    t = S.teacher(tid)
+    if not t:
+        return go("/meet/teachers", err="O'qituvchi topilmadi")
+    try:
+        await B.send_teacher(t, "✅ Majlislar boti ishlayapti: sinov xabari.")
+    except B.BotFail as e:
+        return go("/meet/teachers", err=f"{t['name']}: {e}")
+    return go("/meet/teachers", msg=f"{t['name']} ga sinov xabari yuborildi")
 
 
 # ================================================================ guruhlar
@@ -153,8 +186,8 @@ async def groups_page(request: Request):
             scan_err = str(e)
     gs = S.groups()
     for g in gs:
-        g["n_sched"] = db.one("SELECT COUNT(*) c FROM mt_schedule WHERE group_id=? AND active=1", (g["id"],))["c"]
-        nx = db.one("SELECT start_at FROM mt_lessons WHERE group_id=? AND status='planned' AND start_at>? ORDER BY start_at LIMIT 1", (g["id"], S.fmt(S.now())))
+        g["n_sched"] = db.one("SELECT COUNT(*) c FROM zoom_schedule WHERE group_id=? AND active=1", (g["id"],))["c"]
+        nx = db.one("SELECT start_at FROM zoom_lessons WHERE group_id=? AND status='planned' AND start_at>? ORDER BY start_at LIMIT 1", (g["id"], S.fmt(S.now())))
         g["next"] = nx["start_at"][:16] if nx else ""
     return mpage(request, "meet_groups.html", groups=gs, found=found, scanned=scanned, scan_err=scan_err, teachers=S.teachers(True), acc=S.meet_account())
 
@@ -194,33 +227,21 @@ async def group_detail(request: Request, gid: int):
         return go("/meet/groups", err="Guruh topilmadi")
     now_s = S.fmt(S.now())
     up = S.lessons_between(now_s, S.fmt(S.now() + timedelta(days=60)), gid)
-    past = [S.decorate(dict(r)) for r in db.q("SELECT * FROM mt_lessons WHERE group_id=? AND start_at<? ORDER BY start_at DESC LIMIT 25", (gid, now_s))]
-    scheds = S.schedules(gid)
-    return mpage(request, "meet_group.html", g=g, scheds=scheds, up=up, past=past, teachers=S.teachers(True),
-                 roster=T.roster(gid), aliases=T.aliases(gid), gmail_limit=S.cfg("host_type") == "gmail")
+    past = [S.decorate(dict(r)) for r in db.q("SELECT * FROM zoom_lessons WHERE group_id=? AND start_at<? ORDER BY start_at DESC LIMIT 20", (gid, now_s))]
+    return mpage(request, "meet_group.html", g=g, scheds=S.schedules(gid), up=up, past=past, teachers=S.teachers(True), seg_note=S.duration_note(60))
 
 
 @router.post("/meet/groups/{gid}/save")
 async def group_save(gid: int, teacher_id: str = Form(""), note: str = Form(""), active: str = Form("")):
-    db.ex("UPDATE mt_groups SET teacher_id=?, note=?, active=? WHERE id=?", (_int(teacher_id), note.strip(), 1 if active else 0, gid))
+    db.ex("UPDATE zoom_groups SET teacher_id=?, note=?, active=? WHERE id=?", (_int(teacher_id), note.strip(), 1 if active else 0, gid))
     return go(f"/meet/groups/{gid}", msg="Saqlandi")
 
 
 @router.post("/meet/groups/{gid}/delete")
 async def group_delete(gid: int):
     g = S.group(gid)
-    S.delete_group(gid)
-    return go("/meet/groups", msg=f"«{g['title'] if g else ''}» o'chirildi (Google Calendar'dagi kalendarga tegilmadi)")
-
-
-@router.post("/meet/groups/{gid}/calendar")
-async def group_calendar(gid: int):
-    g = S.group(gid)
-    try:
-        await S.ensure_calendar(g)
-    except G.GoogleError as e:
-        return go(f"/meet/groups/{gid}", err=f"Kalendar yaratilmadi: {e.short()}")
-    return go(f"/meet/groups/{gid}", msg="Guruh kalendari tayyor")
+    await S.delete_group(gid)
+    return go("/meet/groups", msg=f"«{g['title'] if g else ''}» o'chirildi")
 
 
 @router.post("/meet/groups/{gid}/generate")
@@ -241,17 +262,17 @@ async def schedule_add(request: Request, gid: int):
 
 @router.post("/meet/schedule/{sid}/toggle")
 async def schedule_toggle(sid: int):
-    r = db.one("SELECT * FROM mt_schedule WHERE id=?", (sid,))
+    r = db.one("SELECT * FROM zoom_schedule WHERE id=?", (sid,))
     if r:
-        db.ex("UPDATE mt_schedule SET active=? WHERE id=?", (0 if r["active"] else 1, sid))
+        db.ex("UPDATE zoom_schedule SET active=? WHERE id=?", (0 if r["active"] else 1, sid))
     return go(f"/meet/groups/{r['group_id']}" if r else "/meet/groups")
 
 
 @router.post("/meet/schedule/{sid}/delete")
 async def schedule_delete(sid: int):
-    r = db.one("SELECT * FROM mt_schedule WHERE id=?", (sid,))
+    r = db.one("SELECT * FROM zoom_schedule WHERE id=?", (sid,))
     if r:
-        db.ex("DELETE FROM mt_schedule WHERE id=?", (sid,))
+        db.ex("DELETE FROM zoom_schedule WHERE id=?", (sid,))
     return go(f"/meet/groups/{r['group_id']}" if r else "/meet/groups", msg="Jadval qatori o'chirildi (yaratilgan darslar qoladi, kerak bo'lsa bekor qiling)")
 
 
@@ -262,31 +283,8 @@ async def extra_lesson(gid: int, day: str = Form(...), time: str = Form(...), du
         dur = int(duration)
     except ValueError:
         return go(f"/meet/groups/{gid}", err="Sana, vaqt yoki davomiylik noto'g'ri")
-    lid = S.add_extra_lesson(gid, start, dur, _int(teacher_id))
-    ok, why = await S.provision(lid)
-    warn = S.duration_warning(dur)
-    return go(f"/meet/groups/{gid}", msg="Qo'shimcha dars yaratildi" + ("" if ok else f" (Meet havolasi keyin: {why})") + (f". Diqqat: {warn}" if warn else ""))
-
-
-@router.post("/meet/groups/{gid}/roster")
-async def roster_edit(gid: int, name: str = Form(""), remove: str = Form("")):
-    if remove:
-        T.remove_roster(gid, remove)
-    elif name.strip():
-        T.add_roster(gid, name)
-    return go(f"/meet/groups/{gid}#roster")
-
-
-@router.post("/meet/groups/{gid}/merge")
-async def group_merge(gid: int, from_name: str = Form(...), to_name: str = Form(...), back: str = Form("")):
-    n = T.merge_names(gid, from_name, to_name)
-    return go(_safe(back, f"/meet/groups/{gid}"), msg=f"«{from_name}» → «{to_name}» birlashtirildi ({n} ta yozuv)")
-
-
-@router.post("/meet/groups/{gid}/unmerge")
-async def group_unmerge(gid: int, raw_name: str = Form(...), back: str = Form("")):
-    T.unmerge(gid, raw_name)
-    return go(_safe(back, f"/meet/groups/{gid}"), msg="Birlashtirish bekor qilindi")
+    S.add_extra_lesson(gid, start, dur, _int(teacher_id))
+    return go(f"/meet/groups/{gid}", msg="Qo'shimcha dars yaratildi. Zoom majlisi dars boshlanishidan oldin ochiladi")
 
 
 # ================================================================ darslar
@@ -296,9 +294,8 @@ async def lessons_page(request: Request):
     gid = _int(request.query_params.get("group"))
     st = request.query_params.get("status") or None
     a, b = R.month_bounds(ym)
-    ls = S.lessons_between(a, b, gid, [st] if st else None)
-    return mpage(request, "meet_lessons.html", lessons=ls, ym=ym, prev=R.shift_month(ym, -1), nxt=R.shift_month(ym, 1), gid=gid, st=st or "",
-                 groups=S.groups(), statuses=S.STATUS_UZ)
+    return mpage(request, "meet_lessons.html", lessons=S.lessons_between(a, b, gid, [st] if st else None), ym=ym, prev=R.shift_month(ym, -1),
+                 nxt=R.shift_month(ym, 1), gid=gid, st=st or "", groups=S.groups(), statuses=S.STATUS_UZ)
 
 
 @router.get("/meet/lessons/{lid}")
@@ -307,13 +304,8 @@ async def lesson_page(request: Request, lid: int):
     if not les:
         return go("/meet/lessons", err="Dars topilmadi")
     les = S.decorate(les)
-    g = S.group(les["group_id"])
-    people = T.person_rows(lid)
-    sm = T.lesson_summary(lid)
-    atts = [dict(r) for r in db.q("SELECT * FROM mt_attendance WHERE lesson_id=? ORDER BY first_in", (lid,))]
-    return mpage(request, "meet_lesson.html", l=les, g=g, people=people, sm=sm, atts=atts, report=T.report_text(lid) if les["status"] in ("done", "live") else "",
-                 teacher=S.lesson_teacher(les), student_names=[p["person"] for p in people if not p["is_teacher"]] + sm["absent"],
-                 late_min=S.cfg("late_min"), early_min=S.cfg("early_min"), aliases=T.aliases(g["id"]))
+    return mpage(request, "meet_lesson.html", l=les, g=S.group(les["group_id"]), teacher=S.lesson_teacher(les),
+                 can_continue=bool(les["meetings"]) and les["status"] in ("planned", "live", "done"))
 
 
 @router.post("/meet/lessons/{lid}/cancel")
@@ -325,7 +317,6 @@ async def lesson_cancel(lid: int, reason: str = Form(""), back: str = Form("")):
 
 @router.post("/meet/lessons/{lid}/move")
 async def lesson_move(lid: int, when: str = Form(...), duration: str = Form(""), back: str = Form("")):
-    les = S.lesson(lid)
     try:
         ns = datetime.strptime(when, "%Y-%m-%dT%H:%M")
     except ValueError:
@@ -334,111 +325,166 @@ async def lesson_move(lid: int, when: str = Form(...), duration: str = Form(""),
     return go(_safe(back, f"/meet/lessons/{lid}"), msg=msg + ". Guruh va o'qituvchiga xabar yuborildi")
 
 
-@router.post("/meet/lessons/{lid}/record")
-async def lesson_record(lid: int, url: str = Form("")):
-    db.ex("UPDATE mt_lessons SET record_url=? WHERE id=?", (url.strip(), lid))
-    return go(f"/meet/lessons/{lid}", msg="Yozuv havolasi saqlandi")
-
-
 @router.post("/meet/lessons/{lid}/send")
 async def lesson_send(lid: int, who: str = Form("group"), back: str = Form("")):
-    msg = await S.send_now(lid, "teacher" if who == "teacher" else "group")
-    return go(_safe(back, f"/meet/lessons/{lid}"), msg=msg) if msg.startswith(("Yuborildi",)) else go(_safe(back, f"/meet/lessons/{lid}"), err=msg)
+    msg = await S.resend(lid, "teacher" if who == "teacher" else "group")
+    return go(_safe(back, f"/meet/lessons/{lid}"), msg=msg) if msg.startswith("Yuborildi") else go(_safe(back, f"/meet/lessons/{lid}"), err=msg)
 
 
 @router.post("/meet/lessons/{lid}/provision")
 async def lesson_provision(lid: int):
     ok, why = await S.provision(lid)
-    return go(f"/meet/lessons/{lid}", msg="Meet xonasi va kalendar tayyor") if ok else go(f"/meet/lessons/{lid}", err=why)
+    return go(f"/meet/lessons/{lid}", msg="Zoom majlisi tayyor") if ok else go(f"/meet/lessons/{lid}", err=why.split(": ", 1)[-1])
 
 
-@router.post("/meet/lessons/{lid}/poll")
-async def lesson_poll(lid: int):
-    les = S.lesson(lid)
-    if not les or not les.get("space_name"):
-        return go(f"/meet/lessons/{lid}", err="Meet xonasi hali yo'q")
-    try:
-        res = await T.poll_lesson(les)
-    except Exception as e:
-        return go(f"/meet/lessons/{lid}", err=f"Meet API: {e.short() if isinstance(e, G.GoogleError) else e}")
-    return go(f"/meet/lessons/{lid}", msg=("Yangilandi: " + f"{res['n']} ishtirokchi, hozir {res['in_now']} kishi") if res["conf"] else "Meet'da hali hech kim kirmagan")
+@router.post("/meet/lessons/{lid}/continue")
+async def lesson_continue(lid: int):
+    ms = [m for m in S.meetings_of(lid)]
+    if not ms:
+        return go(f"/meet/lessons/{lid}", err="Avval Zoom majlisi yaratilishi kerak")
+    ok, why = await S.continue_lesson(ms[-1]["id"], "admin")
+    return go(f"/meet/lessons/{lid}", msg=why) if ok else go(f"/meet/lessons/{lid}", err=why.split(": ", 1)[-1])
 
 
-@router.post("/meet/lessons/{lid}/finish")
-async def lesson_finish(lid: int):
-    les = S.lesson(lid)
-    if les and les["status"] in ("planned", "live"):
-        await T.finalize(les, missed=not db.one("SELECT 1 FROM mt_attendance WHERE lesson_id=?", (lid,)))
-    return go(f"/meet/lessons/{lid}", msg="Dars yakunlandi, hisobot tayyorlandi")
+@router.post("/meet/meetings/{mid}/end")
+async def meeting_end(mid: int):
+    m = S.meeting(mid)
+    if not m:
+        return go("/meet", err="Majlis topilmadi")
+    a = S.account_raw(m["account_id"])
+    if a and m.get("zoom_id"):
+        await Z.end_meeting(a, m["zoom_id"])
+    db.ex("UPDATE zoom_meetings SET state='ended' WHERE id=?", (mid,))
+    back = f"/meet/lessons/{m['lesson_id']}" if m.get("lesson_id") else "/meet/zoom"
+    return go(back, msg="Majlis tugatildi, akkaunt bo'shatildi")
 
 
-@router.post("/meet/attendance/{aid}/teacher")
-async def att_teacher(aid: int, flag: str = Form("1")):
-    a = db.one("SELECT lesson_id FROM mt_attendance WHERE id=?", (aid,))
-    T.mark_teacher(aid, flag == "1")
-    return go(f"/meet/lessons/{a['lesson_id']}" if a else "/meet/lessons", msg="Belgilandi")
+# ================================================================ Zoom akkauntlar puli
+@router.get("/meet/zoom")
+async def zoom_page(request: Request):
+    S.ready()
+    m = S.meeting(_int(request.query_params.get("m")))
+    if m:
+        m["start_url_plain"] = S.start_url_of(m)
+    edit = S.account_raw(_int(request.query_params.get("edit")))
+    if edit:
+        edit.pop("client_secret", None)
+    return mpage(request, "meet_zoom.html", accs=_acc_rows(), new_m=m, edit=edit, default_min=S.cfg("seg_default_min"), scopes=Z.SCOPES)
 
 
-# ================================================================ hisobotlar
-@router.get("/meet/reports")
-async def reports_page(request: Request):
-    ym = _ym(request)
-    gs = S.groups()
-    gid = _int(request.query_params.get("group")) or (gs[0]["id"] if gs else None)
-    grid = R.month_grid(gid, ym) if gid else None
-    return mpage(request, "meet_reports.html", groups=gs, gid=gid, ym=ym, prev=R.shift_month(ym, -1), nxt=R.shift_month(ym, 1), grid=grid,
-                 g=S.group(gid) if gid else None)
+@router.post("/meet/zoom/add")
+async def zoom_add(label: str = Form(""), email: str = Form(""), account_id: str = Form(""), client_id: str = Form(""),
+                   client_secret: str = Form(""), max_min: str = Form("")):
+    aid, err = S.add_account(label, email, account_id, client_id, client_secret, max_min)
+    if err:
+        return go("/meet/zoom", err=err)
+    return await _check_and_go(aid, deep=False, new=True)
 
 
-@router.get("/meet/reports/export")
-async def reports_export(request: Request):
-    ym = _ym(request)
-    gid = _int(request.query_params.get("group"))
-    g = S.group(gid)
-    if not g:
-        return go("/meet/reports", err="Guruh tanlanmagan")
-    data = R.export_xlsx(gid, ym)
-    safe = "".join(c if c.isalnum() or c in "-_ " else "_" for c in g["title"])[:40].strip() or "guruh"
-    return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    headers={"Content-Disposition": f'attachment; filename="davomat_{safe}_{ym}.xlsx"'.encode("ascii", "ignore").decode()})
+@router.post("/meet/zoom/bulk")
+async def zoom_bulk(text: str = Form("")):
+    n, errs = S.bulk_add(text)
+    if errs and not n:
+        return go("/meet/zoom", err=" · ".join(errs[:4]))
+    return go("/meet/zoom", msg=f"{n} ta akkaunt qo'shildi. «Hammasini tekshirish» ni bosing." + (f" Xatolar: {' · '.join(errs[:3])}" if errs else ""))
 
 
-@router.get("/meet/stats")
-async def stats_page(request: Request):
-    ym = _ym(request)
-    return mpage(request, "meet_stats.html", st=R.stats(ym), ym=ym, prev=R.shift_month(ym, -1), nxt=R.shift_month(ym, 1),
-                 live=S.lessons_between(S.fmt(S.now() - timedelta(days=1)), S.fmt(S.now() + timedelta(days=1)), statuses=["live"]))
+async def _check_and_go(aid: int, deep: bool, new=False):
+    a = S.account_raw(aid)
+    if not a:
+        return go("/meet/zoom", err="Akkaunt topilmadi")
+    items = await Z.check_account(a, deep=deep)
+    S.jput(f"zcheck_{aid}", {"at": S.fmt(S.now()), "items": items, "deep": deep})
+    bad = [i for i in items if i["state"] == "fail"]
+    if bad:
+        S.set_account_err(aid, f"{bad[0]['title']}: {bad[0]['detail']}", cool_min=2)
+        return go(f"/meet/zoom#acc{aid}", err=f"{a['label']}: {bad[0]['title']} — {bad[0]['detail']}. {bad[0]['fix']}")
+    S.set_account_ok(aid)
+    return go(f"/meet/zoom#acc{aid}", msg=("Akkaunt qo'shildi va tekshirildi" if new else "Akkaunt ishlayapti") + f": {a['label']}")
+
+
+@router.post("/meet/zoom/{aid}/test")
+async def zoom_test(aid: int):
+    return await _check_and_go(aid, deep=True)
+
+
+@router.post("/meet/zoom/test-all")
+async def zoom_test_all():
+    bad = 0
+    for a in S.accounts(True):
+        items = await Z.check_account(S.account_raw(a["id"]), deep=True)
+        S.jput(f"zcheck_{a['id']}", {"at": S.fmt(S.now()), "items": items, "deep": True})
+        if any(i["state"] == "fail" for i in items):
+            bad += 1
+            S.set_account_err(a["id"], next(i["title"] + ": " + i["detail"] for i in items if i["state"] == "fail"), cool_min=2)
+        else:
+            S.set_account_ok(a["id"])
+    return go("/meet/zoom", msg="Hamma akkauntlar ishlayapti") if not bad else go("/meet/zoom", err=f"{bad} ta akkauntda xato bor (har birining ostida sababi ko'rsatilgan)")
+
+
+@router.post("/meet/zoom/{aid}/update")
+async def zoom_update(aid: int, label: str = Form(""), email: str = Form(""), account_id: str = Form(""), client_id: str = Form(""),
+                      client_secret: str = Form(""), max_min: str = Form("40")):
+    err = S.update_account(aid, label, email, account_id, client_id, client_secret, max_min)
+    if err:
+        return go(f"/meet/zoom?edit={aid}", err=err)
+    return await _check_and_go(aid, deep=False)
+
+
+@router.post("/meet/zoom/{aid}/toggle")
+async def zoom_toggle(aid: int):
+    a = S.account_raw(aid)
+    if a:
+        db.ex("UPDATE zoom_accounts SET enabled=? WHERE id=?", (0 if a["enabled"] else 1, aid))
+    return go("/meet/zoom")
+
+
+@router.post("/meet/zoom/{aid}/delete")
+async def zoom_delete(aid: int):
+    err = await S.delete_account(aid)
+    return go("/meet/zoom", err=err) if err else go("/meet/zoom", msg="Akkaunt o'chirildi")
+
+
+@router.post("/meet/zoom/{aid}/release")
+async def zoom_release(aid: int):
+    n = await S.release_account(aid)
+    return go("/meet/zoom", msg=f"Akkaunt bo'shatildi ({n} ta majlis tugatildi deb belgilandi)")
+
+
+@router.post("/meet/zoom/{aid}/new")
+async def zoom_new(aid: int, topic: str = Form("")):
+    mid, err = await S.adhoc_meeting(aid, topic.strip())
+    if not mid:
+        return go("/meet/zoom", err=err.split(": ", 1)[-1])
+    return go(f"/meet/zoom?m={mid}", msg="Yangi konferensiya yaratildi")
 
 
 # ================================================================ ogohlantirishlar
 @router.get("/meet/alerts")
 async def alerts_page(request: Request):
     S.ready()
-    rows = [dict(r) for r in db.q("SELECT * FROM mt_alerts ORDER BY id DESC LIMIT 150")]
-    return mpage(request, "meet_alerts.html", alerts=rows)
+    return mpage(request, "meet_alerts.html", alerts=[dict(r) for r in db.q("SELECT * FROM zoom_alerts ORDER BY id DESC LIMIT 150")])
 
 
 @router.post("/meet/alerts/seen")
 async def alerts_seen(id: str = Form("all")):
     if id == "all":
-        db.ex("UPDATE mt_alerts SET seen=1")
+        db.ex("UPDATE zoom_alerts SET seen=1")
     elif id.isdigit():
-        db.ex("UPDATE mt_alerts SET seen=1 WHERE id=?", (int(id),))
+        db.ex("UPDATE zoom_alerts SET seen=1 WHERE id=?", (int(id),))
     return go("/meet/alerts")
 
 
-# ================================================================ Google: sozlama, ulanish, diagnostika
+# ================================================================ sozlamalar (+ o'qituvchilar boti)
 @router.get("/meet/settings")
 async def settings_page(request: Request):
     S.ready()
-    vals = {k: S.cfg(k) for k in S.DEFAULTS}
-    return mpage(request, "meet_settings.html", v=vals, client_id=S.get("google_client_id", ""), has_secret=bool(S.get("google_client_secret")),
-                 g_state=S.get("g_state", "none"), g_email=S.get("g_email", ""), g_connected_at=S.get("g_connected_at", ""),
-                 redirect_uri=G.redirect_uri(), configured=G.configured())
+    return mpage(request, "meet_settings.html", v={k: S.cfg(k) for k in S.DEFAULTS if k != "bot_token"}, has_token=bool(S.get("bot_token")),
+                 bot_user=S.get("bot_username", ""), bot_err=S.get("bot_err", ""), beat=S.get("bot_beat", ""))
 
 
-_INT_RANGE = {"late_min": (0, 180), "early_min": (0, 180), "remind_a": (5, 1440), "remind_b": (1, 240), "teacher_dm_min": (1, 180),
-              "group_link_min": (1, 120), "teacher_late_min": (1, 60), "poll_sec": (30, 60), "horizon_days": (1, 30), "max_people": (0, 500)}
+_INT_RANGE = {"remind_a": (5, 1440), "remind_b": (1, 240), "group_link_min": (1, 120), "t_remind_a": (2, 240), "t_remind_b": (1, 120),
+              "create_lead_min": (10, 180), "prompt_before_min": (1, 10), "min_remaining": (1, 30), "seg_default_min": (0, 1440), "horizon_days": (1, 30)}
 
 
 @router.post("/meet/settings")
@@ -448,69 +494,79 @@ async def settings_save(request: Request):
         v = _int(f.get(k))
         if v is not None:
             S.put(k, max(lo, min(hi, v)))
-    for k in ("remind_on", "report_on", "report_to_group"):
-        S.put(k, 1 if f.get(k) else 0)
-    S.put("host_type", "workspace" if f.get("host_type") == "workspace" else "gmail")
-    S.put("moderation", "OFF" if f.get("moderation") == "OFF" else "ON")
+    S.put("remind_on", 1 if f.get("remind_on") else 0)
     S.put("admin_username", (f.get("admin_username") or "").strip().lstrip("@"))
     return go("/meet/settings", msg="Sozlamalar saqlandi")
 
 
-@router.post("/meet/settings/google")
-async def settings_google(client_id: str = Form(""), client_secret: str = Form("")):
-    if client_id.strip():
-        S.put("google_client_id", client_id.strip())
-    if client_secret.strip():
-        S.put("google_client_secret", client_secret.strip())
-    return go("/meet/settings", msg="OAuth kalit saqlandi (secret shifrlangan). Endi «Google'ga ulash» ni bosing")
-
-
-@router.get("/meet/google/connect")
-async def google_connect():
+@router.post("/meet/settings/bot")
+async def settings_bot(token: str = Form("")):
+    token = token.strip()
+    if not token:
+        return go("/meet/settings", err="Bot tokenini kiriting")
+    old = S.get("bot_token")
+    S.put("bot_token", token)
     try:
-        return RedirectResponse(G.start_auth(), status_code=303)
-    except G.GoogleError as e:
-        return go("/meet/settings", err=e.short())
+        me = await B.verify()
+    except B.BotFail as e:
+        if old:
+            S.put("bot_token", old)
+        else:
+            S.put("bot_token", "")
+        return go("/meet/settings", err=f"Bot tokeni qabul qilinmadi: {e}")
+    return go("/meet/settings", msg=f"Bot ulandi: @{me.get('username')}. O'qituvchilar unga /start yuborishi kerak")
 
 
-@router.get("/meet/google/callback")
-async def google_callback(request: Request):
-    q = request.query_params
-    if q.get("error"):
-        return go("/meet/settings", err=f"Google ulanishni rad etdi: {q.get('error')}")
-    try:
-        email = await G.finish_auth(q.get("code", ""), q.get("state", ""))
-    except G.GoogleError as e:
-        return go("/meet/settings", err=e.short())
-    except Exception as e:
-        log.exception("Google callback")
-        return go("/meet/settings", err=f"{type(e).__name__}: {e}")
-    return go("/meet/diag", msg=f"Google ulandi: {email}. Endi diagnostikani ishga tushiring")
+@router.post("/meet/settings/bot/remove")
+async def settings_bot_remove():
+    S.put("bot_token", "")
+    S.drop("bot_username")
+    S.drop("bot_err")
+    return go("/meet/settings", msg="Bot tokeni o'chirildi")
 
 
-@router.post("/meet/google/disconnect")
-async def google_disconnect():
-    G.disconnect()
-    return go("/meet/settings", msg="Google uzildi. Boshqa akkauntni ulash uchun «Google'ga ulash» ni bosing")
-
-
+# ================================================================ diagnostika
 @router.get("/meet/diag")
 async def diag_page(request: Request):
-    last = S.jget("diag_last", None)
-    return mpage(request, "meet_diag.html", last=last, g_state=S.get("g_state", "none"), configured=G.configured(), host_type=S.cfg("host_type"),
-                 test_email=S.get("diag_email", ""), teachers=[t for t in S.teachers(True) if t.get("gmail")])
+    return mpage(request, "meet_diag.html", last=S.jget("diag_last", None))
 
 
 @router.post("/meet/diag/run")
-async def diag_run(test_email: str = Form("")):
+async def diag_run():
     S.ready()
-    S.put("diag_email", test_email.strip())
-    try:
-        items = await G.diagnose(test_email)
-    except Exception as e:
-        log.exception("Google diagnostika")
-        items = [{"key": "x", "title": "Diagnostika", "state": "fail", "detail": f"{type(e).__name__}: {e}", "fix": "", "ms": 0}]
-    S.jput("diag_last", {"at": S.fmt(S.now()), "items": items, "host": S.get("g_email", ""), "host_type": S.cfg("host_type")})
+    res = {"at": S.fmt(S.now()), "accounts": [], "bot": None, "tg": None}
+    for a in S.accounts():
+        if not a["enabled"]:
+            continue
+        try:
+            items = await Z.check_account(S.account_raw(a["id"]), deep=True)
+        except Exception as e:
+            log.exception("Zoom diagnostika")
+            items = [{"key": "x", "title": "Tekshiruv", "state": "fail", "detail": f"{type(e).__name__}: {e}", "fix": ""}]
+        res["accounts"].append({"label": a["label"], "email": a["email"], "max_min": a["max_min"], "items": items})
+        if any(i["state"] == "fail" for i in items):
+            S.set_account_err(a["id"], next(i["title"] + ": " + i["detail"] for i in items if i["state"] == "fail"), cool_min=2)
+        else:
+            S.set_account_ok(a["id"])
+    if S.get("bot_token"):
+        try:
+            me = await B.verify()
+            ts = S.teachers(True)
+            res["bot"] = {"state": "ok", "detail": f"@{me.get('username')}; ulangan o'qituvchilar: {sum(1 for t in ts if t.get('chat_id'))}/{len(ts)}"}
+        except B.BotFail as e:
+            res["bot"] = {"state": "fail", "detail": str(e)}
+    else:
+        res["bot"] = {"state": "warn", "detail": "Bot tokeni kiritilmagan (Sozlamalar)"}
+    acc = S.meet_account()
+    if not acc:
+        res["tg"] = {"state": "warn", "detail": "Majlislar Telegram akkaunti ulanmagan (guruhlarga havola yuborilmaydi)"}
+    else:
+        try:
+            await S._client()
+            res["tg"] = {"state": "ok", "detail": "Telegram akkaunt ulangan"}
+        except S.TgFail as e:
+            res["tg"] = {"state": "fail", "detail": str(e)}
+    S.jput("diag_last", res)
     return go("/meet/diag")
 
 
@@ -624,7 +680,8 @@ async def account_test():
     return go("/meet/account", msg="Sinov xabari «Saqlangan xabarlar»ga yuborildi")
 
 
+
 # ================================================================ yo'riqnoma
 @router.get("/meet/guide")
 async def guide_page(request: Request):
-    return mpage(request, "meet_guide.html", redirect_uri=G.redirect_uri(), scopes=G.SCOPES)
+    return mpage(request, "meet_guide.html", scopes=Z.SCOPES, bot_user=S.get("bot_username", ""))

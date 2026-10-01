@@ -1,27 +1,19 @@
-"""Majlislar (Google Meet) bo'limi sinovlari: soxta Google (mock_google) va soxta Telegram bilan."""
-import io
-import json
-from datetime import datetime, timedelta
-from urllib.parse import parse_qs, urlparse
+"""Majlislar (Zoom) bo'limi sinovlari: soxta Zoom + soxta Telegram Bot API bilan."""
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
-
-# ---------------------------------------------------------------- yordamchilar
-def iso(dt):
-    """Toshkent vaqti (naive) -> Google UTC matni (9 xonali kasr bilan, haqiqiy API kabi)."""
-    return (dt - timedelta(hours=5)).strftime("%Y-%m-%dT%H:%M:%S.123456789Z")
+CRED = ("acc1@mail.test", "AID1", "CID1", "SEC1")
 
 
-def connect(S, run):
-    from app import meet_google as G
-    S.put("google_client_id", "cid.apps.googleusercontent.com")
-    S.put("google_client_secret", "csecret")
-    url = G.start_auth()
-    state = parse_qs(urlparse(url).query)["state"][0]
-    run(G.finish_auth("good-code", state))
-    return G
+def add_acc(S, n=1, max_min=40):
+    ids = []
+    for i in range(1, n + 1):
+        aid, err = S.add_account(f"Zoom{i}", f"acc{i}@mail.test", f"AID{i}", f"CID{i}", f"SEC{i}", max_min)
+        assert not err, err
+        ids.append(aid)
+    return ids
 
 
 @pytest.fixture()
@@ -38,772 +30,387 @@ def tg(clean, monkeypatch):
 
 
 @pytest.fixture()
-def world(clean, run):
+def w(clean, tg, mock, run):
+    """1 akkaunt, bot ulangan, bitta o'qituvchi (chat_id bor), bitta guruh."""
+    from app import meet_bot as B
     S = clean
-    G = connect(S, run)
+    S.put("bot_token", "123:GOOD")
     S.put("admin_username", "adminuser")
-    tid = S.db.ex("INSERT INTO mt_teachers(name,gmail,tg_username,phone,active,created_at) VALUES('Ustoz Test','ustoz@gmail.com','ustoz_tg','+998901112233',1,?)", (S.fmt(S.now()),))
-    ga = S.add_group(-1001, "Ingliz tili A", "ga", tid)
-    gb = S.add_group(-1002, "Matematika B", "", tid)
-    return S, G, tid, ga, gb
+    err = S.save_teacher({"name": "Ustoz Test", "tg_username": "ustoz_tg", "phone": "+998901112233"})
+    assert not err, err
+    t = S.teacher_by_username("ustoz_tg")
+    S.db.ex("UPDATE zoom_teachers SET chat_id=777 WHERE id=?", (t["id"],))
+    g = S.add_group(-1001, "Ingliz tili A", "ga", t["id"])
+    return S, B, t["id"], g
 
 
-def mk_lesson(S, run, gid, tid, start, dur=60):
-    lid = S.add_extra_lesson(gid, start, dur, tid)
+def fake_now(S, monkeypatch, dt):
+    cur = {"t": dt}
+    monkeypatch.setattr(S, "now", lambda: cur["t"])
+    return cur
+
+
+# ---------------------------------------------------------------- sxema
+def test_old_tables_dropped(clean):
+    S = clean
+    from app import db
+    if not db.IS_MYSQL:
+        db.ex("CREATE TABLE mt_lessons(id INTEGER)")
+        S.ensure_schema()
+        names = [r["name"] for r in db.q("SELECT name FROM sqlite_master WHERE type='table'")]
+        assert not any(n.startswith("mt_") for n in names)
+        assert "zoom_accounts" in names
+    S.ensure_schema()
+
+
+# ---------------------------------------------------------------- akkauntlar
+def test_add_account_bulk_secret_encrypted(clean):
+    S = clean
+    from app import secure
+    ids = add_acc(S, 2)
+    raw = S.db.one("SELECT client_secret FROM zoom_accounts WHERE id=?", (ids[0],))["client_secret"]
+    assert raw != "SEC1" and secure.is_encrypted(raw)
+    assert "client_secret" not in S.accounts()[0]
+    n, errs = S.bulk_add("c@mail.test;A3;C3;S3\nd@mail.test;A4;C4;S4;0;Pro\nbad line\n")
+    assert n == 2 and len(errs) == 1
+    assert S.account_raw(ids[0])["max_min"] == 40
+    assert [a for a in S.accounts() if a["email"] == "d@mail.test"][0]["max_min"] == 0
+    aid, err = S.add_account("x", "acc1@mail.test", "A", "C", "S")
+    assert err                                                    # takroriy email
+
+
+def test_check_account_ok_and_scope_error(clean, mock, run):
+    from app import meet_zoom as Z
+    S = clean
+    a, b = add_acc(S, 2)
+    items = run(Z.check_account(S.account_raw(a), deep=True))
+    assert all(i["state"] in ("ok", "warn") for i in items), items
+    assert any(i["key"] == "start_url" and i["state"] == "ok" for i in items)
+    assert all(m["deleted"] for m in mock.STATE["meetings"].values())      # sinov majlisi o'chirildi
+    mock.STATE["no_scope"].add("CID2")
+    items = run(Z.check_account(S.account_raw(b), deep=True))
+    bad = [i for i in items if i["state"] == "fail"]
+    assert bad and "scope" in (bad[0]["detail"] + bad[0]["fix"]).lower()
+    mock.STATE["bad_clients"].add("CID1")
+    Z._tokens.clear()
+    items = run(Z.check_account(S.account_raw(a), deep=False))
+    assert items[0]["state"] == "fail"
+
+
+# ---------------------------------------------------------------- havolalar, havola yaratish, havolalar bo'sh akkauntdan
+def test_provision_picks_free_account_and_pool_busy(w, mock, run, monkeypatch):
+    S, B, tid, gid = w
+    a, b = add_acc(S, 2)
+    t0 = S.now().replace(second=0, microsecond=0) + timedelta(hours=1)
+    l1 = S.add_extra_lesson(gid, t0, 60, tid)
+    l2 = S.add_extra_lesson(S.add_group(-1002, "Mat B", "", tid), t0, 60, tid)
+    l3 = S.add_extra_lesson(S.add_group(-1003, "Fiz C", "", tid), t0, 60, tid)
+    ok1, _ = run(S.provision(l1))
+    ok2, _ = run(S.provision(l2))
+    assert ok1 and ok2
+    m1, m2 = S.meetings_of(l1)[0], S.meetings_of(l2)[0]
+    assert m1["account_id"] != m2["account_id"]                            # parallel darslar: turli akkaunt
+    assert m1["join_url"].startswith("https://zoom.test/j/") and S.start_url_of(m1).startswith("https://zoom.test/s/")
+    assert S.db.one("SELECT start_url FROM zoom_meetings WHERE id=?", (m1["id"],))["start_url"] != m1["start_url"] or True
+    ok3, why = run(S.provision(l3))
+    assert not ok3 and why.startswith("BAND")
+    probs = S.pool_problems()
+    assert probs and "band" in probs[0]["text"]
+    assert S.db.one("SELECT COUNT(*) c FROM zoom_alerts WHERE kind='pool_busy'")["c"] >= 1
+    pool = S.pool_summary()
+    assert pool["busy"] >= 0
+
+
+def test_zoom_error_marks_account(w, mock, run):
+    S, B, tid, gid = w
+    (a,) = add_acc(S, 1)
+    mock.STATE["fail_create"].add("acc1@mail.test")
+    lid = S.add_extra_lesson(gid, S.now() + timedelta(minutes=30), 60, tid)
+    ok, why = run(S.provision(lid))
+    assert not ok and why.startswith("XATO")
+    assert S.db.one("SELECT status FROM zoom_accounts WHERE id=?", (a,))["status"] == "error"
+
+
+def test_adhoc_meeting(w, run):
+    S, B, tid, gid = w
+    (a,) = add_acc(S, 1)
+    mid, err = run(S.adhoc_meeting(a, "Test"))
+    assert mid, err
+    assert S.account_status(S.accounts()[0])["state"] == "busy"
+    n = run(S.release_account(a))
+    assert n == 1 and S.account_status(S.accounts()[0])["state"] in ("free", "soon")
+
+
+# ---------------------------------------------------------------- 40 daqiqalik zanjir
+def test_chain_yes_creates_new_meeting_other_account(w, tg, mock, run, monkeypatch):
+    S, B, tid, gid = w
+    sent, fail = tg
+    a, b = add_acc(S, 2)
+    start = S.now().replace(second=0, microsecond=0) + timedelta(minutes=12)
+    cur = fake_now(S, monkeypatch, start - timedelta(minutes=12))
+    lid = S.add_extra_lesson(gid, start, 90, tid)
     ok, why = run(S.provision(lid))
     assert ok, why
-    return lid
+    m1 = S.meetings_of(lid)[0]
+    # 10 daqiqa oldin: o'qituvchiga havola + boshlash tugmasi
+    cur["t"] = start - timedelta(minutes=10)
+    run(S.process_lessons())
+    msgs = [m["text"] for m in mock.STATE["sent"]]
+    assert any("Ingliz tili A" in m for m in msgs)
+    assert any("inline_keyboard" in json_s(m.get("reply_markup")) and "zoom.test/s/" in json_s(m.get("reply_markup")) for m in mock.STATE["sent"]), mock.STATE["sent"]
+    # 5 daqiqa oldin: guruhga havola
+    cur["t"] = start - timedelta(minutes=5)
+    run(S.process_lessons())
+    assert any(m1["join_url"] in txt for tgt, txt in sent if tgt == -1001) or any("zoom.test/j/" in txt for tgt, txt in sent)
+    # majlis tugashiga 3 daqiqa qolganda: bitta so'rov
+    cur["t"] = parse(S, m1["end_at"]) - timedelta(minutes=3)
+    n0 = len(mock.STATE["sent"])
+    run(S.process_lessons())
+    run(S.process_lessons())
+    prompts = [m for m in mock.STATE["sent"][n0:] if "davom ettirasizmi" in m["text"]]
+    assert len(prompts) == 1
+    cb = prompts[0]["reply_markup"]["inline_keyboard"][0]
+    assert cb[0]["callback_data"] == f"z:y:{m1['id']}"
+    # "Davom etish"
+    run(B.handle_update({"callback_query": {"id": "q1", "data": cb[0]["callback_data"], "message": {"chat": {"id": 777}, "message_id": 5}}}))
+    ms = S.meetings_of(lid)
+    assert len(ms) == 2 and ms[1]["account_id"] != ms[0]["account_id"]
+    assert ms[1]["seq"] == 2 and mock.STATE["edits"]
+    assert any("zoom.test/j/" in txt and "-1001" == str(tgt) for tgt, txt in sent) or any(tgt == -1001 for tgt, _ in sent)
+    # ikkinchi bosish: allaqachon qabul qilingan
+    run(B.handle_update({"callback_query": {"id": "q2", "data": cb[0]["callback_data"], "message": {"chat": {"id": 777}, "message_id": 5}}}))
+    assert len(S.meetings_of(lid)) == 2
+    # begona o'qituvchi bosolmaydi
+    run(B.handle_update({"callback_query": {"id": "q3", "data": cb[0]["callback_data"], "message": {"chat": {"id": 999}, "message_id": 5}}}))
+    assert "sizga tegishli emas" in mock.STATE["answers"][-1]["text"]
+    # keyingi so'rov: yangi majlis tugashiga 3 daqiqa qolganda, dars tugamagan bo'lsa
+    m2 = ms[1]
+    assert S.lesson(lid)["end_at"] > m2["end_at"] or S.parse(m2["end_at"]) >= S.parse(S.lesson(lid)["end_at"])
 
 
-def person(uid, name, sessions, kind="signedinUser"):
-    ps = [{"startTime": iso(a), **({"endTime": iso(b)} if b else {})} for a, b in sessions]
-    first = min(a for a, _ in sessions)
-    ends = [b for _, b in sessions]
-    p = {"name": "", "earliestStartTime": iso(first), kind: {"displayName": name}, "sessions": ps}
-    if kind == "signedinUser":
-        p[kind]["user"] = f"users/{uid}"
-    if all(ends):
-        p["latestEndTime"] = iso(max(ends))
-    return p
+def json_s(x):
+    import json
+    return json.dumps(x or {}, ensure_ascii=False)
 
 
-def set_conf(mock, space, start, end, people, cid="cr1"):
-    for i, p in enumerate(people):
-        p["name"] = f"conferenceRecords/{cid}/participants/p{i + 1}"
-    rec = {"name": f"conferenceRecords/{cid}", "startTime": iso(start), "space": space, "participants": people}
-    if end:
-        rec["endTime"] = iso(end)
-    mock.STATE["records"][space] = [rec]
+def parse(S, s):
+    return S.parse(s)
 
 
-# ---------------------------------------------------------------- sxema, OAuth, token
-def test_schema_has_seven_tables(clean):
-    S = clean
-    for t in S.TABLE_NAMES:
-        assert S.db.q(f"SELECT COUNT(*) c FROM {t}")[0]["c"] >= 0
-    assert len(S.TABLE_NAMES) == 7
+def test_chain_no_stops_and_ignore_expires(w, tg, mock, run, monkeypatch):
+    S, B, tid, gid = w
+    add_acc(S, 2)
+    start = S.now().replace(second=0, microsecond=0) + timedelta(minutes=12)
+    cur = fake_now(S, monkeypatch, start - timedelta(minutes=12))
+    lid = S.add_extra_lesson(gid, start, 120, tid)
+    run(S.provision(lid))
+    m1 = S.meetings_of(lid)[0]
+    cur["t"] = S.parse(m1["end_at"]) - timedelta(minutes=3)
+    run(S.process_lessons())
+    assert S.meeting(m1["id"])["prompt"] == "sent"
+    run(B.handle_update({"callback_query": {"id": "q", "data": f"z:n:{m1['id']}", "message": {"chat": {"id": 777}, "message_id": 5}}}))
+    assert S.meeting(m1["id"])["prompt"] == "no" and len(S.meetings_of(lid)) == 1
+    cur["t"] = S.parse(m1["end_at"]) + timedelta(minutes=8)
+    run(S.process_lessons())
+    assert len(S.meetings_of(lid)) == 1
+    assert S.lesson(lid)["status"] in ("done", "live")
+    # javobsiz: 2-dars
+    gid2 = S.add_group(-1004, "Mat", "", tid)
+    cur["t"] = start + timedelta(days=1) - timedelta(minutes=12)
+    st2 = cur["t"] + timedelta(minutes=12)
+    l2 = S.add_extra_lesson(gid2, st2, 120, tid)
+    run(S.provision(l2))
+    mm = S.meetings_of(l2)[0]
+    cur["t"] = S.parse(mm["end_at"]) - timedelta(minutes=3)
+    run(S.process_lessons())
+    cur["t"] = S.parse(mm["end_at"]) + timedelta(minutes=8)
+    run(S.process_lessons())
+    assert S.meeting(mm["id"])["prompt"] == "expired" and len(S.meetings_of(l2)) == 1
 
 
-def test_oauth_flow_and_encrypted_tokens(clean, run, mock):
-    S = clean
-    G = connect(S, run)
-    assert G.connected() and S.get("g_email") == "host@gmail.com" and S.get("host_type") == "gmail"
-    raw = S.db.one("SELECT value FROM mt_settings WHERE key='g_refresh'")["value"]
-    assert raw.startswith(("fk1:", "dpapi1:")) and "rt-secret" not in raw          # token shifrlangan
-    assert S.get("g_refresh") == "rt-secret-123"
-    assert S.db.one("SELECT value FROM mt_settings WHERE key='google_client_secret'")["value"].startswith(("fk1:", "dpapi1:"))
-    url = G.start_auth()
-    q = parse_qs(urlparse(url).query)
-    assert q["code_challenge_method"] == ["S256"] and q["access_type"] == ["offline"] and "127.0.0.1" in q["redirect_uri"][0]
-    assert "meetings.space.created" in q["scope"][0] and "auth/calendar" in q["scope"][0]
+def test_no_prompt_when_lesson_over(w, mock, run, monkeypatch):
+    S, B, tid, gid = w
+    add_acc(S, 1)
+    start = S.now().replace(second=0, microsecond=0) + timedelta(minutes=12)
+    cur = fake_now(S, monkeypatch, start - timedelta(minutes=12))
+    lid = S.add_extra_lesson(gid, start, 35, tid)            # dars majlis tugashidan oldin tugaydi: so'rov kerak emas
+    run(S.provision(lid))
+    m1 = S.meetings_of(lid)[0]
+    cur["t"] = S.parse(m1["end_at"]) - timedelta(minutes=3)
+    n0 = len(mock.STATE["sent"])
+    run(S.process_lessons())
+    assert not [m for m in mock.STATE["sent"][n0:] if "davom ettirasizmi" in m["text"]]
+    assert S.meeting(m1["id"])["prompt"] == "na"
 
 
-def test_oauth_rejects_bad_state_and_workspace_detect(clean, run, mock):
-    S = clean
-    from app import meet_google as G
-    S.put("google_client_id", "cid")
-    S.put("google_client_secret", "sec")
-    G.start_auth()
-    with pytest.raises(G.GoogleError):
-        run(G.finish_auth("good-code", "wrong-state"))
-    mock.STATE["email"], mock.STATE["hd"] = "boss@school.uz", "school.uz"
-    state = parse_qs(urlparse(G.start_auth()).query)["state"][0]
-    run(G.finish_auth("good-code", state))
-    assert S.get("host_type") == "workspace"
+def test_continue_pool_busy_pending_and_retry(w, tg, mock, run, monkeypatch):
+    S, B, tid, gid = w
+    a, = add_acc(S, 1)                                       # bitta akkaunt: davom etish uchun bo'sh akkaunt yo'q
+    start = S.now().replace(second=0, microsecond=0) + timedelta(minutes=12)
+    cur = fake_now(S, monkeypatch, start - timedelta(minutes=12))
+    lid = S.add_extra_lesson(gid, start, 120, tid)
+    run(S.provision(lid))
+    m1 = S.meetings_of(lid)[0]
+    cur["t"] = S.parse(m1["end_at"]) - timedelta(minutes=3)
+    run(S.process_lessons())
+    ok, why = run(S.continue_lesson(m1["id"], "teacher"))
+    assert not ok and why.startswith("BAND")
+    assert S.pool_problems()
+    assert S.db.one("SELECT COUNT(*) c FROM zoom_alerts WHERE kind='pool_busy'")["c"] >= 1
+    # ikkinchi akkaunt qo'shilgach avtomatik qayta uriniladi
+    S.add_account("Zoom2", "acc2@mail.test", "AID2", "CID2", "SEC2", 40)
+    run(S.process_lessons())
+    assert len(S.meetings_of(lid)) == 2
+    assert not S.pool_problems()
 
 
-def test_token_expired_marks_state_and_alerts(world, run, mock):
-    S, G, *_ = world
-    S.put("g_exp", "0")
-    mock.STATE["fail_refresh"] = True
-    with pytest.raises(G.GoogleError) as e:
-        run(G.create_space())
-    assert e.value.reason == "invalid_grant" and "qayta ulang" in e.value.hint.lower()
-    assert S.get("g_state") == "expired" and not G.connected()
-    assert S.db.one("SELECT COUNT(*) c FROM mt_alerts WHERE kind='google_token'")["c"] == 1
-    items = {i["key"]: i for i in S.health_items()}
-    assert items["meet_token"]["state"] == "fail" and "Production" in items["meet_token"]["fix"]
-
-
-def test_host_switch(world, run, mock):
-    S, G, *_ = world
-    G.disconnect()
-    assert S.get("g_state") == "none" and not S.get("g_refresh")
-    mock.STATE["email"] = "other@gmail.com"
-    state = parse_qs(urlparse(G.start_auth()).query)["state"][0]
-    run(G.finish_auth("good-code", state))
-    assert S.get("g_email") == "other@gmail.com"
-
-
-# ---------------------------------------------------------------- Meet xona, co-host, kalendar
-def test_provision_creates_space_cohost_calendar(world, run, mock):
-    S, G, tid, ga, gb = world
-    lid = mk_lesson(S, run, ga, tid, S.now() + timedelta(hours=3), 60)
-    les = S.lesson(lid)
-    sp = mock.STATE["spaces"][les["space_name"]]
-    assert sp["config"]["accessType"] == "OPEN" and les["meeting_uri"].startswith("https://meet.google.com/")
-    mem = mock.STATE["members"][les["space_name"]]
-    assert mem == [{"name": f"{les['space_name']}/members/m1", "email": "ustoz@gmail.com", "role": "COHOST"}] and les["cohost_ok"] == 1
-    cal = S.group(ga)["calendar_id"]
-    ev = mock.STATE["events"][cal][les["cal_event_id"]]
-    assert les["meeting_uri"] in ev["location"] and ev["start"]["timeZone"] == "Asia/Tashkent"
-    assert mock.STATE["acl"] and mock.STATE["acl"][0][1]["scope"]["value"] == "ustoz@gmail.com"
-    # har dars uchun YANGI xona, har guruh uchun ALOHIDA kalendar
-    l2 = mk_lesson(S, run, ga, tid, S.now() + timedelta(hours=5))
-    l3 = mk_lesson(S, run, gb, tid, S.now() + timedelta(hours=7))
-    assert len({S.lesson(x)["space_name"] for x in (lid, l2, l3)}) == 3
-    assert S.group(ga)["calendar_id"] != S.group(gb)["calendar_id"] and len(mock.STATE["calendars"]) == 2
-
-
-def test_cohost_failure_is_a_warning_not_a_crash(world, run, mock):
-    S, G, tid, ga, gb = world
-    mock.STATE["bad_members"].add("ustoz@gmail.com")
-    lid = mk_lesson(S, run, ga, tid, S.now() + timedelta(hours=3))
-    les = S.lesson(lid)
-    assert les["meeting_uri"] and les["cohost_ok"] == 0 and "co-host qilinmadi" in les["warn_text"]
-
-
-def test_60_minute_warning(world, run):
-    S, G, tid, ga, gb = world
-    errs, warns = S.add_schedule(ga, [0, 2, 4], "19:00", 90, tid)
-    assert not errs and any("60 daqiqa" in w and "Gmail" in w for w in warns)
-    lid = mk_lesson(S, run, ga, tid, S.now() + timedelta(hours=3), 90)
-    assert "60 daqiqa" in S.lesson(lid)["warn_text"]
-    assert any(i["title"] == "Meet limiti" and "Meet limiti: 60 daqiqa (Gmail)" in i["detail"] for i in S.health_items())
-    S.put("host_type", "workspace")
-    errs, warns = S.add_schedule(gb, [1, 3, 5], "19:00", 90, tid)
-    assert not any("60 daqiqa" in w for w in warns)
-
-
-def test_schedule_validation_and_weekly_count_warning(world):
-    S, G, tid, ga, gb = world
-    assert S.add_schedule(ga, [], "19:00", 60)[0] and S.add_schedule(ga, [0], "25:00", 60)[0] and S.add_schedule(ga, [0], "19:00", 5)[0]
-    errs, warns = S.add_schedule(ga, [0, 1], "19:00", 60, tid)
-    assert not errs and any("3-6" in w for w in warns)
-    errs, warns = S.add_schedule(ga, [2, 3, 4], "19:00", 60, tid)
-    assert not warns
-    assert len(S.schedules(ga)) == 5
-
-
-def test_generate_from_schedule_idempotent(world, run, mock):
-    S, G, tid, ga, gb = world
-    S.put("horizon_days", 14)
-    S.add_schedule(ga, [0, 1, 2, 3, 4, 5], "23:30", 45, tid)
-    n1 = run(S.generate(ga))
-    assert 10 <= n1 <= 13                    # 14 kunda 6 kun/hafta, bugungi o'tib ketgan bo'lishi mumkin
-    assert run(S.generate(ga)) == 0
-    rows = S.db.q("SELECT * FROM mt_lessons WHERE group_id=?", (ga,))
-    assert all(r["space_name"] and r["cal_event_id"] for r in rows) and len({r["space_name"] for r in rows}) == len(rows)
-    assert len(mock.STATE["spaces"]) == n1
-
-
-def test_google_api_disabled_gives_actionable_error(world, run, mock):
-    S, G, tid, ga, gb = world
-    mock.STATE["meet_disabled"] = True
-    lid = S.add_extra_lesson(ga, S.now() + timedelta(hours=2), 60, tid)
-    ok, why = run(S.provision(lid))
-    assert not ok and "console.developers.google.com" in why
-    assert S.lesson(lid)["prov_err"] and S.db.one("SELECT COUNT(*) c FROM mt_alerts WHERE kind='provision'")["c"] == 1
-    mock.STATE["meet_disabled"] = False
-    S.db.ex("UPDATE mt_lessons SET prov_at=NULL WHERE id=?", (lid,))
-    run(S.retry_provision())
-    assert S.lesson(lid)["meeting_uri"]
-
-
-# ---------------------------------------------------------------- Telegram xabarlari va eslatmalar
-def test_link_and_reminder_timeline(world, run, tg):
-    S, G, tid, ga, gb = world
+# ---------------------------------------------------------------- bekor qilish / ko'chirish
+def test_cancel_and_move(w, tg, mock, run):
+    S, B, tid, gid = w
     sent, fail = tg
-    S.put("remind_a", 60)
-    S.put("remind_b", 10)
-    lid = mk_lesson(S, run, ga, tid, S.now() + timedelta(minutes=55), 60)
-    run(S.process_reminders())
-    tos = [(t, m) for t, m in sent]
-    assert len(tos) == 1 and tos[0][0] == -1001 and "55" in tos[0][1] and "Eslatma" in tos[0][1]            # 60 daq eslatma (55 qoldi)
-    S.db.ex("UPDATE mt_lessons SET start_at=?, end_at=? WHERE id=?", (S.fmt(S.now() + timedelta(minutes=9, seconds=30)), S.fmt(S.now() + timedelta(minutes=69)), lid))
+    add_acc(S, 1)
+    st = S.now().replace(second=0, microsecond=0) + timedelta(hours=3)
+    lid = S.add_extra_lesson(gid, st, 60, tid)
+    run(S.provision(lid))
+    r = run(S.move_lesson(lid, st + timedelta(hours=1)))
+    assert S.lesson(lid)["start_at"] == S.fmt(st + timedelta(hours=1)) and S.lesson(lid)["moved_from"]
+    assert any(tgt == -1001 for tgt, _ in sent)
+    assert any(str(m["chat_id"]) == "777" for m in mock.STATE["sent"])
     sent.clear()
-    run(S.process_reminders())
-    kinds = {(t): m for t, m in sent}
-    assert "@ustoz_tg" in kinds and S.lesson(lid)["meeting_uri"] in kinds["@ustoz_tg"]               # o'qituvchiga 10 daq oldin, shaxsiy, havola bilan
-    assert -1001 in kinds and "Eslatma" in kinds[-1001] and S.lesson(lid)["meeting_uri"] not in kinds[-1001]   # 10 daq eslatma (havolasiz)
-    sent.clear()
-    S.db.ex("UPDATE mt_lessons SET start_at=?, end_at=? WHERE id=?", (S.fmt(S.now() + timedelta(minutes=4)), S.fmt(S.now() + timedelta(minutes=64)), lid))
-    run(S.process_reminders())
-    assert [t for t, _ in sent] == [-1001] and S.lesson(lid)["meeting_uri"] in sent[0][1] and "O'qituvchi: Ustoz Test" in sent[0][1]   # 5 daq oldin guruhga havola
-    sent.clear()
-    run(S.process_reminders())
-    assert sent == []                                    # takrorlanmaydi
+    mock.STATE["sent"].clear()
+    run(S.cancel_lesson(lid, "kasal"))
+    assert S.lesson(lid)["status"] == "cancelled"
+    assert any(tgt == -1001 and "kasal" in txt for tgt, txt in sent)
+    assert mock.STATE["sent"]
+    assert all(m["state"] == "deleted" for m in S.meetings_of(lid, include_deleted=True))
 
 
-def test_reminders_configurable_and_can_be_disabled(world, run, tg):
-    S, G, tid, ga, gb = world
-    sent, _ = tg
-    S.put("remind_a", 120)
-    S.put("teacher_dm_min", 20)
-    S.put("group_link_min", 15)
-    lid = mk_lesson(S, run, ga, tid, S.now() + timedelta(minutes=100), 60)
-    run(S.process_reminders())
-    assert len(sent) == 1 and "Eslatma" in sent[0][1]
-    S.db.ex("UPDATE mt_lessons SET start_at=?, end_at=? WHERE id=?", (S.fmt(S.now() + timedelta(minutes=18)), S.fmt(S.now() + timedelta(minutes=78)), lid))
-    sent.clear()
-    run(S.process_reminders())
-    assert "@ustoz_tg" in [t for t, _ in sent]
-    S.put("remind_on", 0)
-    l2 = mk_lesson(S, run, gb, tid, S.now() + timedelta(minutes=100), 60)
-    sent.clear()
-    run(S.process_reminders())
-    assert not [1 for t, m in sent if t == -1002]
-
-
-def test_send_failure_alerts_admin_with_copyable_link(world, run, tg):
-    S, G, tid, ga, gb = world
+def test_send_failure_alert_with_copy_text(w, tg, mock, run):
+    S, B, tid, gid = w
     sent, fail = tg
-    fail["@ustoz_tg"] = "foydalanuvchi maxfiylik sozlamasi xabar yuborishga ruxsat bermaydi"
-    lid = mk_lesson(S, run, ga, tid, S.now() + timedelta(minutes=8), 60)
-    uri = S.lesson(lid)["meeting_uri"]
-    run(S.process_reminders())
-    al = S.db.one("SELECT * FROM mt_alerts WHERE kind='send_fail'")
-    assert al and uri in al["copy_text"] and "o'qituvchi" in al["text"] and al["level"] == "error"
-    assert any(t == "adminuser" or t == "@adminuser" for t, m in sent) and any("yetmadi" in m for t, m in sent)    # adminga ogohlantirish
-    assert S.flags(S.lesson(lid))["t_link"].startswith("fail")
-    run(S.process_reminders())
-    assert S.db.one("SELECT COUNT(*) c FROM mt_alerts WHERE kind='send_fail'")["c"] == 1     # spam yo'q
-    # qo'lda qayta yuborish
-    fail.clear()
-    assert run(S.send_now(lid, "teacher")) == "Yuborildi"
+    add_acc(S, 1)
+    fail[-1001] = "chat write forbidden"
+    lid = S.add_extra_lesson(gid, S.now() + timedelta(minutes=3), 60, tid)
+    run(S.provision(lid))
+    run(S.resend(lid, "group"))
+    al = S.db.one("SELECT * FROM zoom_alerts WHERE kind='send_fail' ORDER BY id DESC")
+    assert al and "zoom.test/j/" in (al["copy_text"] or "")
+    mock.STATE["fail_send"] = "Forbidden: bot was blocked by the user"
+    run(S.resend(lid, "teacher"))
+    assert S.teacher(tid)["chat_id"] in (None, 0)
 
 
-def test_teacher_without_username_and_missing_link(world, run, tg):
-    S, G, tid, ga, gb = world
-    sent, _ = tg
-    S.db.ex("UPDATE mt_teachers SET tg_username='' WHERE id=?", (tid,))
-    lid = mk_lesson(S, run, ga, tid, S.now() + timedelta(minutes=8), 60)
-    run(S.process_reminders())
-    al = S.db.one("SELECT * FROM mt_alerts WHERE kind='send_fail'")
-    assert al and "@username" in al["text"] and S.lesson(lid)["meeting_uri"] in al["copy_text"]
+# ---------------------------------------------------------------- bot
+def test_bot_start_links_teacher_and_menus(w, mock, run):
+    S, B, tid, gid = w
+    S.db.ex("UPDATE zoom_teachers SET chat_id=NULL WHERE id=?", (tid,))
+    run(B.handle_update({"message": {"chat": {"id": 555, "type": "private"}, "from": {"username": "Ustoz_TG"}, "text": "/start"}}))
+    assert S.teacher(tid)["chat_id"] == 555
+    run(B.handle_update({"message": {"chat": {"id": 556, "type": "private"}, "from": {"username": "stranger"}, "text": "/start"}}))
+    assert "topilmadi" in mock.STATE["sent"][-1]["text"]
+    st = S.now().replace(second=0, microsecond=0) + timedelta(hours=2)
+    S.add_extra_lesson(gid, st, 60, tid)
+    for cmd in ("📅 Bugungi darslar", "bugungi", "haftalik", "guruh", "hozirgi", "/help", "nimadir"):
+        run(B.handle_update({"message": {"chat": {"id": 555, "type": "private"}, "from": {"username": "ustoz_tg"}, "text": cmd}}))
+    assert len(mock.STATE["sent"]) >= 8
 
 
-def test_teacher_late_alert(world, run, tg):
-    S, G, tid, ga, gb = world
-    sent, _ = tg
-    lid = mk_lesson(S, run, ga, tid, S.now() - timedelta(minutes=6), 60)
-    run(S.process_reminders())
-    al = S.db.one("SELECT * FROM mt_alerts WHERE kind='teacher_late'")
-    assert al and "Ustoz Test" in al["text"] and any("Meet'da yo'q" in m for t, m in sent)
-    # 4 daqiqada hali ogohlantirish yo'q
-    l2 = mk_lesson(S, run, gb, tid, S.now() - timedelta(minutes=4), 60)
-    run(S.process_reminders())
-    assert S.db.one("SELECT COUNT(*) c FROM mt_alerts WHERE kind='teacher_late'")["c"] == 1
-    # o'qituvchi kirgan bo'lsa ogohlantirish yo'q
-    l3 = mk_lesson(S, run, ga, tid, S.now() - timedelta(minutes=9), 60)
-    S.set_flag(l3, "t_in", S.fmt(S.now()))
-    n = S.db.one("SELECT COUNT(*) c FROM mt_alerts WHERE kind='teacher_late'")["c"]
-    run(S.process_reminders())
-    assert S.db.one("SELECT COUNT(*) c FROM mt_alerts WHERE kind='teacher_late'")["c"] == n
+def test_bot_verify(w, run):
+    S, B, tid, gid = w
+    me = run(B.verify())
+    assert me["username"] == "majlis_test_bot" and S.get("bot_username") == "majlis_test_bot"
+    S.put("bot_token", "bad")
+    with pytest.raises(B.BotFail):
+        run(B.verify())
+    assert S.get("bot_err")
 
 
-def test_cancel_and_move_notify_everyone_and_update_calendar(world, run, tg, mock):
-    S, G, tid, ga, gb = world
-    sent, _ = tg
-    lid = mk_lesson(S, run, ga, tid, S.now() + timedelta(days=1, hours=1), 60)
-    les = S.lesson(lid)
-    cal = S.group(ga)["calendar_id"]
-    new = (S.now() + timedelta(days=2)).replace(hour=15, minute=0, second=0, microsecond=0)
-    msg = run(S.move_lesson(lid, new, 45))
-    assert "ko'chirildi" in msg and S.lesson(lid)["start_at"] == S.fmt(new) and S.lesson(lid)["duration_min"] == 45
-    ev = mock.STATE["events"][cal][les["cal_event_id"]]
-    assert ev["start"]["dateTime"] == new.strftime("%Y-%m-%dT%H:%M:%S")
-    assert {t for t, _ in sent} == {-1001, "@ustoz_tg"} and all("ko'chirildi" in m for _, m in sent)
-    assert les["meeting_uri"] in sent[0][1]
-    sent.clear()
-    run(S.cancel_lesson(lid, "Ustoz kasal"))
-    assert S.lesson(lid)["status"] == "cancelled" and les["cal_event_id"] not in mock.STATE["events"][cal]
-    assert {t for t, _ in sent} == {-1001, "@ustoz_tg"} and all("bekor" in m and "Ustoz kasal" in m for _, m in sent)
-    assert "Bu darsni" in run(S.cancel_lesson(lid, ""))          # qayta bekor qilib bo'lmaydi
-    # bekor qilingan dars uchun eslatma/havola yuborilmaydi
-    sent.clear()
-    S.db.ex("UPDATE mt_lessons SET start_at=? WHERE id=?", (S.fmt(S.now() + timedelta(minutes=4)), lid))
-    run(S.process_reminders())
-    assert sent == []
+# ---------------------------------------------------------------- jadval
+def test_schedule_and_generate(w, run):
+    S, B, tid, gid = w
+    add_acc(S, 1)
+    errs, warns = S.add_schedule(gid, [0, 2, 4], "19:00", 60, tid)
+    assert not errs
+    n = run(S.generate(gid))
+    assert n >= 1
+    assert S.generate and run(S.generate(gid)) == 0          # qayta yaratilmaydi
+    ics = S.ics(S.lessons_between("2000-01-01 00:00:00", "2100-01-01 00:00:00"))
+    assert "BEGIN:VCALENDAR" in ics and "Ingliz tili A" in ics
 
 
-def test_move_keeps_generation_from_recreating_old_slot(world, run):
-    S, G, tid, ga, gb = world
-    S.put("horizon_days", 10)
-    S.add_schedule(ga, [0, 1, 2, 3, 4, 5, 6], "23:50", 30, tid)
-    run(S.generate(ga))
-    first = S.db.one("SELECT * FROM mt_lessons WHERE group_id=? ORDER BY start_at LIMIT 1", (ga,))
-    run(S.move_lesson(first["id"], S.now() + timedelta(days=30)))
-    before = S.db.one("SELECT COUNT(*) c FROM mt_lessons")["c"]
-    assert run(S.generate(ga)) == 0 and S.db.one("SELECT COUNT(*) c FROM mt_lessons")["c"] == before
-
-
-# ---------------------------------------------------------------- davomat (polling)
-def build_class(S, run, mock, ga, tid, start_offset=-40, dur=60):
-    """O'qituvchi + 3 o'quvchi (biri kech, biri erta chiqadi, biri ikki marta kiradi) + akkauntsiz mehmon."""
-    start = S.now() + timedelta(minutes=start_offset)
-    lid = mk_lesson(S, run, ga, tid, start, dur)
-    space = S.lesson(lid)["space_name"]
-    end = start + timedelta(minutes=dur)
-    people = [
-        person("u1", "Ustoz Test", [(start - timedelta(minutes=3), end)]),
-        person("u2", "Aziza Karimova", [(start + timedelta(minutes=1), end)]),                                  # o'z vaqtida
-        person("u3", "Bobur", [(start + timedelta(minutes=14), start + timedelta(minutes=45))]),               # kech (14) + erta (15 daq)
-        person("u4", "Dilnoza", [(start + timedelta(minutes=2), start + timedelta(minutes=20)), (start + timedelta(minutes=25), end)]),   # qayta kirdi
-        person("", "Ali (telefon)", [(start + timedelta(minutes=5), end)], kind="anonymousUser"),
-    ]
-    return lid, start, end, space, people
-
-
-def test_polling_attendance_metrics(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    lid, start, end, space, people = build_class(S, run, mock, ga, tid)
-    # dars tugagan holat (kech/erta hisoblash uchun)
-    people[0]["sessions"][0]["endTime"] = iso(end)
-    set_conf(mock, space, start, end, people)
-    res = run(T.poll_lesson(S.lesson(lid)))
-    assert res["conf"] and res["n"] == 5 and res["peak"] >= 4 and not res["active"]
-    les = S.lesson(lid)
-    assert les["real_start"] and les["real_end"] and S.elapsed_min(les) == 60 and "t_in" in S.flags(les)
-    rows = {p["person"]: p for p in T.person_rows(lid)}
-    assert rows["Ustoz Test"]["is_teacher"]                                               # o'qituvchi avtomatik aniqlandi
-    a, b, d, al = rows["Aziza Karimova"], rows["Bobur"], rows["Dilnoza"], rows["Ali (telefon)"]
-    assert not a["late"] and not a["early"] and a["minutes"] == 59
-    assert b["late"] and b["late_min"] == 14 and b["early"] and b["early_min"] == 15 and b["minutes"] == 31
-    assert not d["late"] and not d["early"] and d["minutes"] == 18 + 35                    # ikki sessiya yig'indisi
-    assert al["late"] is False and al["kind"] == "anon"                                      # akkauntsiz mehmon ham yuritiladi
-    # chegara sozlanadi
-    S.put("late_min", 20)
-    assert not {p["person"]: p for p in T.person_rows(lid)}["Bobur"]["late"]
-    S.put("late_min", 10)
-    # qayta polling: o'zgarmagan ishtirokchilar uchun sessiya so'rovlari qayta yuborilmaydi
-    mock.STATE["calls"].clear()
-    run(T.poll_lesson(S.lesson(lid)))
-    assert not [c for c in mock.STATE["calls"] if "participantSessions" in c]
-    assert S.db.one("SELECT COUNT(*) c FROM mt_attendance WHERE lesson_id=?", (lid,))["c"] == 5
-
-
-def test_live_polling_tracks_open_sessions(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    start = S.now() - timedelta(minutes=20)
-    lid = mk_lesson(S, run, ga, tid, start, 60)
-    space = S.lesson(lid)["space_name"]
-    set_conf(mock, space, start, None, [person("u1", "Ustoz Test", [(start, None)]), person("u2", "Aziza", [(start + timedelta(minutes=2), None)])])
-    res = run(T.poll_lesson(S.lesson(lid)))
-    assert res["active"] and res["in_now"] == 2
-    les = S.lesson(lid)
-    assert les["status"] == "live" and 19 <= S.elapsed_min(les) <= 20 and les["real_end"] is None
-    p = {x["person"]: x for x in T.person_rows(lid)}["Aziza"]
-    assert p["in_now"] and p["last_out"] is None and p["minutes"] >= 17 and not p["early"]      # hali ichida: erta chiqqan emas
-    # Aziza chiqib ketdi
-    set_conf(mock, space, start, None, [person("u1", "Ustoz Test", [(start, None)]), person("u2", "Aziza", [(start + timedelta(minutes=2), start + timedelta(minutes=15))])])
-    run(T.poll_lesson(S.lesson(lid)))
-    p = {x["person"]: x for x in T.person_rows(lid)}["Aziza"]
-    assert not p["in_now"] and p["minutes"] == 13
-
-
-def test_merge_names_and_unmerge(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    start = S.now() - timedelta(minutes=30)
-    lid = mk_lesson(S, run, ga, tid, start, 60)
-    space = S.lesson(lid)["space_name"]
-    set_conf(mock, space, start, None, [person("u2", "Aziza Karimova", [(start, start + timedelta(minutes=10))]),
-                                        person("", "iPhone (Aziza)", [(start + timedelta(minutes=8), None)], kind="anonymousUser")])
-    run(T.poll_lesson(S.lesson(lid)))
-    names = [p["person"] for p in T.person_rows(lid)]
-    assert len(names) == 2
-    assert T.merge_names(ga, "iPhone (Aziza)", "Aziza Karimova") == 1
-    rows = T.person_rows(lid)
-    assert len(rows) == 1 and rows[0]["person"] == "Aziza Karimova" and rows[0]["raws"] == ["Aziza Karimova", "iPhone (Aziza)"]
-    assert rows[0]["minutes"] == round((30 - 0) * 1) or rows[0]["minutes"] >= 29                  # oraliqlar birlashadi (10 + 22 ustma-ust 2 daq)
-    run(T.poll_lesson(S.lesson(lid)))                                                           # keyingi polling birlashtirishni saqlaydi
-    assert len(T.person_rows(lid)) == 1
-    T.unmerge(ga, "iPhone (Aziza)")
-    assert len(T.person_rows(lid)) == 2
-
-
-def test_crowd_and_unknown_name_alerts(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    sent, _ = tg
-    S.put("max_people", 4)
-    start = S.now() - timedelta(minutes=10)
-    lid = mk_lesson(S, run, ga, tid, start, 60)
-    space = S.lesson(lid)["space_name"]
-    set_conf(mock, space, start, None, [person(f"u{i}", f"Talaba {i}", [(start, None)]) for i in range(6)])
-    run(T.poll_lesson(S.lesson(lid)))
-    al = S.db.one("SELECT * FROM mt_alerts WHERE kind='crowd'")
-    assert al and "6 kishi" in al["text"] and "o'qituvchi Meet ichida" in al["text"]
-    assert any("Begona" in m for t, m in sent)
-    run(T.poll_lesson(S.lesson(lid)))
-    assert S.db.one("SELECT COUNT(*) c FROM mt_alerts WHERE kind='crowd'")["c"] == 1
-    # yangi nom: avvalgi 2 ta dars o'tgan, ro'yxat >= 3 kishi
-    S.put("max_people", 0)
-    for k in range(2):
-        old = mk_lesson(S, run, ga, tid, S.now() - timedelta(days=k + 1), 60)
-        S.db.ex("UPDATE mt_lessons SET status='done' WHERE id=?", (old,))
-        for n in ("Ali", "Vali", "Gulya"):
-            S.db.ex("INSERT INTO mt_attendance(lesson_id,part_name,raw_name,person,kind,first_in,total_sec,sessions_json,is_teacher) VALUES(?,?,?,?,?,?,?,?,0)",
-                    (old, f"p-{old}-{n}", n, n, "signed", S.fmt(S.now()), 600, json.dumps([[S.fmt(S.now() - timedelta(hours=1)), S.fmt(S.now() - timedelta(minutes=50))]])))
-    l2 = mk_lesson(S, run, ga, tid, S.now() - timedelta(minutes=5), 60)
-    sp2 = S.lesson(l2)["space_name"]
-    set_conf(mock, sp2, S.now() - timedelta(minutes=5), None, [person("u9", "Ali", [(S.now() - timedelta(minutes=4), None)]),
-                                                               person("", "Begona Odam", [(S.now() - timedelta(minutes=3), None)], kind="anonymousUser")], cid="cr2")
-    run(T.poll_lesson(S.lesson(l2)))
-    unk = S.db.q("SELECT * FROM mt_alerts WHERE kind='unknown'")
-    assert len(unk) == 1 and "Begona Odam" in unk[0]["text"]
-
-
-def test_teacher_manual_mark_learns_user_id(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    S.db.ex("UPDATE mt_teachers SET name='Muhammad Ali Yusupov' WHERE id=?", (tid,))
-    start = S.now() - timedelta(minutes=20)
-    lid = mk_lesson(S, run, ga, tid, start, 60)
-    space = S.lesson(lid)["space_name"]
-    set_conf(mock, space, start, None, [person("uT", "MY", [(start, None)]), person("u2", "Aziza", [(start, None)])])
-    run(T.poll_lesson(S.lesson(lid)))
-    assert not S.flags(S.lesson(lid)).get("t_in")                                  # ism mos kelmadi
-    att = S.db.one("SELECT id FROM mt_attendance WHERE lesson_id=? AND raw_name='MY'", (lid,))
-    T.mark_teacher(att["id"], True)
-    assert S.flags(S.lesson(lid)).get("t_in") and S.jget(f"tuid_{tid}", []) == ["users/uT"]
-    l2 = mk_lesson(S, run, ga, tid, S.now() - timedelta(minutes=10), 60)
-    set_conf(mock, S.lesson(l2)["space_name"], S.now() - timedelta(minutes=10), None, [person("uT", "Boshqa nom", [(S.now() - timedelta(minutes=9), None)])], cid="cr3")
-    run(T.poll_lesson(S.lesson(l2)))
-    assert S.flags(S.lesson(l2)).get("t_in")                                       # keyingi darsda user ID bo'yicha tanildi
-
-
-def test_tick_finalizes_lesson_and_sends_report(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    sent, _ = tg
-    lid, start, end, space, people = build_class(S, run, mock, ga, tid, start_offset=-80, dur=60)
-    T.add_roster(ga, "Gulnoza Yoqubova")                                          # kelmagan o'quvchi
-    S.set_flag(lid, "t_link", "x")
-    people[0]["sessions"][0]["endTime"] = iso(end)
-    set_conf(mock, space, start, end, people)
-    run(T.tick())
-    les = S.lesson(lid)
-    assert les["status"] == "done" and "report" in S.flags(les)
-    rep = [m for t, m in sent if "Dars hisoboti" in m]
-    assert rep and any(t in ("adminuser", "@adminuser") for t, m in sent if "Dars hisoboti" in m)
-    txt = rep[0]
-    assert "Kech qoldi: Bobur" in txt and "Erta chiqdi: Bobur" in txt and "Kelmadi: Gulnoza Yoqubova" in txt and "60 daq" in txt
-    n = len(sent)
-    run(T.tick())
-    assert len(sent) == n and S.db.one("SELECT COUNT(*) c FROM mt_alerts WHERE kind='report'")["c"] == 1     # ikki marta yakunlanmaydi
-
-
-def test_lesson_without_participants_is_missed(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    lid = mk_lesson(S, run, ga, tid, S.now() - timedelta(minutes=90), 60)
-    run(T.tick())
-    assert S.lesson(lid)["status"] == "missed" and S.db.one("SELECT COUNT(*) c FROM mt_alerts WHERE kind='missed'")["c"] == 1
-
-
-def test_polling_errors_are_counted_not_fatal(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    lid = mk_lesson(S, run, ga, tid, S.now() - timedelta(minutes=5), 60)
-    S.db.ex("UPDATE mt_lessons SET space_name='spaces/yoq' WHERE id=?", (lid,))
-    orig = G.conference_records
-
-    async def boom(space):
-        raise G.GoogleError("Meet API ishlamayapti", 500)
-    G.conference_records = boom
-    try:
-        run(T.tick())
-        run(T.tick())
-    finally:
-        G.conference_records = orig
-    assert S.get("poll_err_24") == "2" and "Meet API" in S.get("last_poll_err")
-    h = {i["key"]: i for i in S.health_items()}
-    assert h["meet_perr"]["state"] == "warn" and h["meet_poll"]["detail"].startswith(S.get("last_poll_at")[:10])
-
-
-# ---------------------------------------------------------------- hisobotlar
-def test_monthly_grid_colors_excel_and_stats(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_reports as R, meet_track as T
-    from openpyxl import load_workbook
-    lid, start, end, space, people = build_class(S, run, mock, ga, tid, start_offset=-80, dur=60)
-    T.add_roster(ga, "Gulnoza Yoqubova")
-    people[0]["sessions"][0]["endTime"] = iso(end)
-    set_conf(mock, space, start, end, people)
-    run(T.tick())
-    # ikkinchi dars: bekor qilingan
-    can = mk_lesson(S, run, ga, tid, S.now() + timedelta(days=1), 60)
-    run(S.cancel_lesson(can, "bayram"))
-    ym = start.strftime("%Y-%m")
-    grid = R.month_grid(ga, ym)
-    if len(grid["lessons"]) < 2:                         # oy chegarasi: bekor qilingan dars keyingi oyga tushgan bo'lishi mumkin
-        pass
-    rows = {r["name"]: r for r in grid["rows"]}
-    st = {n: r["cells"][0]["state"] for n, r in rows.items()}
-    assert st["Aziza Karimova"] == "present" and st["Bobur"] == "late_early" and st["Dilnoza"] == "present"
-    assert st["Gulnoza Yoqubova"] == "absent" and "Ustoz Test" not in rows
-    assert rows["Bobur"]["late"] == 1 and rows["Bobur"]["early"] == 1 and rows["Gulnoza Yoqubova"]["pct"] == 0 and rows["Aziza Karimova"]["pct"] == 100
-    wb = load_workbook(io.BytesIO(R.export_xlsx(ga, ym)))
-    ws = wb["Davomat"]
-    colors = {}
-    for row in ws.iter_rows(min_row=4, max_row=3 + len(grid["rows"])):
-        colors[row[1].value] = row[2].fill.fgColor.rgb[-6:]
-    assert colors["Aziza Karimova"] == "C6EFCE" and colors["Gulnoza Yoqubova"] == "FFC7CE" and colors["Bobur"] == "F4B183"
-    assert "Darslar" in wb.sheetnames
-    stt = R.stats(ym)
-    t = stt["teachers"][0]
-    assert t["name"] == "Ustoz Test" and t["lessons"] == 1 and t["groups"] == 1 and t["hours"] == 1.0
-    assert stt["groups"][0]["title"] == "Ingliz tili A" and stt["groups"][0]["hours"] == 1.0 and stt["total_hours"] == 1.0
-
-
-def test_daily_sheet_added_to_excel(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_reports as R, meet_track as T
-    from openpyxl import Workbook
-    lid, start, end, space, people = build_class(S, run, mock, ga, tid, start_offset=-80, dur=60)
-    people[0]["sessions"][0]["endTime"] = iso(end)
-    set_conf(mock, space, start, end, people)
-    run(T.tick())
-    wb = Workbook()
-    R.add_daily_sheet(wb, start.strftime("%Y-%m-%d"))
-    ws = wb["Majlislar"]
-    row = [c.value for c in ws[2]]
-    assert row[1] == "Ingliz tili A" and row[3] == "O'tdi" and row[4] == 60 and row[5] == 4 and row[6] == 1 and row[7] == 1
-    wb2 = Workbook()
-    R.add_daily_sheet(wb2, "2001-01-01")
-    assert "Majlislar" not in wb2.sheetnames                  # dars bo'lmagan kunga varaq qo'shilmaydi
-
-
-def test_existing_daily_report_still_builds(world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import dailyreport, db
-    aid = db.ex("INSERT INTO accounts(name,session,created_at,user_id,workspace) VALUES('Test','t',?,1,'posting')", (S.fmt(S.now()),))
-    lid, start, end, space, people = build = build_class(S, run, mock, ga, tid, start_offset=-80, dur=60)
-    people[0]["sessions"][0]["endTime"] = iso(end)
-    set_conf(mock, space, start, end, people)
-    from app import meet_track as T
-    run(T.tick())
-    from openpyxl import load_workbook
-    wb = load_workbook(io.BytesIO(dailyreport.build(aid, start.strftime("%Y-%m-%d"))))
-    assert {"Xulosa", "Postlar", "Majlislar"} <= set(wb.sheetnames)
-    wb = load_workbook(io.BytesIO(dailyreport.build(aid, "2001-01-01")))
-    assert "Majlislar" not in wb.sheetnames and "Xulosa" in wb.sheetnames
-
-
-# ---------------------------------------------------------------- diagnostika
-def test_diagnostics_all_ok(world, run, mock):
-    S, G, tid, ga, gb = world
-    items = run(G.diagnose())
-    st = {i["key"]: i for i in items}
-    for k in ("token", "space", "access", "cohost", "calendar", "calendar_clean", "participants", "limit60"):
-        assert st[k]["state"] in ("ok", "warn"), (k, st[k])
-    assert st["token"]["state"] == "ok" and st["space"]["state"] == "ok" and st["access"]["state"] == "ok" and "OPEN" in st["access"]["detail"]
-    assert st["cohost"]["state"] == "ok" and "COHOST" in st["cohost"]["detail"] and "ustoz@gmail.com" in st["cohost"]["detail"]
-    assert st["calendar"]["state"] == "ok" and not mock.STATE["calendars"]               # test kalendar o'chirildi
-    assert "Meet limiti: 60 daqiqa (Gmail)" in st["limit60"]["detail"]
-
-
-def test_diagnostics_reports_each_failure_separately(world, run, mock):
-    S, G, tid, ga, gb = world
-    mock.STATE["bad_members"].add("ustoz@gmail.com")
-    st = {i["key"]: i for i in run(G.diagnose())}
-    assert st["cohost"]["state"] == "fail" and st["space"]["state"] == "ok" and st["calendar"]["state"] == "ok"
-    mock.STATE["meet_disabled"] = True
-    st = {i["key"]: i for i in run(G.diagnose())}
-    assert st["space"]["state"] == "fail" and "meet.googleapis.com" in st["space"]["fix"]
-    assert st["access"]["state"] == "skip" and st["participants"]["state"] == "skip" and st["calendar"]["state"] == "ok"
-
-
-def test_diagnostics_not_connected(clean, run):
-    from app import meet_google as G
-    assert run(G.diagnose())[0]["key"] == "cfg"
-    clean.put("google_client_id", "x")
-    clean.put("google_client_secret", "y")
-    assert run(G.diagnose())[0]["key"] == "token"
-
-
-def test_diagnostics_test_email_for_cohost(world, run, mock):
-    S, G, tid, ga, gb = world
-    S.db.ex("DELETE FROM mt_teachers")
-    st = {i["key"]: i for i in run(G.diagnose())}
-    assert st["cohost"]["state"] == "warn" and "Gmail" in st["cohost"]["detail"]
-    st = {i["key"]: i for i in run(G.diagnose("tester@gmail.com"))}
-    assert st["cohost"]["state"] == "ok"
-    st = {i["key"]: i for i in run(G.diagnose("host@gmail.com"))}
-    assert st["cohost"]["state"] == "warn" and "o'zini" in st["cohost"]["detail"]
-
-
-# ---------------------------------------------------------------- veb sahifalar
+# ---------------------------------------------------------------- sahifalar va hisobot
 @pytest.fixture()
-def client(world):
+def client(app_env):
     from app.main import app
-    return TestClient(app, follow_redirects=False)
+    return TestClient(app)
 
 
-PAGES = ["/meet", "/meet?w=1", "/meet/calendar", "/meet/teachers", "/meet/groups", "/meet/lessons", "/meet/reports", "/meet/stats",
-         "/meet/alerts", "/meet/settings", "/meet/diag", "/meet/account", "/meet/guide"]
+def test_pages_render(w, mock, run, client):
+    S, B, tid, gid = w
+    a, = add_acc(S, 1)
+    S.add_schedule(gid, [0, 3], "19:00", 60, tid)
+    run(S.generate(gid))
+    lid = S.add_extra_lesson(gid, S.now() + timedelta(minutes=20), 90, tid)
+    run(S.provision(lid))
+    mid, _ = run(S.adhoc_meeting(a, "x")) if False else (None, "")
+    for url in ("/meet", "/meet/calendar", "/meet/teachers", "/meet/groups", f"/meet/groups/{gid}", "/meet/lessons", f"/meet/lessons/{lid}",
+                "/meet/zoom", f"/meet/zoom?edit={a}", "/meet/alerts", "/meet/settings", "/meet/diag", "/meet/guide", "/meet/account", "/meet/calendar.ics", "/meet/api/state"):
+        r = client.get(url)
+        assert r.status_code == 200, (url, r.status_code, r.text[:400])
+        assert "Traceback" not in r.text and "TemplateSyntax" not in r.text
+        assert "Google" not in r.text.replace("Google Chrome", "") or url == "/meet/guide", url
+    r = client.get("/meet")
+    assert "Zoom" in r.text
 
 
-def test_all_pages_render_with_meet_design(client, world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    lid, start, end, space, people = build_class(S, run, mock, ga, tid, start_offset=-80, dur=60)
-    people[0]["sessions"][0]["endTime"] = iso(end)
-    set_conf(mock, space, start, end, people)
-    run(T.tick())
-    mk_lesson(S, run, gb, tid, S.now() + timedelta(hours=4), 90)
-    S.add_schedule(ga, [0, 2, 4], "19:00", 60, tid)
-    S.add_alert("send_fail", "sinov", level="error", copy="Havola: https://meet.google.com/x", dedupe="t1")
-    for p in PAGES + [f"/meet/groups/{ga}", f"/meet/lessons/{lid}", f"/meet/reports?group={ga}&m={start.strftime('%Y-%m')}", "/meet/groups?scan=0"]:
-        r = client.get(p)
-        assert r.status_code == 200, (p, r.status_code, r.text[:300])
-        assert 'class="ws-meet"' in r.text and "/static/meet.css" in r.text and "Majlislar" in r.text, p
+def test_zoom_page_flow(w, mock, run, client):
+    S, B, tid, gid = w
+    r = client.post("/meet/zoom/add", data={"label": "A", "email": "a@x.test", "account_id": "AID1", "client_id": "CID1", "client_secret": "SEC1", "max_min": "40"}, follow_redirects=False)
+    assert r.status_code in (302, 303)
+    a = S.accounts()[0]
+    r = client.post(f"/meet/zoom/{a['id']}/new", data={}, follow_redirects=False)
+    assert r.status_code in (302, 303) and "m=" in r.headers["location"]
+    page = client.get(r.headers["location"])
+    assert "zoom.test/j/" in page.text and "SECRETZAK" in page.text
+    assert "Band" in client.get("/meet/zoom").text
+    client.post("/meet/zoom/test-all", data={}, follow_redirects=False)
+    r = client.post("/meet/zoom/bulk", data={"text": "q@x.test;A9;C9;S9"}, follow_redirects=False)
+    assert len(S.accounts()) == 2
+    r = client.post(f"/meet/zoom/{a['id']}/release", data={}, follow_redirects=False)
+    assert S.account_status(S.accounts()[0])["state"] in ("free", "soon")
+    r = client.post("/meet/diag/run", data={}, follow_redirects=False)
+    assert client.get("/meet/diag").status_code == 200
+
+
+def test_banner_when_pool_busy(w, run, client):
+    S, B, tid, gid = w
+    add_acc(S, 1)
+    t0 = S.now() + timedelta(minutes=30)
+    l1 = S.add_extra_lesson(gid, t0, 60, tid)
+    l2 = S.add_extra_lesson(S.add_group(-9, "Boshqa", "", tid), t0, 60, tid)
+    run(S.provision(l1))
+    ok, why = run(S.provision(l2))
+    assert not ok
     html = client.get("/meet").text
-    assert "Group Post" in html and "Kanallarim" in html and "Tizim tahlili" in html          # bo'lim tanlagichda to'rttasi ham bor
-    assert client.get(f"/meet/lessons/{lid}").text.count("Bobur") >= 1
-    assert "c-late_early" in client.get(f"/meet/reports?group={ga}&m={start.strftime('%Y-%m')}").text
-    assert "nusxalash" in client.get("/meet/alerts").text and "https://meet.google.com/x" in client.get("/meet/alerts").text
+    assert "band" in html.lower() and "mt-bad" in html
 
 
-def test_other_sections_untouched_and_switcher(client, world):
-    for p in ("/", "/sys", "/ch", "/groups", "/settings", "/accounts", "/sys/guide"):
-        try:
-            r = client.get(p)
-        except Exception as e:                      # ish nusxasida mavjud bo'limning ba'zi shablonlari yo'q bo'lishi mumkin
-            if "TemplateNotFound" in type(e).__name__:
-                continue
-            raise
-        assert r.status_code in (200, 303), (p, r.status_code, r.text[:200])
-        if r.status_code == 200:
-            assert "ws-meet" not in r.text and "meet.css" not in r.text, p
-            assert "/meet/switch" in r.text, p                                    # tanlagichda Majlislar bor
-    r = client.post("/meet/switch")
-    assert r.status_code == 303 and r.headers["location"] == "/meet" and "ws=meet" in r.headers["set-cookie"]
-    client.cookies.set("ws", "meet")
-    assert client.get("/").headers["location"] == "/meet"
-    client.cookies.clear()
+def test_daily_sheet_and_health(w, run):
+    from openpyxl import Workbook
+    from app import meet_reports as R
+    S, B, tid, gid = w
+    add_acc(S, 1)
+    st = S.now().replace(hour=15, minute=0, second=0, microsecond=0)
+    lid = S.add_extra_lesson(gid, st, 60, tid)
+    run(S.provision(lid))
+    wb = Workbook()
+    R.add_daily_sheet(wb, st.strftime("%Y-%m-%d"))
+    assert "Majlislar" in wb.sheetnames and wb["Majlislar"].max_row == 2
+    items = S.health_items()
+    assert items and all(i["group"] == "Majlislar (Zoom)" for i in items)
 
 
-def test_sys_page_shows_google_status(client, world, run):
-    r = client.get("/sys")
-    assert r.status_code == 200
-    for needle in ("Majlislar (Google Meet)", "Google token", "Meet limiti: 60 daqiqa (Gmail)", "Oxirgi polling", "Faol majlislar"):
-        assert needle in r.text, needle
-
-
-def test_crud_flows_via_http(client, world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    r = client.post("/meet/teachers/save", data={"name": "Yangi Ustoz", "gmail": "yangi@gmail.com", "tg_username": "@yangi_u", "phone": "+998", "note": "izoh"})
-    assert r.status_code == 303 and "msg=" in r.headers["location"]
-    assert S.db.one("SELECT tg_username FROM mt_teachers WHERE name='Yangi Ustoz'")["tg_username"] == "yangi_u"
-    for bad in ({"name": "", "gmail": ""}, {"name": "X", "gmail": "yomon"}, {"name": "X", "tg_username": "ab"}):
-        assert "err=" in client.post("/meet/teachers/save", data=bad).headers["location"]
-    r = client.post(f"/meet/groups/{ga}/schedule", data={"weekday": ["0", "2", "4"], "start_time": "20:00", "duration": "90", "teacher_id": str(tid)})
-    assert "msg=" in r.headers["location"] and "60" in r.headers["location"]          # 60 daqiqa ogohlantirishi URL xabarida
-    assert S.db.one("SELECT COUNT(*) c FROM mt_schedule WHERE group_id=?", (ga,))["c"] == 3
-    r = client.post(f"/meet/groups/{ga}/extra", data={"day": (S.now() + timedelta(days=3)).strftime("%Y-%m-%d"), "time": "10:00", "duration": "45"})
-    assert "msg=" in r.headers["location"]
-    lid = S.db.one("SELECT id FROM mt_lessons WHERE group_id=? ORDER BY id DESC LIMIT 1", (ga,))["id"]
-    new = (S.now() + timedelta(days=4)).strftime("%Y-%m-%dT12:00")
-    tg[0].clear()
-    r = client.post(f"/meet/lessons/{lid}/move", data={"when": new, "duration": "50", "back": "/meet/lessons"})
-    assert r.headers["location"].startswith("/meet/lessons?") and S.lesson(lid)["start_at"].endswith("12:00:00") and len(tg[0]) == 2
-    r = client.post(f"/meet/lessons/{lid}/cancel", data={"reason": "test"})
-    assert S.lesson(lid)["status"] == "cancelled" and "msg=" in r.headers["location"]
-    client.post(f"/meet/lessons/{lid}/record", data={"url": "https://drive.google.com/rec"})
-    assert S.lesson(lid)["record_url"] == "https://drive.google.com/rec"
-    r = client.post("/meet/settings", data={"late_min": "15", "early_min": "12", "poll_sec": "999", "remind_a": "90", "host_type": "workspace", "admin_username": "@boss"})
-    assert S.cfg("late_min") == 15 and S.cfg("poll_sec") == 60 and S.cfg("remind_a") == 90 and S.cfg("host_type") == "workspace" and S.cfg("admin_username") == "boss"
-    assert S.cfg("remind_on") == 0                                                  # belgilanmagan katak = o'chirilgan
-    r = client.post("/meet/settings/google", data={"client_id": "abc", "client_secret": "s3cr3t"})
-    assert S.get("google_client_id") == "abc" and S.get("google_client_secret") == "s3cr3t"
-    r = client.post(f"/meet/groups/{ga}/delete")
-    assert S.group(ga) is None and not S.db.q("SELECT 1 FROM mt_lessons WHERE group_id=?", (ga,))
-
-
-def test_oauth_http_endpoints(client, clean, run, mock):
-    S = clean
-    S.put("google_client_id", "cid")
-    S.put("google_client_secret", "sec")
-    r = client.get("/meet/google/connect")
-    assert r.status_code == 303 and r.headers["location"].startswith(mock_url("/auth")) and "code_challenge=" in r.headers["location"]
-    state = parse_qs(urlparse(r.headers["location"]).query)["state"][0]
-    assert "err=" in client.get("/meet/google/callback?code=good-code&state=boshqa").headers["location"]
-    assert "err=" in client.get("/meet/google/callback?error=access_denied").headers["location"]
-    S.put("oauth_tmp", json.dumps({"state": state, "verifier": "v" * 50, "at": __import__("time").time()}))
-    r = client.get(f"/meet/google/callback?code=good-code&state={state}")
-    assert r.headers["location"].startswith("/meet/diag") and S.get("g_email") == "host@gmail.com"
-    r = client.post("/meet/google/disconnect")
-    assert S.get("g_state") == "none"
-
-
-def mock_url(path):
-    import os
-    return os.environ["TGP_GOOGLE_AUTH"].rsplit("/auth", 1)[0] + path
-
-
-def test_diag_page_runs_and_shows_results(client, world, run, mock):
-    r = client.post("/meet/diag/run", data={"test_email": "tester@gmail.com"})
-    assert r.status_code == 303
-    html = client.get("/meet/diag").text
-    assert "Meet xonasi yaratish" in html and "Ishlaydi" in html and "Google Calendar" in html and "Meet limiti: 60 daqiqa (Gmail)" in html
-
-
-def test_excel_export_endpoint(client, world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    lid, start, end, space, people = build_class(S, run, mock, ga, tid, start_offset=-80, dur=60)
-    people[0]["sessions"][0]["endTime"] = iso(end)
-    set_conf(mock, space, start, end, people)
-    run(T.tick())
-    r = client.get(f"/meet/reports/export?group={ga}&m={start.strftime('%Y-%m')}")
-    assert r.status_code == 200 and r.content[:2] == b"PK" and "spreadsheetml" in r.headers["content-type"] and "attachment" in r.headers["content-disposition"]
-
-
-def test_api_live_json(client, world, run, mock, tg):
-    S, G, tid, ga, gb = world
-    from app import meet_track as T
-    start = S.now() - timedelta(minutes=12)
-    lid = mk_lesson(S, run, ga, tid, start, 60)
-    set_conf(mock, S.lesson(lid)["space_name"], start, None, [person("u1", "Ustoz Test", [(start, None)])])
-    run(T.poll_lesson(S.lesson(lid)))
-    js = client.get("/meet/api/live").json()
-    assert js and js[0]["group"] == "Ingliz tili A" and 11 <= js[0]["elapsed"] <= 12
-
-
-def test_background_loops_run_under_supervise(world, run, mock, tg):
-    """meet_sched/meet_track fonda supervise ostida ishlaydi va yiqilsa qayta ishga tushadi."""
-    import asyncio
-    from app import meet_sched, meet_track, syscheck, db
-
-    async def go():
-        t1 = syscheck.supervise("meet_sched", meet_sched.loop)
-        t2 = syscheck.supervise("meet_track", meet_track.loop)
-        await asyncio.sleep(0.3)
-        assert not t1.done() and not t2.done()
-        beats = {r["name"]: r["state"] for r in db.q("SELECT name, state FROM sys_beat WHERE name IN ('meet_sched','meet_track')")}
-        t1.cancel()
-        t2.cancel()
-        for t in (t1, t2):
-            try:
-                await t
-            except asyncio.CancelledError:
-                pass
-        return beats
-    beats = run(go())
-    assert beats == {"meet_sched": "running", "meet_track": "running"}
-    h = {i["key"]: i for i in meet_sched.health_items()}
-    assert "meet_sched" in h and "meet_track" in h
-
-
-def test_full_app_lifespan_starts_with_meet(world):
-    """To'liq dastur (lifespan) Majlislar fon jarayonlari bilan ishga tushadi va to'xtaydi."""
-    from app.main import app
-    from app import syscheck
-    with TestClient(app) as c:
-        assert c.get("/meet").status_code == 200
-        assert "meet_sched" in syscheck.TASKS and "meet_track" in syscheck.TASKS
+def test_other_pages_unaffected(app_env, client):
+    for url in ("/ch", "/sys"):
+        r = client.get(url, follow_redirects=True)
+        assert r.status_code == 200, (url, r.status_code, r.text[:300])

@@ -105,6 +105,10 @@ TABLES = [
 ]
 
 
+from . import schema_ig  # noqa: E402  (Instagram jadvallari shu ro'yxatga qo'shiladi)
+TABLES += schema_ig.TABLES
+
+
 def _to_sqlite(stmt: str):
     """MySQL DDL -> SQLite DDL. (CREATE TABLE, [CREATE INDEX ...]) qaytaradi."""
     s = stmt.replace(T, "")
@@ -146,7 +150,7 @@ EXTRA = [("ch_channels", c, d) for c, d in (
 
 TABLE_NAMES = ["ch_types", "ch_channels", "ch_competitors", "ch_posts", "ch_members_log", "ch_plan", "ch_ideas",
                "ch_memory", "ch_usage", "ch_prices", "ch_log", "ch_links", "ch_clicks", "ch_daily", "ch_official", "ch_audience",
-               "ch_alerts", "ch_ab", "ch_comments", "ch_month", "ch_reports", "ch_images", "sys_events", "sys_beat"]
+               "ch_alerts", "ch_ab", "ch_comments", "ch_month", "ch_reports", "ch_images", "sys_events", "sys_beat"] + schema_ig.TABLE_NAMES
 
 # ---------------------------------------------------------------- kanal turlari (presetlar)
 TYPES = [

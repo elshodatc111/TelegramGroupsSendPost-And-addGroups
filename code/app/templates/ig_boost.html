@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block title %}Reklama (target){% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Reklama (target) tavsiyasi: @{{ a.username }}</h1><p class="sub">Qaysi postga pullik reklama (Boost) yoqish foydali ekanini ko'rsatadi. Reklamani Instagram ilovasining o'zida qo'lda yoqasiz: bu platforma reklama yurgizmaydi.</p></div>
+  <div class="actions"><form method="post" action="/ig/boost/run" data-busy="AI tavsiya tayyorlamoqda..." style="margin:0"><button class="btn" {{ '' if ai_ok and a.niche and cands else 'disabled' }}>{{ ic('target') }} AI tavsiya olish</button></form></div></div>
+<div class="note info">{{ ic('alert') }}<div><b>Qanday yoqiladi:</b> Instagram ilovasi → o'sha postni oching → «Boost post» (Reklamani boshlash) → maqsad, auditoriya, byudjet va muddatni shu yerdagi tavsiyaga qarab kiriting. Meta reklama hisobi/to'lov kartasi kerak bo'lishi mumkin.</div></div>
+<div class="card"><div class="card-h"><h2>Nomzod postlar (AI'siz hisob)</h2></div>
+{% if cands %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Post</th><th>Format</th><th>Yoshi</th><th>Qamrov</th><th>ER</th><th>Saqlash</th><th>Ulashish</th><th>Baho</th></tr></thead><tbody>
+{% for c in cands %}<tr><td style="max-width:320px">{% if c.permalink %}<a href="{{ c.permalink }}" target="_blank" rel="noopener">{{ c.caption or '(tavsifsiz)' }}</a>{% else %}{{ c.caption }}{% endif %}</td><td>{{ c.fmt }}</td><td>{{ c.age }} kun</td><td>{{ c.reach|num }}{% if c.underreached %} <span class="badge b-good" title="O'rtachadan kam qamrov, lekin sifati baland">potensial</span>{% endif %}</td><td>{{ c.er }}%</td><td>{{ c.saved }}</td><td>{{ c.shares }}</td><td><b>{{ c.score }}</b></td></tr>{% endfor %}</tbody></table></div>
+<div class="hint">Baho = (saqlash×3 + ulashish×4 + izoh×2 + like) / qamrov. Organik ko'rsatkichi kuchli postlar reklamada ham yaxshi ishlaydi.</div>
+{% else %}<div class="empty">Hali yetarli ma'lumot yo'q: kamida bir nechta post va ularning qamrovi kerak. Statistika sahifasida «Yangilash» ni bosing.</div>{% endif %}</div>
+{% if rep %}<div class="card"><div class="card-h"><h2>AI tavsiyasi</h2><span class="hint">{{ rep_at[:16] }}</span></div><p>{{ rep.summary }}</p>
+{% for p in rep.picks %}{% set c = (cands|selectattr('id', 'equalto', p.media_id)|list|first) %}<div class="sg"><h3 style="margin:0 0 6px">{{ c.caption if c else ('Post #' ~ p.media_id) }}</h3>
+<div class="small"><b>Nega:</b> {{ p.why }}</div><div class="small"><b>Reklama maqsadi:</b> {{ p.objective }}</div><div class="small"><b>Auditoriya:</b> {{ p.audience }}</div>
+<div class="small"><b>Byudjet:</b> kuniga ~${{ p.budget_usd_per_day }}, {{ p.days }} kun</div><div class="small"><b>Nimani kuzatish:</b> {{ p.watch }}</div>{% if p.creative_note %}<div class="small"><b>Boostdan oldin:</b> {{ p.creative_note }}</div>{% endif %}
+{% if c and c.permalink %}<a class="btn sm sec" href="{{ c.permalink }}" target="_blank" rel="noopener" style="margin-top:6px">Postni ochish</a>{% endif %}</div>{% endfor %}
+{% if rep.skip %}<p class="small mut">{{ rep.skip }}</p>{% endif %}{% for c in rep.cautions %}<div class="note" style="margin:6px 0"><div>{{ c }}</div></div>{% endfor %}</div>{% endif %}
+{% endblock %}

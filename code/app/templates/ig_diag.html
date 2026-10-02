@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}Diagnostika{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Instagram diagnostikasi: @{{ a.username }}</h1><p class="sub">Token, ruxsatlar, statistika, joylash imkoniyati va (xohlasangiz) tunnel sinovi.</p></div></div>
+<div class="card"><form method="post" action="/ig/diag/run" data-busy="Tekshirilmoqda..." class="actions"><button class="btn">{{ ic('shield') }} Tekshirish</button>
+<label class="small"><input type="checkbox" name="tunnel" value="1" style="width:auto"> Tunnel sinovi (cloudflared ochib, 1 daqiqa)</label></form></div>
+{% if items %}<div class="card"><div class="card-h"><h2>Natija</h2></div>
+{% for i in items %}<div style="display:grid;grid-template-columns:70px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--bd)">
+<span class="badge {{ 'b-good' if i.state == 'ok' else 'b-bad' if i.state == 'fail' else '' }}" style="height:fit-content">{{ {'ok':'OK','fail':'XATO','warn':'DIQQAT','info':'INFO'}[i.state] }}</span>
+<div><b>{{ i.title }}</b><div class="small">{{ i.detail }}</div>{% if i.fix %}<div class="small mut">→ {{ i.fix }}</div>{% endif %}</div></div>{% endfor %}</div>{% endif %}
+{% endblock %}

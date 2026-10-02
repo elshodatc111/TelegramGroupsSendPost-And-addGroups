@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block title %}Bosh sahifa{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Instagram sahifalar</h1><p class="sub">Barcha ulangan sahifalar bir joyda. Joylash rejimi: <b>{{ 'Avto (cloudflared)' if mode == 'auto' else 'Eslatma (qo\'lda joylash)' }}</b>.</p></div>
+  <div class="actions"><a class="btn sm sec" href="/ig/accounts">{{ ic('plus') }} Sahifa qo'shish</a></div></div>
+{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div>AI uchun <a href="/ch/settings"><b>Kanallarim → Sozlamalar</b></a> da OpenAI kalitini kiriting (barcha bo'limlar uchun umumiy).</div></div>{% endif %}
+{% if due %}<div class="card" style="border-color:var(--pri)"><div class="card-h"><h2>{{ ic('clock') }} Hozir joylash vaqti ({{ due|length }})</h2></div>
+{% for p in due %}<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--bd)"><div><b>@{{ p.username }}</b> · {{ p.title }} <span class="hint">{{ p.scheduled_at[:16] }}</span></div>
+<form method="post" action="/ig/select" style="margin:0"><input type="hidden" name="id" value="{{ p.account_id }}"><input type="hidden" name="next" value="/ig/plan"><button class="btn sm">Ochish</button></form></div>{% endfor %}</div>{% endif %}
+<div class="grid g2">
+{% for r in rows %}{% set a = r.a %}<div class="card ig-card" style="margin:0">
+  <div style="display:flex;gap:12px;align-items:center"><span class="ava ig" style="width:46px;height:46px;font-size:18px">{{ a.username[:1]|upper }}</span>
+    <div style="min-width:0;flex:1"><h3 style="margin:0">@{{ a.username }}</h3><div class="hint">{{ a.name or '' }} · {{ a.account_type }}</div></div>
+    {% if a.status != 'active' %}<span class="badge b-bad">{{ 'Token xato' if a.status == 'token' else 'Xato' }}</span>{% elif r.days is not none and r.days <= 10 %}<span class="badge b-bad">Token: {{ r.days }} kun</span>{% else %}<span class="badge b-good">Faol</span>{% endif %}</div>
+  <div class="ch-kv"><div><b>{{ a.followers|num }}</b><span>Obunachi</span></div><div><b>{{ r.s.growth if r.s.growth is not none else '—' }}</b><span>30 kunda o'zgarish</span></div><div><b>{{ r.s.avg_reach|num }}</b><span>O'rtacha qamrov</span></div></div>
+  {% if r.gp %}<div><div class="hint">Maqsad: {{ r.gp.target|num }} obunachi · {{ r.gp.pct }}%{% if r.gp.left_days is not none %} · {{ r.gp.left_days }} kun qoldi{% endif %}</div><div class="ig-prog"><i style="width:{{ r.gp.pct }}%"></i></div></div>
+  {% else %}<div class="hint">Maqsad qo'yilmagan: <a href="/ig/profile">Profil va maqsad</a></div>{% endif %}
+  <div class="hint">Kutayotgan postlar: <b>{{ r.queued }}</b>{% if r.next %} · keyingisi {{ r.next.scheduled_at[:16] }}{% endif %}</div>
+  {% if a.last_error %}<div class="red small">{{ a.last_error[:160] }}</div>{% endif %}
+  <form method="post" action="/ig/select" class="actions"><input type="hidden" name="id" value="{{ a.id }}"><button class="btn sm" name="next" value="/ig/stats">Statistika</button><button class="btn sm sec" name="next" value="/ig/plan">Reja</button><button class="btn sm sec" name="next" value="/ig/ideas">G'oya</button></form>
+</div>{% endfor %}</div>
+{% endblock %}

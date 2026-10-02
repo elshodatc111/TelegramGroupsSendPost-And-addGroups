@@ -68,6 +68,8 @@ _ICONS = {
     "trending": '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
     "cpu": '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>',
     "film": '<rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/>',
+    "camera": '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+    "target": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
     "link": '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
 }
 ICONS = {k: Markup(v) for k, v in _ICONS.items()}
@@ -175,8 +177,17 @@ def page(request: Request, name: str, status_code: int = 200, **ctx):
                auth_on=bool(db.get_setting("password_hash")), user=user, ws=ws,
                ch_list=getattr(request.state, "channels", []), cur_ch=cur_channel(request),
                ch_all=getattr(request.state, "ch_all", False), ch_acc=getattr(request.state, "ch_account", None),
-               alerts_unseen=_unseen() if ws == "channels" else 0)
+               alerts_unseen=_unseen() if ws == "channels" else 0,
+               ig_list=getattr(request.state, "igs", []), cur_ig=getattr(request.state, "ig", None),
+               ig_due=_ig_due() if ws == "instagram" else 0)
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)
+
+
+def _ig_due() -> int:
+    try:
+        return db.one("SELECT COUNT(*) c FROM ig_plan WHERE status='reminded'")["c"]
+    except Exception:
+        return 0
 
 
 def _unseen() -> int:

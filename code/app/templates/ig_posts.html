@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Postlar natijasi{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Postlar natijasi: @{{ a.username }}</h1><p class="sub">Har bir post uchun qamrov, saqlash, ulashish va jalb qilish (ER = jalb qilish / qamrov).</p></div>
+<div class="actions">{% for k, l in (('ts','Yangilari'),('reach','Qamrov'),('er','ER'),('saved','Saqlash'),('shares','Ulashish'),('comments','Izoh')) %}<a class="chip {{ 'on' if k == o }}" href="?o={{ k }}">{{ l }}</a>{% endfor %}</div></div>
+<div class="card">{% if ms %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Sana</th><th>Post</th><th>Format</th><th>Qamrov</th><th>Ko'rish</th><th>Like</th><th>Izoh</th><th>Saqlash</th><th>Ulashish</th><th>ER</th></tr></thead><tbody>
+{% for m in ms %}<tr><td>{{ m.ts[:10] if m.ts else '' }}</td><td style="max-width:360px">{% if m.permalink %}<a href="{{ m.permalink }}" target="_blank" rel="noopener">{{ (m.caption or '(tavsifsiz)')[:90] }}</a>{% else %}{{ (m.caption or '')[:90] }}{% endif %}</td>
+<td>{{ m.fmt }}</td><td>{{ m.reach|num }}</td><td>{{ m.views|num }}</td><td>{{ m.likes|num }}</td><td>{{ m.comments|num }}</td><td>{{ m.saved|num }}</td><td>{{ m.shares|num }}</td><td><b>{{ m.er }}%</b></td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Hali post yo'q. Statistika sahifasida «Yangilash» ni bosing.</div>{% endif %}</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% block title %}Statistika{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Statistika: @{{ a.username }}</h1><p class="sub">Instagram'ning rasmiy ma'lumoti. Yangi ko'rsatkichlar 48 soatgacha kechikishi mumkin; obunachi soni dastur ishlagan kunlardan saqlanib boradi.</p></div>
+  <div class="actions">{% for k in (7, 14, 30, 60, 90) %}<a class="chip {{ 'on' if k == days }}" href="?d={{ k }}">{{ k }} kun</a>{% endfor %}
+  <form method="post" action="/ig/sync" style="margin:0"><input type="hidden" name="next" value="/ig/stats"><button class="btn sm">{{ ic('refresh') }} Yangilash</button></form></div></div>
+{% if a.last_error %}<div class="note red">{{ ic('alert') }}<div>{{ a.last_error[:240] }} — <a href="/ig/diag">Diagnostika</a></div></div>{% endif %}
+<div class="grid g4">
+  <div class="stat blue"><div class="k">Obunachilar</div><div class="v">{{ a.followers|num }}</div></div>
+  <div class="stat {{ 'ok' if s.growth and s.growth > 0 else 'pri' }}"><div class="k">{{ days }} kunda o'zgarish</div><div class="v">{{ ('+' if s.growth and s.growth > 0 else '') ~ s.growth if s.growth is not none else '—' }}</div></div>
+  <div class="stat"><div class="k">Qamrov ({{ days }} kun)</div><div class="v">{{ s.reach_total|num }}</div></div>
+  <div class="stat"><div class="k">Postlar · o'rtacha qamrov · ER</div><div class="v" style="font-size:20px">{{ s.posts }} · {{ s.avg_reach|num }} · {{ s.er }}%</div></div></div>
+{% if gp %}<div class="card" style="margin-top:14px"><div class="card-h"><h2>Maqsad: {{ gp.target|num }} obunachi</h2><span class="badge">{{ gp.pct }}%</span></div><div class="ig-prog"><i style="width:{{ gp.pct }}%"></i></div>
+<div class="hint">Hozir {{ gp.current|num }}{% if gp.left_days is not none %} · {{ gp.left_days }} kun qoldi{% endif %}{% if gp.need_per_day %} · maqsadga yetish uchun kuniga +{{ gp.need_per_day }}{% endif %}</div></div>{% endif %}
+<div class="grid g2" style="margin-top:14px">
+<div class="card" style="margin:0"><div class="card-h"><h2>Obunachilar soni</h2></div>{{ g_fol }}</div>
+<div class="card" style="margin:0"><div class="card-h"><h2>Kunlik sof o'sish</h2></div>{{ g_net }}</div>
+<div class="card" style="margin:0"><div class="card-h"><h2>Kunlik qamrov</h2></div>{{ g_reach }}</div>
+<div class="card" style="margin:0"><div class="card-h"><h2>Kunlik jalb qilish (like, izoh, saqlash...)</h2></div>{{ g_int }}</div></div>
+<div class="grid g2" style="margin-top:14px">
+<div class="card" style="margin:0"><div class="card-h"><h2>Qaysi format yaxshi (60 kun)</h2></div>
+{% if fm %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Format</th><th>Post</th><th>O'rtacha qamrov</th><th>ER</th><th>Saqlash</th><th>Ulashish</th></tr></thead><tbody>{% for f in fm %}<tr><td><b>{{ f.label }}</b></td><td>{{ f.n }}</td><td>{{ f.reach|num }}</td><td>{{ f.er }}%</td><td>{{ f.saves }}</td><td>{{ f.shares }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty small">Hali ma'lumot yo'q</div>{% endif %}</div>
+<div class="card" style="margin:0"><div class="card-h"><h2>Eng yaxshi vaqt (postlar qamrovi bo'yicha)</h2></div>
+{% if hs %}<div class="hm"><span></span>{% for h in range(6, 24) %}<span>{{ h }}</span>{% endfor %}</div>{% for name, vals in hs.rows %}<div class="hm" style="margin-top:2px"><span>{{ name }}</span>{% for v in vals %}<i style="opacity:{{ 0.08 + v * 0.92 }}" title="{{ name }} {{ 6 + loop.index0 }}:00"></i>{% endfor %}</div>{% endfor %}
+<div class="hint">To'qroq = shu vaqtda chiqqan postlar ko'proq qamrov olgan.</div>{% else %}<div class="empty small">Postlar ko'paygach ko'rinadi</div>{% endif %}</div></div>
+<div class="card" style="margin-top:14px"><div class="card-h"><h2>Auditoriya</h2></div>
+{% if demo %}<div class="grid g2">{% for kind, label in (('age','Yosh'),('gender','Jins'),('city','Shahar'),('country','Mamlakat')) %}{% if demo.get(kind) %}<div><h3 style="font-size:14px">{{ label }}</h3>{% set tot = demo[kind]|sum(attribute='v') or 1 %}{% for x in demo[kind][:8] %}<div class="dbar"><span>{{ x.k }}</span><i><b style="width:{{ (x.v / tot * 100)|round(1) }}%"></b></i><span class="mut">{{ (x.v / tot * 100)|round|int }}%</span></div>{% endfor %}</div>{% endif %}{% endfor %}</div>
+{% else %}<div class="empty small">{% if (a.followers or 0) < 100 %}Instagram auditoriya ma'lumotini 100 va undan ko'p obunachida beradi (hozir {{ a.followers or 0 }}).{% else %}Hali yig'ilmagan: «Yangilash» ni bosing.{% endif %}</div>{% endif %}
+<div class="hint">Faqat umumiy taqsimot (yosh/jins/shahar); alohida foydalanuvchilar ro'yxati yig'ilmaydi.</div></div>
+<div class="card"><div class="card-h"><h2>Oylar kesimida</h2></div>
+{% if m %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Oy</th><th>Obunachi</th><th>O'sish</th><th>Qamrov</th><th>Ko'rishlar</th><th>Jalb qilish</th></tr></thead><tbody>{% for x in m %}<tr><td><b>{{ x.month }}</b></td><td>{{ x.followers|num if x.followers is not none else '—' }}</td><td>{{ x.net if x.net is not none else '—' }}</td><td>{{ x.reach|num }}</td><td>{{ x.views|num }}</td><td>{{ x.inter|num }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty small">Har kun saqlanib boradi</div>{% endif %}</div>
+<div class="card"><div class="card-h"><h2>Kunlar kesimida</h2></div><div class="tbl-wrap"><table class="aj-tbl mini-tbl"><thead><tr><th>Sana</th><th>Obunachi</th><th>O'sish</th><th>Qamrov</th><th>Ko'rishlar</th><th>Jalb qilish</th><th>Profil ko'rish</th></tr></thead><tbody>
+{% for x in d %}<tr><td>{{ x.day }}</td><td>{{ x.followers|num if x.followers is not none else '—' }}</td><td>{{ x.net if x.net is not none else '—' }}</td><td>{{ x.reach|num if x.reach is not none else '—' }}</td><td>{{ x.views|num if x.views is not none else '—' }}</td><td>{{ x.interactions|num if x.interactions is not none else '—' }}</td><td>{{ x.profile_views|num if x.profile_views is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

@@ -60,7 +60,10 @@ def calc_cost(model: str, tin: int, tout: int, cached: int = 0, audio_sec: float
 def record_usage(channel_id, purpose, model, tin=0, tout=0, cached=0, audio_sec=0.0, ok=True, note=""):
     cost, priced = calc_cost(model, tin, tout, cached, audio_sec)
     title = None
-    if channel_id:
+    if channel_id and channel_id < 0:                  # manfiy id = Instagram akkaunti (-ig_accounts.id)
+        r = db.one("SELECT username FROM ig_accounts WHERE id=?", (-channel_id,))
+        title = ("IG @" + r["username"]) if r and r["username"] else "Instagram"
+    elif channel_id:
         r = db.one("SELECT title FROM ch_channels WHERE id=?", (channel_id,))
         title = r["title"] if r else None
     now = datetime.now()

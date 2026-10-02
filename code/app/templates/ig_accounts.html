@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}Sahifalar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Instagram sahifalar</h1><p class="sub">Har bir sahifa alohida ishlaydi (statistika, maqsad, reja, AI). Istalgancha qo'shish va o'chirish mumkin.</p></div>
+  <div class="actions"><a class="btn sm sec" href="/ig/guide">Qanday ulanadi?</a></div></div>
+<div class="card"><div class="card-h"><h2>Ulangan sahifalar</h2></div>
+{% if accs %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Sahifa</th><th>Turi</th><th>Obunachi</th><th>Token</th><th>Oxirgi yig'ish</th><th></th></tr></thead><tbody>
+{% for a in accs %}{% set d = days(a) %}<tr><td><b>@{{ a.username }}</b><div class="hint">{{ a.name or '' }}</div>{% if a.last_error %}<div class="red small">{{ a.last_error[:140] }}</div>{% endif %}</td>
+<td>{{ a.account_type }}</td><td>{{ a.followers|num }}</td>
+<td>{% if a.status == 'token' %}<span class="badge b-bad">Yaroqsiz</span>{% elif d is none %}<span class="badge">Noma'lum</span>{% elif d <= 10 %}<span class="badge b-bad">{{ d }} kun</span>{% else %}<span class="badge b-good">{{ d }} kun</span>{% endif %}</td>
+<td>{{ a.synced_at[:16] if a.synced_at else '—' }}</td>
+<td><div class="actions" style="justify-content:flex-end"><form method="post" action="/ig/accounts/{{ a.id }}/refresh-token"><button class="btn sm sec">Tokenni yangilash</button></form>
+<details><summary class="btn sm sec" style="list-style:none;cursor:pointer">{{ ic('trash') }} O'chirish</summary>
+<form method="post" action="/ig/accounts/{{ a.id }}/delete" style="margin-top:8px"><div class="hint">Barcha ma'lumoti (reja, statistika, AI natijalar, fayllar) o'chadi. Tasdiqlash uchun @{{ a.username }} yozing:</div><input type="text" name="confirm" placeholder="{{ a.username }}" required><button class="btn sm" style="margin-top:6px">O'chirishni tasdiqlash</button></form></details></div></td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Hali sahifa ulanmagan.</div>{% endif %}</div>
+<div class="grid g2">
+<div class="card" style="margin:0"><div class="card-h"><h2>1-usul: Token bilan (eng oson)</h2></div>
+<form method="post" action="/ig/accounts/token" data-busy="Tekshirilmoqda..."><label class="l">Instagram token</label><textarea name="token" rows="3" placeholder="IGAA..." autocomplete="off" required></textarea>
+<div class="hint">Meta dasturi → Instagram → «API setup with Instagram login» → akkaunt yoniga «Generate token». Yo'riqnomada rasmli qadamlar bor. Token shifrlanib saqlanadi.</div>
+<div class="actions" style="margin-top:10px"><button class="btn">Ulash</button></div></form></div>
+<div class="card" style="margin:0"><div class="card-h"><h2>2-usul: Instagram orqali kirish</h2></div>
+{% if oauth_ok %}<p class="small">Tugmani bosing, jamoa a'zosi sahifa akkauntiga kirib ruxsat beradi (parolni faqat Instagram'ning o'zi ko'radi). Qayta yo'naltirish manzili: <code>{{ conf.redirect }}</code> (Meta dasturida ham shu bo'lishi shart).</p>
+<a class="btn" href="/ig/oauth/start">Instagram orqali ulash</a>
+{% else %}<p class="small">Bu usul uchun <a href="/ig/settings"><b>Sozlamalar</b></a>da Meta App ID va App Secret kiritilishi kerak. Token usuli ularsiz ham ishlaydi.</p>{% endif %}</div></div>
+{% endblock %}

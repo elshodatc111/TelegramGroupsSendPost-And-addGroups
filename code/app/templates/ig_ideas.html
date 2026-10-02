@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% block title %}G'oya va ssenariy{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>G'oya va ssenariy: @{{ a.username }}</h1><p class="sub">AI sahifa maqsadi, statistikasi, rejadagi postlar va oldingi g'oyalarni hisobga olib yozadi. Faqat so'raganingizda ishlaydi.</p></div>
+  <div class="actions"><a class="chip {{ 'on' if kind == 'idea' }}" href="/ig/ideas">G'oyalar</a><a class="chip {{ 'on' if kind == 'script' }}" href="/ig/ideas?k=script">Video ssenariylar</a><span class="badge">Shu oy: {{ month_cost|usd }}</span></div></div>
+{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div><a href="/ch/settings"><b>Kanallarim → Sozlamalar</b></a> da OpenAI kalitini kiriting.</div></div>{% endif %}
+{% if not a.niche %}<div class="note">{{ ic('alert') }}<div>Avval <a href="/ig/profile"><b>Profil va maqsad</b></a>da sahifa sohasini kiriting.</div></div>{% endif %}
+{% if kind == 'idea' %}
+<div class="card"><div class="card-h"><h2>{{ ic('bulb') }} Yangi g'oyalar</h2></div>
+<form method="post" action="/ig/ideas/new" data-busy="AI g'oyalar yozmoqda (1-2 daqiqa)..."><div class="grid g3">
+<div><label class="l">Til</label><select name="lang"><option value="uz">O'zbekcha</option><option value="ru">Ruscha</option><option value="both">Ikkalasi</option></select></div>
+<div><label class="l">Format</label><select name="fmt"><option value="">AI statistikaga qarab tanlasin</option><option value="reel">Reels</option><option value="carousel">Karusel</option><option value="photo">Rasm</option><option value="story">Stories</option></select></div>
+<div><label class="l">Nechta</label><select name="n">{% for i in (1,2,3,4,5,6) %}<option {{ 'selected' if i == 3 }}>{{ i }}</option>{% endfor %}</select></div></div>
+<label class="l">Izoh (ixtiyoriy): mavzu, aksiya, nimaga urg'u</label><textarea name="note" rows="2"></textarea>
+<div class="actions" style="margin-top:10px"><button class="btn" {{ '' if ai_ok and a.niche else 'disabled' }}>G'oya yaratish</button></div></form></div>
+{% else %}
+<div class="card"><div class="card-h"><h2>{{ ic('film') }} Video ssenariy (Reels / Stories)</h2></div>
+<form method="post" action="/ig/script/new" data-busy="AI ssenariy yozmoqda (1-2 daqiqa)..."><label class="l">Mavzu</label><input type="text" name="topic" value="{{ prefill }}" placeholder="Masalan: Koreys tilida 5 ta eng kerakli salomlashish" required>
+<div class="grid g3"><div><label class="l">Davomiyligi (soniya)</label><select name="duration">{% for s in (15, 20, 30, 45, 60, 90) %}<option {{ 'selected' if s == 30 }}>{{ s }}</option>{% endfor %}</select></div>
+<div><label class="l">Til</label><select name="lang"><option value="uz">O'zbekcha</option><option value="ru">Ruscha</option></select></div>
+<div><label class="l">Uslub (ixtiyoriy)</label><input type="text" name="style" placeholder="hazil, tez montaj, o'qituvchi kadrda"></div></div>
+<div class="actions" style="margin-top:10px"><button class="btn" {{ '' if ai_ok and a.niche else 'disabled' }}>Ssenariy yozish</button></div></form></div>
+{% endif %}
+<div class="card"><div class="card-h"><h2>{{ 'Oldingi g\'oyalar' if kind == 'idea' else 'Oldingi ssenariylar' }}</h2></div>
+{% if rows %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Sana</th><th>Sarlavha</th><th>Format</th><th>Holat</th><th>Narx</th></tr></thead><tbody>
+{% for i in rows %}<tr><td>{{ i.created_at[:16] }}</td><td><a href="/ig/ideas/{{ i.id }}"><b>{{ i.title }}</b></a></td><td>{{ {'reel':'Reels','carousel':'Karusel','photo':'Rasm','story':'Stories'}.get(i.fmt, i.fmt) }}</td>
+<td><span class="badge {{ 'b-good' if i.status in ('accepted','used') else 'b-bad' if i.status == 'rejected' else '' }}">{{ {'new':'Yangi','accepted':'Qabul','rejected':'Rad','used':'Ishlatilgan'}.get(i.status, i.status) }}</span></td><td>{{ (i.cost or 0)|usd }}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Hali yo'q.</div>{% endif %}</div>
+{% endblock %}

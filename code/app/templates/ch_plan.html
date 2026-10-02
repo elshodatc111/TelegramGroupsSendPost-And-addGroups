@@ -2,18 +2,53 @@
 {% block content %}
 <div class="page-h"><div><h1>Kontent reja: {{ ch.title }}</h1><p class="sub">Post shu akkaunt orqali faqat o'z kanalingizga yuboriladi.</p></div>
   <div class="actions"><a class="chip {{ 'on' if not flt }}" href="/ch/plan">Hammasi</a>{% for k, l in STATUS_L.items() %}<a class="chip {{ 'on' if flt == k }}" href="?s={{ k }}">{{ l }} {{ counts.get(k, '') }}</a>{% endfor %}</div></div>
+<style>
+.pv-wrap{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
+@media(max-width:980px){.pv-wrap{grid-template-columns:1fr}}
+.pv-box{position:sticky;top:12px;background:var(--surface2,#eef2f7);border:1px solid var(--bd);border-radius:16px;padding:14px}
+.pv-box h3{margin:0 0 10px;font-size:14px;color:var(--mut)}
+.tg-bubble{background:var(--surface,#fff);border-radius:14px 14px 14px 4px;box-shadow:0 1px 2px rgba(0,0,0,.12);overflow:hidden;max-width:380px}
+.tg-bubble .imgs{display:grid;gap:2px}.tg-bubble .imgs.n2,.tg-bubble .imgs.n4{grid-template-columns:1fr 1fr}.tg-bubble .imgs img{width:100%;display:block;max-height:340px;object-fit:cover}
+.tg-bubble .vid{background:#111827;color:#fff;padding:36px 12px;text-align:center;font-size:13px}
+.tg-bubble .body{padding:9px 12px 6px;font-size:14.5px;line-height:1.42;word-break:break-word;white-space:normal}
+.tg-bubble .body a{color:var(--blue,#2563eb)}.tg-bubble .body pre,.tg-bubble .body code{background:rgba(0,0,0,.07);border-radius:4px;padding:0 4px;font-size:13px}
+.tg-bubble .meta{display:flex;justify-content:space-between;gap:8px;padding:0 12px 8px;font-size:11.5px;color:var(--mut)}
+.tg-bubble .empty-pv{padding:22px 14px;color:var(--mut);font-size:13px;text-align:center}
+.pv-count{font-size:12.5px;margin-top:8px;color:var(--mut)}.pv-count.bad{color:#dc2626;font-weight:600}
+.pv-toggle{display:flex;gap:6px;margin-bottom:8px}.pv-toggle button{flex:1}
+.ai-panel{margin-top:14px}
+.sc-row{display:grid;grid-template-columns:90px 1fr 34px;gap:8px;align-items:center;font-size:13px;margin:4px 0}
+.sc-row i{display:block;height:8px;border-radius:99px;background:var(--surface2,#e5e7eb);overflow:hidden}.sc-row i b{display:block;height:100%;background:var(--pri)}
+.sg{border:1px solid var(--bd);border-radius:12px;padding:9px 12px;margin:8px 0;font-size:13.5px}
+.sg .pr{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-right:6px}
+.pr.high{background:#fee2e2;color:#991b1b}.pr.medium{background:#fef3c7;color:#92400e}.pr.low{background:#e0e7ff;color:#3730a3}
+.alt{border:1px dashed var(--pri);border-radius:12px;padding:10px 12px;margin:10px 0;white-space:pre-wrap;font-size:14px;background:var(--surface)}
+.tm{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.tm button{text-align:left;border:1px solid var(--bd);background:var(--surface);border-radius:12px;padding:8px 12px;cursor:pointer;color:inherit;font:inherit}
+.tm button:hover{border-color:var(--pri)}.tm b{display:block}.tm small{color:var(--mut)}
+</style>
 <div class="card"><div class="card-h"><h2>{{ 'Tahrirlash' if edit else 'Yangi post' }}</h2></div>
-<form method="post" action="/ch/plan/save" enctype="multipart/form-data" data-busy="Saqlanmoqda...">
+<div class="pv-wrap"><div>
+<form method="post" action="/ch/plan/save" enctype="multipart/form-data" data-busy="Saqlanmoqda..." id="planform">
   <input type="hidden" name="id" value="{{ edit.id if edit else 0 }}">
   <label class="l">Sarlavha (faqat o'zingiz uchun)</label><input type="text" name="title" value="{{ edit.title if edit else '' }}">
-  <label class="l">Post matni</label><textarea name="text" rows="7">{{ edit.text if edit else '' }}</textarea>
-  <div class="grid g2"><div><label class="l">Yuborish vaqti (bo'sh = qoralama)</label><input type="datetime-local" name="when" value="{{ (edit.scheduled_at[:16]|replace(' ','T')) if edit and edit.scheduled_at else '' }}"></div>
-    <div><label class="l">Rasm / video {{ '(yangisi eskisini almashtiradi)' if edit }}</label><input type="file" name="files" multiple accept="image/*,video/*"></div></div>
+  <label class="l">Post matni</label><textarea name="text" id="f_text" rows="9">{{ edit.text if edit else '' }}</textarea>
+  <div class="grid g2"><div><label class="l">Yuborish vaqti (bo'sh = qoralama)</label><input type="datetime-local" name="when" id="f_when" value="{{ (edit.scheduled_at[:16]|replace(' ','T')) if edit and edit.scheduled_at else '' }}"></div>
+    <div><label class="l">Rasm / video {{ '(yangisi eskisini almashtiradi)' if edit }}</label><input type="file" name="files" id="f_files" multiple accept="image/*,video/*"></div></div>
   <div style="display:flex;gap:20px;margin-top:10px;flex-wrap:wrap">
     {% if footer and not track_ok %}<div class="hint" style="width:100%">Kuzatuv havolasi uchun Sozlamalarda Worker manzilini kiriting.</div>{% endif %}
-    {% if footer %}<label class="small"><input type="checkbox" name="add_footer" value="1" style="width:auto" {{ '' if edit else 'checked' }}> Lead havolasini qo'shish</label>{% endif %}
-    <label class="small"><input type="checkbox" name="parse_mode" value="html" style="width:auto" {{ 'checked' if edit and edit.parse_mode == 'html' }}> HTML formatlash</label></div>
-  <div class="actions" style="margin-top:12px"><button class="btn">Saqlash</button>{% if edit %}<a class="btn sec" href="/ch/plan">Bekor qilish</a>{% endif %}</div></form></div>
+    {% if footer %}<label class="small"><input type="checkbox" name="add_footer" id="f_footer" value="1" style="width:auto" {{ '' if edit else 'checked' }}> Lead havolasini qo'shish</label>{% endif %}
+    <label class="small"><input type="checkbox" name="parse_mode" id="f_html" value="html" style="width:auto" {{ 'checked' if edit and edit.parse_mode == 'html' }}> HTML formatlash</label></div>
+  <div class="actions" style="margin-top:12px"><button class="btn">Saqlash</button>
+    <button type="button" class="btn sec" id="b_review" {{ 'disabled' if not ai_ok }}>{{ ic('bulb') }} AI tahlil</button>
+    <button type="button" class="btn ghost" id="b_times">{{ ic('clock') }} Vaqt taklifi</button>
+    {% if edit %}<a class="btn sec" href="/ch/plan">Bekor qilish</a>{% endif %}</div>
+  {% if not ai_ok %}<div class="hint">AI tahlil uchun Sozlamalarda OpenAI kalitini kiriting. «Vaqt taklifi» AI'siz ishlaydi.</div>{% endif %}
+</form></div>
+<div class="pv-box"><h3>Jonli ko'rinish: kanalda shunday ko'rinadi</h3>
+  <div class="pv-toggle" id="pv_toggle" style="display:none"><button type="button" class="btn sm" data-mode="mine">Mening matnim</button><button type="button" class="btn sm sec" data-mode="alt">AI taklifi</button></div>
+  <div class="tg-bubble" id="pv"></div><div class="pv-count" id="pv_count"></div>
+  <div class="hint" style="margin-top:6px">Ko'rinish taxminiy: Telegram ilovasida shrift biroz farq qilishi mumkin. Lead havolasi yuborilganda post uchun alohida kuzatuv havolasiga almashtiriladi.</div></div></div>
+<div class="ai-panel" id="ai_panel" style="display:none"></div></div>
 <div class="card"><div class="card-h"><h2>Postlar</h2></div>
 {% if items %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Vaqt</th><th>Post</th><th>Media</th><th>Holat</th><th></th></tr></thead><tbody>
 {% for it in items %}<tr><td>{{ (it.scheduled_at or it.created_at)[:16] }}</td>
@@ -29,3 +64,131 @@
     <form method="post" action="/ch/plan/{{ it.id }}/delete" onsubmit="return confirm('O\'chirilsinmi?')"><button class="btn sm ghost">{{ ic('trash') }}</button></form>{% endif %}
   </div></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty">Reja bo'sh.</div>{% endif %}</div>
 {% endblock %}
+{% block scripts %}<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const FOOTER = {{ (footer or '')|tojson }};
+  const OLD_MEDIA = {{ (media(edit) if edit else [])|tojson }};
+  const TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'code', 'pre'];
+  let altText = null, altHtml = false, mode = 'mine', urls = [];
+  function fmt(text, html) {
+    let t = esc(text);
+    if (html) {
+      TAGS.forEach(g => { t = t.replace(new RegExp('&lt;(/?)' + g + '&gt;', 'gi'), '<$1' + g + '>'); });
+      t = t.replace(/&lt;a href=&quot;(https?:\/\/[^"<>\s]+?)&quot;&gt;/gi, '<a href="$1" target="_blank" rel="noopener">').replace(/&lt;\/a&gt;/gi, '</a>');
+    }
+    t = t.replace(/(^|[\s>])(https?:\/\/[^\s<]+)/g, (m, p, u) => /href=/.test(p) ? m : p + '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>');
+    return t.replace(/\n/g, '<br>');
+  }
+  function mediaEls() {
+    const f = $('f_files'), files = f && f.files ? Array.from(f.files) : [];
+    urls.forEach(u => URL.revokeObjectURL(u)); urls = [];
+    if (files.length) {
+      const imgs = files.filter(x => x.type.startsWith('image/')), vids = files.filter(x => x.type.startsWith('video/'));
+      let h = '';
+      if (imgs.length) { imgs.slice(0, 4).forEach(x => { const u = URL.createObjectURL(x); urls.push(u); h += '<img src="' + u + '" alt="">'; }); h = '<div class="imgs n' + Math.min(imgs.length, 4) + '">' + h + '</div>'; }
+      if (vids.length) h += '<div class="vid">🎞 Video: ' + esc(vids[0].name) + '</div>';
+      return {html: h, n: files.length};
+    }
+    if (OLD_MEDIA.length) {
+      const im = OLD_MEDIA.filter(n => /\.(jpe?g|png|webp|gif)$/i.test(n));
+      let h = im.length ? '<div class="imgs n' + Math.min(im.length, 4) + '">' + im.slice(0, 4).map(n => '<img src="/media/' + esc(n) + '" alt="">').join('') + '</div>' : '';
+      if (OLD_MEDIA.length > im.length) h += '<div class="vid">🎞 Video</div>';
+      return {html: h, n: OLD_MEDIA.length};
+    }
+    return {html: '', n: 0};
+  }
+  function render() {
+    const useAlt = mode === 'alt' && altText != null;
+    let text = useAlt ? altText : $('f_text').value;
+    const html = useAlt ? altHtml : $('f_html').checked;
+    const m = mediaEls();
+    const withFooter = $('f_footer') && $('f_footer').checked && FOOTER && text.indexOf(FOOTER.split('\n').pop()) < 0;
+    const full = withFooter ? text.replace(/\s+$/, '') + '\n\n' + FOOTER : text;
+    const w = $('f_when').value;
+    const when = w ? w.replace('T', ' ').slice(5) : 'qoralama';
+    $('pv').innerHTML = m.html + (full.trim() ? '<div class="body">' + fmt(full, html) + '</div>' : (m.html ? '' : '<div class="empty-pv">Matn yozing: shu yerda post ko\'rinadi</div>')) +
+      '<div class="meta"><span>' + esc(when) + '</span><span>👁</span></div>';
+    const lim = m.n ? 1024 : 4096, len = full.length;
+    const c = $('pv_count'); c.textContent = len + ' / ' + lim + ' belgi' + (m.n ? ' (rasm/video ostida)' : '') + (len > lim ? ' — limitdan oshdi, Telegram kesib tashlaydi' : '');
+    c.className = 'pv-count' + (len > lim ? ' bad' : '');
+  }
+  ['input', 'change'].forEach(ev => ['f_text', 'f_when', 'f_files', 'f_html', 'f_footer'].forEach(id => { const e = $(id); if (e) e.addEventListener(ev, render); }));
+  document.querySelectorAll('#pv_toggle button').forEach(b => b.addEventListener('click', () => {
+    mode = b.dataset.mode; document.querySelectorAll('#pv_toggle button').forEach(x => x.className = 'btn sm ' + (x === b ? '' : 'sec')); render();
+  }));
+  render();
+  async function post(url, fd) { const r = await fetch(url, {method: 'POST', body: fd}); return r.json(); }
+  function timesHtml(t) {
+    if (!t || !t.times || !t.times.length) return '<div class="hint">Mos bo\'sh vaqt topilmadi (kunlik me\'yor to\'lgan bo\'lishi mumkin).</div>';
+    return '<div class="tm">' + t.times.map(x => '<button type="button" data-when="' + esc(x.when) + '"><b>' + esc(x.label) + ' · ' + x.score + '%</b><small>' + esc(x.reason) + '</small></button>').join('') + '</div>' +
+      '<div class="hint">Tanlash faqat «Yuborish vaqti» maydonini to\'ldiradi, saqlash uchun «Saqlash» ni bosing. ' + (t.data ? '' : 'Statistika kam: standart faol soatlar ishlatildi. ') + 'Kunlik me\'yor: ' + t.cap + ' ta post.</div>' +
+      (t.load && t.load.length ? '<details style="margin-top:6px"><summary class="small">Kontent rejada band vaqtlar (' + t.load.length + ')</summary><div class="small">' + t.load.map(l => esc(l.when) + ' · ' + esc(l.title)).join('<br>') + '</div></details>' : '');
+  }
+  function bindTimes(root) {
+    root.querySelectorAll('[data-when]').forEach(b => b.addEventListener('click', () => { $('f_when').value = b.dataset.when; render(); b.style.borderColor = 'var(--pri)'; }));
+  }
+  const panel = $('ai_panel');
+  $('b_times').addEventListener('click', async () => {
+    panel.style.display = 'block';
+    panel.innerHTML = '<div class="card" style="margin:0"><div class="card-h"><h2>Vaqt taklifi</h2></div>' + 'Hisoblanmoqda...</div>';
+    const r = await (await fetch('/ch/plan/times?plan={{ edit.id if edit else '' }}')).json();
+    panel.innerHTML = '<div class="card" style="margin:0"><div class="card-h"><h2>Vaqt taklifi</h2></div>' + (r.ok ? timesHtml(r) : esc(r.msg)) + '</div>';
+    bindTimes(panel);
+  });
+  $('b_review').addEventListener('click', async () => {
+    const txt = $('f_text').value;
+    if (txt.trim().length < 15) { alert('Avval post matnini yozing'); return; }
+    const b = $('b_review'); b.disabled = true; const old = b.innerHTML; b.textContent = 'AI tahlil qilmoqda...';
+    panel.style.display = 'block'; panel.innerHTML = '<div class="card" style="margin:0">AI kanal ma\'lumotlari va rejadagi postlarni o\'qib tahlil qilmoqda (10–40 soniya)...</div>';
+    const fd = new FormData();
+    fd.append('text', txt); fd.append('title', document.querySelector('[name=title]').value); fd.append('when', $('f_when').value);
+    fd.append('media_n', mediaEls().n); if ($('f_html').checked) fd.append('html', '1'); fd.append('plan_id', {{ (edit.id if edit else 0) }});
+    let r;
+    try { r = await post('/ch/plan/ai-review', fd); } catch (e) { r = {ok: false, msg: 'Server bilan aloqa yo\'q'}; }
+    b.disabled = false; b.innerHTML = old;
+    if (!r.ok) { panel.innerHTML = '<div class="note red"><div>' + esc(r.msg) + '</div></div>'; return; }
+    show(r);
+  });
+  const SC = {hook: 'Hook (1-qator)', clarity: 'Aniqlik', cta: 'Chaqiriq (CTA)', structure: 'Tuzilish', fit: 'Kanalga mosligi', overall: 'Umumiy'};
+  function show(r) {
+    altText = r.improved || null; altHtml = false;
+    const scores = Object.keys(SC).map(k => '<div class="sc-row"><span>' + SC[k] + '</span><i><b style="width:' + (r.score[k] * 10) + '%"></b></i><span>' + r.score[k] + '</span></div>').join('');
+    const sg = (r.suggestions || []).map(s => '<div class="sg"><span class="pr ' + esc(s.priority) + '">' + esc({high: 'Muhim', medium: "O'rtacha", low: 'Kichik'}[s.priority] || s.priority) + '</span><b>' + esc(s.area) + '</b>: ' + esc(s.issue) + '<br><span class="mut">→ ' + esc(s.fix) + '</span></div>').join('');
+    const warn = (r.warnings || []).map(w => '<div class="note red"><div>' + esc(w) + '</div></div>').join('');
+    const tags = (r.hashtags || []).map(h => '<button type="button" class="chip" data-tag="' + esc(h) + '">' + esc(h) + '</button>').join(' ');
+    panel.innerHTML = '<div class="card" style="margin:0"><div class="card-h"><h2>' + '🧠 AI tahlil' + '</h2><span class="badge">Sizning matningiz o\'zgarmagan</span></div>' +
+      warn + '<p>' + esc(r.summary) + '</p>' + scores +
+      '<h3 style="font-size:15px;margin:14px 0 4px">Takliflar</h3>' + (sg || '<div class="hint">Jiddiy kamchilik topilmadi.</div>') +
+      (r.best_format ? '<div class="hint">Format: ' + esc(r.best_format) + '</div>' : '') +
+      (altText ? '<h3 style="font-size:15px;margin:14px 0 4px">Yaxshilangan variant (taklif)</h3><div class="alt" id="alt_txt">' + esc(altText) + '</div>' +
+        '<div class="actions"><button type="button" class="btn sm" id="a_use">Matnimga qo\'yish</button><button type="button" class="btn sm sec" id="a_view">Ko\'rinishda ko\'rsatish</button><button type="button" class="btn sm ghost" id="a_copy">Nusxa</button></div>' : '') +
+      (r.improved_html ? '<h3 style="font-size:15px;margin:14px 0 4px">Dizayn qilingan variant (Telegram formatlash bilan)</h3><div class="alt" id="alt_html_prev">' + fmt(r.improved_html, true) + '</div>' +
+        '<div class="actions"><button type="button" class="btn sm" id="h_use">Qo\'llash (HTML rejimi)</button><button type="button" class="btn sm sec" id="h_view">Ko\'rinishda ko\'rsatish</button></div>' : '') +
+      (tags ? '<div style="margin-top:10px"><span class="small mut">Hashtag (bosib qo\'shing):</span> ' + tags + '</div>' : '') +
+      '<h3 style="font-size:15px;margin:14px 0 4px">Qachon yuborish kerak</h3>' + timesHtml(r.times) +
+      '<div class="hint" style="margin-top:8px">AI sarfi: ' + (r.cost != null ? '$' + Number(r.cost).toFixed(4) : '—') + ' (kanal hisobiga yoziladi)</div></div>';
+    bindTimes(panel);
+    const ta = $('f_text'); let backup = null;
+    const toggle = $('pv_toggle'); toggle.style.display = 'flex';
+    const setMode = m => { mode = m; document.querySelectorAll('#pv_toggle button').forEach(x => x.className = 'btn sm ' + (x.dataset.mode === m ? '' : 'sec')); render(); };
+    const undoBtn = () => {
+      if (document.getElementById('undo_b')) return;
+      const u = document.createElement('button'); u.type = 'button'; u.id = 'undo_b'; u.className = 'btn sm ghost'; u.textContent = 'Eski matnni qaytarish';
+      u.onclick = () => { ta.value = backup; $('f_html').checked = backup_html; render(); u.remove(); };
+      document.getElementById('b_review').parentNode.insertBefore(u, document.getElementById('b_review').nextSibling);
+    };
+    let backup_html = false;
+    const use = (text, html) => { backup = ta.value; backup_html = $('f_html').checked; ta.value = text; $('f_html').checked = html; altText = null; mode = 'mine'; setMode('mine'); undoBtn(); };
+    const bind = (id, fn) => { const e = $(id); if (e) e.addEventListener('click', fn); };
+    bind('a_use', () => use(r.improved, false));
+    bind('a_view', () => { altText = r.improved; altHtml = false; setMode('alt'); window.scrollTo({top: $('pv').getBoundingClientRect().top + scrollY - 80, behavior: 'smooth'}); });
+    bind('a_copy', () => navigator.clipboard && navigator.clipboard.writeText(r.improved));
+    bind('h_use', () => use(r.improved_html, true));
+    bind('h_view', () => { altText = r.improved_html; altHtml = true; setMode('alt'); window.scrollTo({top: $('pv').getBoundingClientRect().top + scrollY - 80, behavior: 'smooth'}); });
+    panel.querySelectorAll('[data-tag]').forEach(t => t.addEventListener('click', () => { ta.value = ta.value.replace(/\s+$/, '') + (ta.value.indexOf(t.dataset.tag) < 0 ? ' ' + t.dataset.tag : ''); render(); }));
+    render();
+  }
+})();
+</script>{% endblock %}

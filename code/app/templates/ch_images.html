@@ -11,7 +11,8 @@
 <div class="card" style="margin:0"><div class="card-h"><h2>{{ ic('image') }} Yangi rasm</h2></div>
   <label class="l">Qaysi post uchun</label>
   <select id="plan_id" onchange="location='?plan='+this.value"><option value="">— tanlanmagan —</option>{% for p in plan %}<option value="{{ p.id }}" {{ 'selected' if sel and sel.id == p.id }}>{{ (p.scheduled_at or '')[:16] }} · {{ p.title[:50] }}</option>{% endfor %}</select>
-  <div class="actions" style="margin-top:8px"><button type="button" class="btn sm sec" id="b_prompt" {{ 'disabled' if not ai_ok }}>{{ ic('bulb') }} AI prompt yozsin</button><span class="mut small" id="p_msg"></span></div>
+  <div class="actions" style="margin-top:8px"><button type="button" class="btn sm sec" id="b_prompt" {{ 'disabled' if not ai_ok }}>{{ ic('bulb') }} AI prompt yozsin</button><button type="button" class="btn sm" id="b_advice" {{ 'disabled' if not ai_ok }}>🧠 AI tahlil</button><span class="mut small" id="p_msg"></span></div>
+  <div id="adv" style="display:none;margin-top:10px"></div>
   <label class="l">Rasm tavsifi (inglizcha, matnsiz)</label><textarea id="prompt" rows="4">{{ sel.image_prompt if sel and sel.image_prompt }}</textarea>
   <div class="grid g2"><div><label class="l">Katta yozuv (sarlavha)</label><input type="text" id="headline" maxlength="80"></div><div><label class="l">Kichik yozuv</label><input type="text" id="subline" maxlength="120"></div></div>
   <div class="grid g3"><div><label class="l">O'lcham</label><select id="size">{% for k in sizes %}<option>{{ k }}</option>{% endfor %}</select></div>
@@ -51,6 +52,19 @@
       $('g_msg').textContent = j.msg || '';
       if (j.done) { clearInterval(t); b.disabled = false; if (j.ok) { $('preview').innerHTML = '<img src="/media/' + j.name + '" style="max-width:100%;border-radius:12px;border:1px solid var(--bd)"><div class="actions" style="margin-top:8px"><a class="btn sm sec" href="">Ro\'yxatni yangilash</a></div>'; } }
     }, 1500);
+  });
+
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  $('b_advice').addEventListener('click', async () => {
+    const adv = $('adv'); adv.style.display = 'block'; adv.innerHTML = '<div class="hint">AI kanal tahlilini o\'qib, rasm bo\'yicha maslahat yozmoqda (10–30 soniya)...</div>';
+    const d = await post('/ch/images/ai-advice', { plan_id: $('plan_id').value, text: {{ (sel.text if sel else '')|tojson }}, title: {{ (sel.title if sel else '')|tojson }} });
+    if (!d.ok) { adv.innerHTML = '<div class="note red"><div>' + esc(d.msg) + '</div></div>'; return; }
+    window._opts = d.options;
+    adv.innerHTML = '<div style="border:1px solid var(--bd);border-radius:12px;padding:12px;background:var(--surface2)"><b>Kanal tahlilidan</b><p class="small" style="margin:4px 0 8px">' + esc(d.channel_insight) + '</p><b>Tavsiya etilgan yo\'nalish</b><p class="small" style="margin:4px 0 8px">' + esc(d.visual_direction) + '</p>' +
+      d.options.map((o, i) => '<div style="border:1px solid var(--bd);border-radius:10px;padding:9px 11px;margin:8px 0;background:var(--surface)"><b>' + (i + 1) + '. ' + esc(o.name) + '</b><div class="small mut">' + esc(o.why) + '</div><div class="small" style="margin:4px 0"><code style="white-space:pre-wrap">' + esc(o.image_prompt) + '</code></div><div class="small">Sarlavha: <b>' + esc(o.headline) + '</b> · ' + esc(o.subline) + '</div><div class="actions" style="margin-top:6px"><button type="button" class="btn sm" data-opt="' + i + '">Shuni tanlash</button><button type="button" class="btn sm ghost" data-cp="' + i + '">Promptni nusxalash</button></div></div>').join('') +
+      ((d.avoid || []).length ? '<div class="hint">Qochish kerak: ' + d.avoid.map(esc).join('; ') + '</div>' : '') + '<div class="hint">AI sarfi: ' + (d.cost != null ? '$' + Number(d.cost).toFixed(4) : '—') + '</div></div>';
+    adv.querySelectorAll('[data-opt]').forEach(b => b.addEventListener('click', () => { const o = window._opts[+b.dataset.opt]; $('prompt').value = o.image_prompt; $('headline').value = o.headline; $('subline').value = o.subline; $('layout').value = o.layout; $('p_msg').textContent = 'Variant tanlandi: «Rasm yaratish» ni bosing'; }));
+    adv.querySelectorAll('[data-cp]').forEach(b => b.addEventListener('click', () => navigator.clipboard && navigator.clipboard.writeText(window._opts[+b.dataset.cp].image_prompt)));
   });
 })();
 </script>{% endblock %}

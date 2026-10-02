@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import FileResponse
 
-from . import ai, ch_data, ch_extra, ch_insight, ch_report, ch_tg, ch_track, charts, db, imagegen, notify
+from . import ai, ch_assist, ch_data, ch_extra, ch_insight, ch_report, ch_tg, ch_track, charts, db, imagegen, notify
 from .config import log
 from .web import go, need_channel, page
 
@@ -313,7 +313,18 @@ async def month_page(request: Request):
         row, body = ch_extra.month_get(plans[0]["id"])
         cur = {"row": row, "body": body}
     nxt = (datetime.now().replace(day=1) + timedelta(days=32)).strftime("%Y-%m")
-    return page(request, "ch_month.html", ch=ch, plans=plans, mcur=cur, cur_month=datetime.now().strftime("%Y-%m"), next_month=nxt)
+    busy = []
+    if cur:
+        mm = cur["row"]["month"]
+        y_, m_ = int(mm[:4]), int(mm[5:7])
+        busy = ch_assist.busy_slots(ch["id"], datetime(y_, m_, 1), datetime(y_ + (m_ == 12), (m_ % 12) + 1, 1) - timedelta(seconds=1))
+    return page(request, "ch_month.html", ch=ch, plans=plans, busy=busy, cap=ch_assist.max_per_day(), mcur=cur, cur_month=datetime.now().strftime("%Y-%m"), next_month=nxt)
+
+
+@router.post("/ch/month/cap")
+async def month_cap(request: Request, cap: int = Form(2), back: str = Form("/ch/month")):
+    db.set_setting("ch_max_per_day", str(min(max(cap, 1), 10)))
+    return go(back if back.startswith("/ch/") else "/ch/month", msg="Kunlik post me'yori saqlandi")
 
 
 @router.post("/ch/month/new")
@@ -499,3 +510,55 @@ async def images_install(request: Request):
         subprocess.Popen(["cmd", "/c", "start", "", str(p)], cwd=str(p.parent))
         return go("/ch/images", msg="O'rnatish oynasi ochildi. Tugagach dasturni qayta ishga tushiring")
     return go("/ch/images", err="Avtomatik ochib bo'lmadi: code\\tools\\install_imagegen.bat faylini ikki marta bosing")
+
+
+# ================================================================ Kontent reja: AI tahlil, vaqt taklifi (matnga tegmaydi)
+@router.post("/ch/plan/ai-review")
+async def plan_ai_review(request: Request):
+    from fastapi.responses import JSONResponse
+    ch = _ch(request)
+    if not ch:
+        return JSONResponse({"ok": False, "msg": "Kanal tanlanmagan"})
+    f = await request.form()
+    pid = int(f.get("plan_id") or 0) or None
+    if pid and not db.one("SELECT 1 FROM ch_plan WHERE id=? AND channel_id=?", (pid, ch["id"])):
+        pid = None
+    try:
+        data = await ch_assist.review_post(ch["id"], f.get("text") or "", f.get("title") or "", int(f.get("media_n") or 0),
+                                           "html" if f.get("html") else "none", pid, f.get("when") or "")
+        return JSONResponse({"ok": True, **data})
+    except ai.AIError as e:
+        return JSONResponse({"ok": False, "msg": str(e)})
+    except Exception as e:
+        log.warning("Post tahlili xato: %s", e, exc_info=True)
+        return JSONResponse({"ok": False, "msg": f"{type(e).__name__}: {e}"})
+
+
+@router.get("/ch/plan/times")
+async def plan_times(request: Request):
+    from fastapi.responses import JSONResponse
+    ch = _ch(request)
+    if not ch:
+        return JSONResponse({"ok": False, "msg": "Kanal tanlanmagan"})
+    pid = request.query_params.get("plan", "")
+    return JSONResponse({"ok": True, **ch_assist.suggest_times(ch["id"], int(pid) if pid.isdigit() else None)})
+
+
+@router.post("/ch/images/ai-advice")
+async def images_ai_advice(request: Request, plan_id: str = Form(""), text: str = Form(""), title: str = Form("")):
+    from fastapi.responses import JSONResponse
+    ch = _ch(request)
+    if not ch:
+        return JSONResponse({"ok": False, "msg": "Kanal tanlanmagan"})
+    if plan_id.isdigit():
+        it = db.one("SELECT * FROM ch_plan WHERE id=? AND channel_id=?", (int(plan_id), ch["id"]))
+        if it:
+            text, title = it["text"], it["title"]
+    try:
+        data = await ch_assist.image_advice(ch["id"], text, title)
+        return JSONResponse({"ok": True, **data})
+    except ai.AIError as e:
+        return JSONResponse({"ok": False, "msg": str(e)})
+    except Exception as e:
+        log.warning("Rasm maslahati xato: %s", e, exc_info=True)
+        return JSONResponse({"ok": False, "msg": f"{type(e).__name__}: {e}"})

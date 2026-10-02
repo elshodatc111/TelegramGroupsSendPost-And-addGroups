@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}Sozlamalar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Instagram sozlamalari</h1><p class="sub">Kalitlar shifrlangan holda saqlanadi va faqat shu kompyuterda ochiladi.</p></div></div>
+<div class="card"><div class="card-h"><h2>OpenAI</h2>{% if ai_ok %}<span class="badge b-good">Kalit bor</span>{% else %}<span class="badge b-bad">Kalit yo'q</span>{% endif %}</div>
+<p class="small">OpenAI kaliti, modellar va oylik chegara barcha bo'limlar uchun umumiy: <a href="/ch/settings"><b>Kanallarim → Sozlamalar</b></a>. Har Instagram sahifaning sarfi alohida hisoblanadi (AI sarfi sahifasi).</p></div>
+<div class="card"><div class="card-h"><h2>Joylash va umumiy</h2></div>
+<form method="post" action="/ig/settings/general"><div class="grid g3">
+<div><label class="l">Joylash rejimi</label><select name="mode"><option value="reminder" {{ 'selected' if mode == 'reminder' }}>Eslatma (qo'lda joylash, hech narsa o'rnatilmaydi)</option><option value="auto" {{ 'selected' if mode == 'auto' }}>Avto (cloudflared tunnel orqali)</option></select></div>
+<div><label class="l">Eslatma: necha daqiqa oldin</label><input type="number" min="0" max="240" name="remind" value="{{ remind }}"></div>
+<div><label class="l">Kunlik post me'yori (sahifa uchun)</label><input type="number" min="1" max="10" name="cap" value="{{ cap }}"></div>
+<div><label class="l">Ma'lumot yig'ish (soatda bir)</label><input type="number" min="1" max="48" name="sync_h" value="{{ sync_h }}"></div>
+<div><label class="l">Kechikish chegarasi (soat)</label><input type="number" min="1" max="48" name="grace" value="{{ grace }}"></div>
+<div><label class="l">cloudflared yo'li (ixtiyoriy)</label><input type="text" name="exe_path" value="{{ exe_path }}" placeholder="bo'sh = avtomatik"></div></div>
+<div class="hint"><b>Eslatma rejimi:</b> post vaqti kelganda Windows bildirishnomasi chiqadi, tayyor tavsif va fayl «Kontent reja»da turadi; Instagram ilovasida 1 daqiqada joylaysiz. <b>Avto rejim:</b> Instagram faylni internetdagi ochiq havoladan yuklab oladi, shuning uchun postdan oldin bepul «Cloudflare Quick Tunnel» bir necha daqiqaga ochiladi, faqat o'sha bitta fayl uchun bir martalik havola beriladi, dasturning qolgan sahifalari yopiq, joylangach tunnel o'chadi. Hech qanday fayl boshqa serverga yuklanmaydi.</div>
+<div class="actions" style="margin-top:12px"><button class="btn">Saqlash</button></div></form>
+<hr style="border:0;border-top:1px solid var(--bd);margin:16px 0">
+<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="badge {{ 'b-good' if exe else '' }}">cloudflared: {{ exe if exe else "topilmadi (eslatma rejimida kerak emas)" }}</span>
+{% if not exe %}<form method="post" action="/ig/settings/cloudflared" data-busy="Yuklanmoqda (~40 MB)..." style="margin:0"><button class="btn sm sec">{{ ic('download') }} cloudflared'ni yuklab olish</button></form>{% endif %}
+<a class="btn sm sec" href="/ig/diag">Tunnel sinovi (Diagnostika)</a></div></div>
+<div class="card"><div class="card-h"><h2>Meta ilovasi (faqat «Instagram orqali kirish» usuli uchun)</h2></div>
+<form method="post" action="/ig/settings/app"><div class="grid g2">
+<div><label class="l">Instagram App ID</label><input type="text" name="app_id" value="{{ conf.app_id }}"></div>
+<div><label class="l">Instagram App Secret {% if has_secret %}<span class="badge b-good">saqlangan</span>{% endif %}</label><input type="password" name="app_secret" autocomplete="off" placeholder="{{ 'o\'zgartirish uchun kiriting' if has_secret else '' }}"></div></div>
+<label class="l">Redirect URL (Meta dasturidagi bilan bir xil bo'lsin)</label><input type="text" name="redirect" value="{{ conf.redirect }}">
+<div class="hint">Token usuli (Sahifalar → 1-usul) bularsiz ishlaydi. App Secret bo'lsa, token avtomatik uzoq muddatliga (60 kun) almashtiriladi. Qadamlar: <a href="/ig/guide">Yo'riqnoma</a>.</div>
+<div class="actions" style="margin-top:12px"><button class="btn sm">Saqlash</button></div></form></div>
+{% endblock %}

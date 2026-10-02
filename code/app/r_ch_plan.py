@@ -5,7 +5,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Form, Request
 
-from . import ch_data, ch_plan, ch_track, db
+from . import ai, ch_data, ch_plan, ch_track, db
 from .web import go, need_channel, page
 
 router = APIRouter()
@@ -38,7 +38,7 @@ async def ch_plan_page(request: Request):
         edit = db.one("SELECT * FROM ch_plan WHERE id=? AND channel_id=?", (int(request.query_params["edit"]), ch["id"]))
     links = {it["id"]: ch_track.plan_link(it, ch) for it in items}
     clicks = ch_track.clicks_by_code(ch["id"])
-    return page(request, "ch_plan.html", ch=ch, items=items, links=links, clicks=clicks, track_ok=ch_track.enabled(), counts=counts, flt=flt, STATUS_L=STATUS, BADGE=BADGE, edit=edit,
+    return page(request, "ch_plan.html", ch=ch, ai_ok=ai.configured(), items=items, links=links, clicks=clicks, track_ok=ch_track.enabled(), counts=counts, flt=flt, STATUS_L=STATUS, BADGE=BADGE, edit=edit,
                 media=ch_plan.media_list, footer=ch_data.lead_footer(ch), now=datetime.now().strftime("%Y-%m-%dT%H:%M"))
 
 

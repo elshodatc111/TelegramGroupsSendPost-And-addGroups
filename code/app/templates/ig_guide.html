@@ -1,0 +1,46 @@
+{% extends "base.html" %}{% block title %}Yo'riqnoma{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Instagram bo'limi yo'riqnomasi</h1><p class="sub">Ulashdan boshlab kundalik ishgacha. Meta menyulari vaqti-vaqti bilan o'zgaradi: nomlari biroz farq qilsa, ma'nosi bo'yicha qidiring.</p></div></div>
+<div class="card"><div class="card-h"><h2>1. Nimalar kerak</h2></div><ul style="line-height:1.9;padding-left:20px;margin:0">
+<li>Instagram sahifa <b>Professional</b> bo'lishi shart: Instagram ilovasi → Sozlamalar → «Akkaunt turi va asboblar» → «Professional akkauntga o'tish» (Business yoki Creator, ikkalasi ham bo'ladi).</li>
+<li>Facebook <b>sahifasi kerak emas</b>. Faqat Meta dasturchilar kabinetiga kirish uchun oddiy Facebook akkaunt kerak (bir martalik, jamoadan bitta odamda bo'lsa yetadi).</li>
+<li>Kompyuter doimiy yoqiq va dastur (run.bat) ochiq turadi: statistika, eslatma va joylash shunda ishlaydi.</li></ul></div>
+<div class="card"><div class="card-h"><h2>2. Meta ilovasini yaratish (bir marta, ~10 daqiqa, bepul)</h2></div><ol style="line-height:1.9;padding-left:20px;margin:0">
+<li><code>developers.facebook.com</code> → kiring → «Get Started»/«My Apps» → <b>Create App</b>.</li>
+<li>Nom bering (masalan, «SMM Panel»), foydalanish turida Instagram bilan bog'liq variantni tanlang («Manage messaging &amp; content on Instagram» yoki «Other» → Business turi).</li>
+<li>Ilova ichida <b>Add product → Instagram</b> → <b>API setup with Instagram login</b> bo'limini oching.</li>
+<li>Ilova <b>Development (rivojlantirish) rejimida</b> qolaveradi: o'z va tester akkauntlaringiz uchun Meta tekshiruvi (App Review) <b>kerak emas</b>.</li>
+<li>Har bir Instagram sahifani <b>tester</b> qiling: ilova → <b>App roles → Roles → Add People → Instagram Tester</b> → sahifa username'ini yozing. Keyin o'sha Instagram akkauntga kirib: Sozlamalar → «Veb-saytlar uchun ruxsatlar» (Apps and websites) → <b>Tester taklifnomalari</b> → qabul qiling. Jamoa sahifalarni boshqargani uchun buni o'zingiz bajara olasiz.</li></ol></div>
+<div class="card"><div class="card-h"><h2>3. Sahifani ulash</h2></div>
+<p class="small"><b>1-usul (tavsiya, eng oson): token bilan.</b> Meta ilovasi → Instagram → API setup with Instagram login → «Generate access token» bo'limida sahifangiz yonidagi <b>Generate token</b> tugmasi → sahifa akkauntiga kirib ruxsat bering (uchala ruxsat: basic, content publish, manage insights) → uzun tokenni nusxalang → <a href="/ig/accounts">Sahifalar</a> → Token maydoniga qo'yib «Ulash». Dastur akkaunt Professional ekanini tekshiradi va ma'lumotni yig'a boshlaydi.</p>
+<p class="small"><b>2-usul: «Instagram orqali kirish».</b> Shu sahifadagi <b>Instagram App ID</b> va <b>App Secret</b> (Meta ilovasining Instagram bo'limida ko'rinadi; bosh ilova ID'sidan farq qiladi) ni <a href="/ig/settings">Sozlamalar</a>ga kiriting. Meta dasturida «Valid OAuth redirect URIs» ga <code>{{ conf.redirect }}</code> ni qo'shing (Sozlamalarda bir xil bo'lsin). Keyin Sahifalar → «Instagram orqali ulash». Agar Meta http:// manzilini qabul qilmasa, 1-usuldan foydalaning: u hamma holatda ishlaydi.</p>
+<ul class="small" style="line-height:1.8"><li>Token <b>60 kun</b> yashaydi. Dastur ochiq bo'lsa, muddati tugashiga 10 kun qolganda <b>o'zi yangilaydi</b>. Dastur 60 kundan ortiq o'chiq tursa, token o'ladi: qaytadan Generate token qiling.</li>
+<li>Sahifani o'chirish: Sahifalar → «O'chirish» (nom yozib tasdiqlanadi). Sahifaning hamma ma'lumoti dasturdan o'chadi, Instagram'dagi akkauntga tegilmaydi.</li>
+<li>3 tadan ortiq sahifa ham qo'shsa bo'ladi: har biri alohida tester bo'ladi va yuqoridagi sahifa tanlagichidan almashtirasiz.</li></ul></div>
+<div class="card"><div class="card-h"><h2>4. Kundalik ish tartibi</h2></div><ol style="line-height:1.9;padding-left:20px;margin:0">
+<li><b>Profil va maqsad</b>: sahifa sohasi, auditoriya, ohangni yozing. «AI maqsad taklif qilsin»ni bosing: AI real maqsad tuzadi; o'zgartirib «Maqsadni saqlash». Asosiy maqsad: sahifani o'stirish.</li>
+<li><b>G'oya va ssenariy</b>: g'oya so'rang (AI statistika, maqsad va rejadagi postlarni hisobga oladi). Yoqqanini «Rejaga qo'shish»; Reels bo'lsa «Video ssenariy yozdirish» (kadrma-kadr, ovoz, ekrandagi yozuv, tavsif).</li>
+<li><b>Kontent reja</b>: rasm/video qo'shing, vaqt qo'ying. O'ngda Instagram'dagi ko'rinish chiqadi. «AI tahlil» takliflar beradi (sizning matningiz o'zgarmaydi); «Vaqt taklifi» eng yaxshi 3 vaqtni beradi (rejadagi postlar va kunlik me'yor hisobga olinadi).</li>
+<li><b>Joylash</b>: <i>Eslatma rejimi</i>da vaqti kelganda bildirishnoma chiqadi, reja sahifasida tavsifni nusxalab, faylni yuklab Instagram'da joylaysiz va «Joylandi ✓» bosasiz. <i>Avto rejim</i>da dastur o'zi joylaydi.</li>
+<li><b>Reja nazorati</b>: haftada bir «Rejani tekshirish»: AI tezlik, format balansi, bo'shliqlarni aytadi va keyingi g'oyalarni vaqti bilan beradi.</li>
+<li><b>Statistika / Postlar natijasi / AI tahlil</b>: nima ishlayapti va keyingi 7 kun uchun harakatlar.</li>
+<li><b>Reklama (target)</b>: qaysi postga Boost yoqish foydali, qancha byudjet va qaysi auditoriya. Reklamani Instagram ilovasida o'zingiz yoqasiz.</li></ol></div>
+<div class="card"><div class="card-h"><h2>5. Avto joylash (ixtiyoriy)</h2></div><ul style="line-height:1.9;padding-left:20px;margin:0">
+<li>Instagram faylni sizning kompyuteringizdan ola olmaydi: u internetdagi ochiq havoladan yuklab oladi. Shuning uchun faqat avto joylash uchun bepul <b>cloudflared</b> (Cloudflare Quick Tunnel) ishlatiladi, hisob ochish shart emas.</li>
+<li>Sozlamalar → «cloudflared'ni yuklab olish» → rejimni «Avto» qiling → Diagnostika → «Tunnel sinovi». Sinov o'tsa tayyor.</li>
+<li>Tunnel faqat joylash paytida ochiladi, faqat bitta faylga bir martalik havola beradi, qolgan sahifalaringiz tashqaridan ochilmaydi; joylangach yopiladi.</li>
+<li>Avto joylash ishlamasa, post «Xato» holatida qoladi va bildirishnoma chiqadi: eslatma rejimidagidek qo'lda joylashingiz mumkin.</li>
+<li>Talablar: rasm JPEG (dastur o'zi o'giradi), Reels uchun MP4/MOV vertikal video, karusel 2-10 fayl. Instagram sutkasiga ~50-100 ta API post limiti qo'yadi.</li></ul></div>
+<div class="card"><div class="card-h"><h2>6. Statistika haqida bilish kerak</h2></div><ul style="line-height:1.9;padding-left:20px;margin:0">
+<li>Yangi ko'rsatkichlar Instagram'da 48 soatgacha kechikishi mumkin. Obunachi soni dastur har kuni saqlab boradi (shuning uchun dastur ochiq turgani muhim).</li>
+<li>Auditoriya (yosh, jins, shahar) Instagram tomonidan faqat <b>100 va undan ko'p obunachi</b>da beriladi.</li>
+<li>Faqat umumiy raqamlar yig'iladi; obunachilarning shaxsiy ro'yxati yig'ilmaydi. Raqobatchilar tahlili yo'q: Instagram rasmiy API'si boshqalarning sahifasini bermaydi.</li>
+<li>Reklama (target) Instagram API orqali boshqarilmaydi: dastur tavsiya beradi, reklamani qo'lda yoqasiz.</li></ul></div>
+<div class="card"><div class="card-h"><h2>7. Muammolar</h2></div><ul style="line-height:1.9;padding-left:20px;margin:0">
+<li><b>«Token yaroqsiz» (190)</b>: Meta'da yangi token yarating va Sahifalar'da qayta kiriting (o'sha akkaunt bo'yicha eskisi almashadi).</li>
+<li><b>«Professional emas»</b>: Instagram ilovasida akkaunt turini o'zgartiring.</li>
+<li><b>Statistika bo'sh</b>: yangi akkauntda 48 soat kuting; Diagnostika → «Statistika (insights)» ruxsatni ko'rsatadi; tokenda manage_insights bo'lishi kerak.</li>
+<li><b>Joylab bo'lmadi</b>: Diagnostika → «Joylash ruxsati» va «Tunnel sinovi». Antivirus cloudflared'ni to'sgan bo'lishi mumkin.</li>
+<li><b>AI ishlamayapti</b>: OpenAI kaliti va hisobdagi mablag'ni tekshiring (Kanallarim → Sozlamalar).</li>
+<li>Tushunarsiz xato: Tizim tahlili → Instagram bo'limi va «AI xulosa so'rash».</li></ul></div>
+{% endblock %}

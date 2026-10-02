@@ -1,0 +1,105 @@
+{% extends "base.html" %}{% block title %}Kontent reja{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Kontent reja: @{{ a.username }}</h1><p class="sub">Joylash rejimi: <b>{{ modes[mode] }}</b> (<a href="/ig/settings">o'zgartirish</a>). Eslatma rejimida vaqti kelganda ilova xabar beradi va tayyor matn + faylni shu yerda ko'rsatadi.</p></div>
+  <div class="actions"><a class="chip {{ 'on' if not flt }}" href="/ig/plan">Hammasi</a>{% for k, l in STATUS_L.items() %}<a class="chip {{ 'on' if flt == k }}" href="?s={{ k }}">{{ l }} {{ counts.get(k, '') }}</a>{% endfor %}</div></div>
+<style>
+.pv-wrap{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
+@media(max-width:980px){.pv-wrap{grid-template-columns:1fr}}
+.pv-box{position:sticky;top:12px;background:var(--surface2,#eef2f7);border:1px solid var(--bd);border-radius:16px;padding:14px}
+.pv-box h3{margin:0 0 10px;font-size:14px;color:var(--mut)}
+.pv-count{font-size:12.5px;margin-top:8px;color:var(--mut)}.pv-count.bad{color:#dc2626;font-weight:600}
+.sc-row{display:grid;grid-template-columns:90px 1fr 34px;gap:8px;align-items:center;font-size:13px;margin:4px 0}
+.sc-row i{display:block;height:8px;border-radius:99px;background:var(--surface2,#e5e7eb);overflow:hidden}.sc-row i b{display:block;height:100%;background:var(--pri)}
+.sg{border:1px solid var(--bd);border-radius:12px;padding:9px 12px;margin:8px 0;font-size:13.5px}
+.sg .pr{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-right:6px}
+.pr.high{background:#fee2e2;color:#991b1b}.pr.medium{background:#fef3c7;color:#92400e}.pr.low{background:#e0e7ff;color:#3730a3}
+.alt{border:1px dashed var(--pri);border-radius:12px;padding:10px 12px;margin:10px 0;white-space:pre-wrap;font-size:14px;background:var(--surface)}
+.tm{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.tm button{text-align:left;border:1px solid var(--bd);background:var(--surface);border-radius:12px;padding:8px 12px;cursor:pointer;color:inherit;font:inherit}
+.tm button:hover{border-color:var(--pri)}.tm b{display:block}.tm small{color:var(--mut)}
+.ready{border:2px solid var(--pri);border-radius:14px;padding:12px 14px;margin:10px 0;background:var(--surface)}
+.ready pre{white-space:pre-wrap;background:var(--surface2);border-radius:10px;padding:10px;font:inherit;font-size:14px;margin:8px 0}
+</style>
+{% if ready %}<div class="card" style="border-color:var(--pri)"><div class="card-h"><h2>{{ ic('clock') }} Hozir joylash vaqti ({{ ready|length }})</h2></div>
+{% for it in ready %}<div class="ready"><b>{{ it.title }}</b> <span class="hint">{{ it.scheduled_at[:16] }} · {{ mtypes.get(it.mtype, it.mtype) }}</span>
+<pre id="cap{{ it.id }}">{{ it.caption }}</pre>
+<div class="actions"><button type="button" class="btn sm" data-copy-from="cap{{ it.id }}">Tavsifni nusxalash</button>
+{% for n in media(it) %}<a class="btn sm sec" href="/media/{{ n }}" download>{{ ic('download') }} Fayl {{ loop.index }}</a>{% endfor %}</div>
+<div class="hint">Instagram ilovasi → «+» → faylni tanlang → nusxalangan tavsifni qo'ying → Ulashish. Keyin pastdan «Joylandi» ni bosing.</div>
+<div class="actions" style="margin-top:8px"><form method="post" action="/ig/plan/{{ it.id }}/done" class="actions" style="margin:0"><input type="text" name="permalink" placeholder="Post havolasi (ixtiyoriy)" style="width:260px"><button class="btn sm ok">Joylandi ✓</button></form>
+<form method="post" action="/ig/plan/{{ it.id }}/snooze" style="margin:0"><button class="btn sm sec" name="minutes" value="30">30 daqiqa keyin</button></form></div></div>{% endfor %}</div>{% endif %}
+<div class="card"><div class="card-h"><h2>{{ 'Tahrirlash' if edit else 'Yangi post' }}</h2></div>
+<div class="pv-wrap"><div>
+<form method="post" action="/ig/plan/save" enctype="multipart/form-data" data-busy="Saqlanmoqda..." id="planform">
+  <input type="hidden" name="id" value="{{ edit.id if edit else 0 }}">
+  <label class="l">Sarlavha (faqat o'zingiz uchun)</label><input type="text" name="title" value="{{ edit.title if edit else '' }}">
+  <label class="l">Tavsif (caption)</label><textarea name="caption" id="f_text" rows="9">{{ edit.caption if edit else '' }}</textarea>
+  <div class="grid g3"><div><label class="l">Format</label><select name="mtype" id="f_type">{% for k, l in mtypes.items() %}<option value="{{ k }}" {{ 'selected' if edit and edit.mtype == k }}>{{ l }}</option>{% endfor %}</select><div class="hint">Bo'sh qoldirsangiz fayllarga qarab aniqlanadi</div></div>
+    <div><label class="l">Joylash vaqti (bo'sh = qoralama)</label><input type="datetime-local" name="when" id="f_when" value="{{ (edit.scheduled_at[:16]|replace(' ','T')) if edit and edit.scheduled_at else '' }}"></div>
+    <div><label class="l">Joylash usuli</label><select name="mode"><option value="">Umumiy ({{ modes[mode] }})</option>{% for k, l in modes.items() %}<option value="{{ k }}" {{ 'selected' if edit and edit.mode == k }}>{{ l }}</option>{% endfor %}</select></div></div>
+  <label class="l">Rasm / video {{ '(yangisi eskisini almashtiradi)' if edit }}</label><input type="file" name="files" id="f_files" multiple accept="image/*,video/mp4,video/quicktime">
+  <div class="hint">Rasm JPEG'ga o'giriladi. Reels uchun vertikal video (9:16), karusel uchun 2-10 ta fayl. Avto rejimda fayl shart.</div>
+  <label class="l">Eslatma o'zingiz uchun (ixtiyoriy)</label><textarea name="notes" rows="2">{{ edit.notes if edit else '' }}</textarea>
+  <div class="actions" style="margin-top:12px"><button class="btn">Saqlash</button>
+    <button type="button" class="btn sec" id="b_review" {{ 'disabled' if not ai_ok }}>{{ ic('bulb') }} AI tahlil</button>
+    <button type="button" class="btn ghost" id="b_times">{{ ic('clock') }} Vaqt taklifi</button>
+    {% if edit %}<a class="btn sec" href="/ig/plan">Bekor qilish</a>{% endif %}</div>
+  {% if not ai_ok %}<div class="hint">AI tahlil uchun OpenAI kaliti kerak (Kanallarim → Sozlamalar). «Vaqt taklifi» AI'siz ishlaydi.</div>{% endif %}
+</form></div>
+<div class="pv-box"><h3>Jonli ko'rinish: Instagram'da shunday ko'rinadi</h3>
+  <div class="pv-toggle" id="pv_toggle" style="display:none;gap:6px;margin-bottom:8px"><button type="button" class="btn sm" data-mode="mine">Mening matnim</button><button type="button" class="btn sm sec" data-mode="alt">AI taklifi</button></div>
+  <div class="ig-mock"><div class="hd"><span class="ava ig" style="width:28px;height:28px;font-size:12px">{{ a.username[:1]|upper }}</span>{{ a.username }}</div><div class="ph" id="pv_ph">Rasm / video</div><div class="cap" id="pv_cap"></div></div>
+  <div class="pv-count" id="pv_count"></div>
+  <div class="hint" style="margin-top:6px">Instagram tavsifning faqat birinchi ~125 belgisini ko'rsatadi, qolgani «ko'proq» orqasida. Shuning uchun birinchi qator eng muhim.</div></div></div>
+<div id="ai_panel" style="display:none;margin-top:14px"></div></div>
+<div class="card"><div class="card-h"><h2>Postlar</h2></div>
+{% if items %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Vaqt</th><th>Post</th><th>Tur</th><th>Media</th><th>Holat</th><th></th></tr></thead><tbody>
+{% for it in items %}<tr><td>{{ (it.scheduled_at or it.created_at)[:16] }}</td>
+<td style="max-width:420px"><b>{{ it.title }}</b><div class="hint">{{ (it.caption or '')[:120] }}</div>{% if it.error %}<div class="red small">{{ it.error }}</div>{% endif %}{% if it.permalink %}<a class="small" href="{{ it.permalink }}" target="_blank" rel="noopener">Instagram'da ochish</a>{% endif %}</td>
+<td>{{ mtypes.get(it.mtype, it.mtype)|truncate(12, True, '') }}</td><td>{{ media(it)|length or '—' }}</td><td><span class="badge b-{{ BADGE.get(it.status, 'waiting') }}">{{ STATUS_L.get(it.status, it.status) }}</span></td>
+<td><div class="actions" style="justify-content:flex-end">
+{% if it.status in ('scheduled','reminded','failed','missed') %}<form method="post" action="/ig/plan/{{ it.id }}/publish-now"><button class="btn sm" title="Hozir API orqali joylash (cloudflared kerak)">Hozir joyla</button></form>
+<form method="post" action="/ig/plan/{{ it.id }}/done"><button class="btn sm ok" title="Qo'lda joyladim">Joylandi ✓</button></form>{% endif %}
+{% if it.status != 'published' %}<a class="btn sm sec" href="?edit={{ it.id }}">Tahrir</a>{% endif %}
+{% if it.status in ('scheduled','reminded') %}<form method="post" action="/ig/plan/{{ it.id }}/cancel"><button class="btn sm sec">Bekor</button></form>{% endif %}
+<form method="post" action="/ig/plan/{{ it.id }}/delete" onsubmit="return confirm('O\'chirilsinmi?')"><button class="btn sm ghost" title="O'chirish">{{ ic('trash') }}</button></form></div></td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty">Reja bo'sh.</div>{% endif %}</div>
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+var $=function(i){return document.getElementById(i)},cap=$('f_text'),ph=$('pv_ph'),pc=$('pv_cap'),cnt=$('pv_count');
+var alt=null,mode='mine',urls=[],existing={{ (media(edit)|tojson) if edit else '[]' }};
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function render(){var t=(mode==='alt'&&alt)?alt:cap.value;var first=t.slice(0,125),rest=t.slice(125);
+ pc.innerHTML='<b>{{ a.username }}</b>'+esc(first).replace(/\n/g,'<br>')+(rest?'<span class="more"> ... yana</span>':'');
+ var n=t.length,tags=(t.match(/#[\p{L}\p{N}_]+/gu)||[]).length;cnt.className='pv-count'+((n>2200||tags>30)?' bad':'');
+ cnt.textContent=n+' / 2200 belgi · '+tags+' ta hashtag'+(n>2200?' · LIMITDAN OSHDI':'')+(tags>30?' · 30 tadan ko\'p hashtag Instagram\'da rad etiladi':'')}
+function media(){ph.innerHTML='';var src=urls.length?urls:existing.map(function(n){return{u:'/media/'+n,v:/\.(mp4|mov|m4v)$/i.test(n)}});
+ if(!src.length){ph.textContent='Rasm / video';return}var s=src[0],e=document.createElement(s.v?'video':'img');e.src=s.u;if(s.v){e.muted=true;e.controls=false}ph.appendChild(e);
+ if(src.length>1){var b=document.createElement('div');b.style.cssText='position:absolute;right:8px;top:8px;background:rgba(0,0,0,.6);color:#fff;border-radius:99px;padding:2px 9px;font-size:12px';b.textContent='1/'+src.length;ph.style.position='relative';ph.appendChild(b)}}
+cap.addEventListener('input',render);
+$('f_files').addEventListener('change',function(){urls.forEach(function(x){URL.revokeObjectURL(x.u)});urls=Array.prototype.map.call(this.files,function(f){return{u:URL.createObjectURL(f),v:f.type.indexOf('video')===0}});media()});
+document.querySelectorAll('#pv_toggle button').forEach(function(b){b.onclick=function(){mode=b.dataset.mode;document.querySelectorAll('#pv_toggle button').forEach(function(x){x.className='btn sm'+(x===b?'':' sec')});render()}});
+render();media();
+var panel=$('ai_panel');
+function post(url,fd){return fetch(url,{method:'POST',body:fd}).then(function(r){return r.json()})}
+function timesHtml(t){if(!t||!t.times||!t.times.length)return '<div class="hint">Mos bo\'sh vaqt topilmadi.</div>';
+ return '<div class="tm">'+t.times.map(function(x){return '<button type="button" data-at="'+x.at+'"><b>'+x.label+'</b><small>'+(x.load?('shu kunda yana '+x.load+' ta post'):'bo\'sh kun')+'</small></button>'}).join('')+'</div><div class="hint">'+(t.data?'Postlaringiz qamroviga qarab tanlandi.':'Hali statistika kam: umumiy eng yaxshi soatlar (kechqurun, tushlik) taklif qilindi.')+' Kunlik me\'yor: '+t.cap+' ta; rejadagi postlar hisobga olingan.</div>'}
+panel.addEventListener('click',function(e){var b=e.target.closest('button[data-at]');if(b){$('f_when').value=b.dataset.at;$('f_when').scrollIntoView({block:'center'})}
+ var u=e.target.closest('button[data-use]');if(u&&alt){if(confirm('Matningiz AI taklifi bilan almashtirilsinmi? (Bekor qilsangiz matningiz o\'zgarmaydi)')){cap.value=alt;mode='mine';render()}}});
+$('b_times').onclick=function(){var q=new URLSearchParams();{% if edit %}q.set('plan_id','{{ edit.id }}');{% endif %}
+ fetch('/ig/plan/times?'+q).then(function(r){return r.json()}).then(function(j){panel.style.display='block';panel.innerHTML='<div class="card" style="margin:0"><div class="card-h"><h2>Vaqt taklifi</h2></div>'+(j.ok?timesHtml(j.data):'<div class="red">'+esc(j.error)+'</div>')+'</div>'})};
+var br=$('b_review');if(br)br.onclick=function(){var fd=new FormData();fd.set('caption',cap.value);fd.set('title',document.querySelector('[name=title]').value);fd.set('mtype',$('f_type').value);
+ fd.set('media_n',(urls.length||existing.length));fd.set('when',$('f_when').value);{% if edit %}fd.set('plan_id','{{ edit.id }}');{% endif %}
+ br.disabled=true;panel.style.display='block';panel.innerHTML='<div class="card" style="margin:0"><div class="empty small">AI tahlil qilmoqda (20-60 soniya)...</div></div>';
+ post('/ig/plan/ai-review',fd).then(function(j){br.disabled=false;if(!j.ok){panel.innerHTML='<div class="note red"><div>'+esc(j.error)+'</div></div>';return}
+  var d=j.data,h='<div class="card" style="margin:0"><div class="card-h"><h2>AI tahlil</h2><span class="badge">Umumiy: '+d.score.overall+'/10</span></div>';
+  if(d.summary)h+='<p>'+esc(d.summary)+'</p>';
+  [['hook','Hook'],['clarity','Aniqlik'],['cta','CTA'],['structure','Tuzilma'],['fit','Moslik']].forEach(function(k){h+='<div class="sc-row"><span>'+k[1]+'</span><i><b style="width:'+d.score[k[0]]*10+'%"></b></i><b>'+d.score[k[0]]+'</b></div>'});
+  (d.warnings||[]).forEach(function(w){h+='<div class="note red" style="margin:8px 0"><div>'+esc(w)+'</div></div>'});
+  h+='<h3 style="margin-top:14px">Takliflar</h3>';(d.suggestions||[]).forEach(function(s){h+='<div class="sg"><span class="pr '+esc(s.priority||'low')+'">'+esc(s.priority||'')+'</span><b>'+esc(s.area||'')+'</b><div>'+esc(s.issue||'')+'</div><div class="mut">→ '+esc(s.fix||'')+'</div></div>'});
+  if(d.improved){h+='<h3>Yaxshilangan variant (sizning matningiz o\'zgarmaydi)</h3><div class="alt">'+esc(d.improved)+'</div>'+(d.hashtags&&d.hashtags.length?'<div class="small">'+esc(d.hashtags.join(' '))+'</div>':'')+'<div class="actions"><button type="button" class="btn sm sec" data-use="1">Shu variantni qo\'llash</button></div>';alt=d.improved;$('pv_toggle').style.display='flex'}
+  if(d.best_format)h+='<p class="small"><b>Eng mos format:</b> '+esc(d.best_format)+'</p>';
+  h+='<h3>Qachon joylash</h3>'+timesHtml(d.times)+'<div class="hint" style="margin-top:8px">AI xarajati: $'+(d.cost||0)+'</div></div>';panel.innerHTML=h;panel.scrollIntoView({behavior:'smooth',block:'start'})}).catch(function(){br.disabled=false;panel.innerHTML='<div class="note red"><div>Aloqa xatosi</div></div>'})};
+document.querySelectorAll('[data-copy-from]').forEach(function(b){b.onclick=function(){var t=$(b.dataset.copyFrom).textContent;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){b.textContent='Nusxalandi ✓'}).catch(function(){var r=document.createRange();r.selectNodeContents($(b.dataset.copyFrom));var s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy');b.textContent='Nusxalandi ✓'})}});
+})();
+</script>{% endblock %}

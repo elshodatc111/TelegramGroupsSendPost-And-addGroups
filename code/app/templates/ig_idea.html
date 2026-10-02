@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}{{ row.title }}{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>{{ row.title }}</h1><p class="sub">{{ 'Video ssenariy' if row.kind == 'script' else "G'oya" }} · {{ row.created_at[:16] }} · {{ (row.cost or 0)|usd }}</p></div>
+  <div class="actions"><a class="btn sm sec" href="/ig/ideas{{ '?k=script' if row.kind == 'script' }}">← Ro'yxat</a></div></div>
+{% if row.kind == 'idea' %}
+<div class="card"><div class="grid g2"><div><span class="badge">{{ {'reel':'Reels','carousel':'Karusel','photo':'Rasm','story':'Stories'}.get(b.format, b.format) }}</span> {% if b.effort %}<span class="badge">qiyinlik: {{ b.effort }}</span>{% endif %} {% if b.best_time_hint %}<span class="badge">{{ b.best_time_hint }}</span>{% endif %}</div></div>
+<h3>Ilk soniya / birinchi qator (hook)</h3><div class="idea-post">{{ b.hook }}</div>
+<h3>Nima qilish kerak</h3><div class="idea-post">{{ b.concept }}</div>
+<h3>Nega aynan shu sahifaga mos</h3><p>{{ b.why }}</p>
+{% for lg, cap in (b.captions or {}).items() %}{% if cap %}<h3>Tayyor tavsif ({{ lg }})</h3><div class="idea-post">{{ cap }}</div>{% endif %}{% endfor %}
+{% if b.hashtags %}<p class="small">{{ b.hashtags|join(' ') }}</p>{% endif %}{% if b.cta %}<p class="small"><b>CTA:</b> {{ b.cta }}</p>{% endif %}</div>
+{% else %}
+<div class="card"><div class="small mut">{{ b.goal }} · {{ b.duration_sec }} soniya</div><h3>Hook (birinchi 2-3 soniya)</h3><div class="idea-post">{{ b.hook }}</div>
+<h3>Sahnalar</h3>{% for s in b.scenes %}<div class="scene"><div class="t">{{ s.t }}</div><div><div><b>Kadr:</b> {{ s.visual }}</div>{% if s.voiceover %}<div><b>Ovoz:</b> «{{ s.voiceover }}»</div>{% endif %}{% if s.onscreen %}<div><b>Ekranda yozuv:</b> {{ s.onscreen }}</div>{% endif %}</div></div>{% endfor %}
+<h3>Tavsif (caption)</h3><div class="idea-post">{{ b.caption }}</div>{% if b.hashtags %}<p class="small">{{ b.hashtags|join(' ') }}</p>{% endif %}
+<div class="grid g2"><div><h3>Musiqa</h3><p class="small">{{ b.music }}</p>{% if b.cta %}<h3>CTA</h3><p class="small">{{ b.cta }}</p>{% endif %}</div>
+<div>{% if b.shooting_tips %}<h3>Suratga olish maslahatlari</h3><ul class="small">{% for t in b.shooting_tips %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}{% if b.needs %}<h3>Kerak bo'ladi</h3><ul class="small">{% for t in b.needs %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}</div></div></div>
+{% endif %}
+<div class="card"><div class="actions">
+<form method="post" action="/ig/ideas/{{ row.id }}/to-plan" class="actions" style="margin:0">{% if row.kind == 'idea' and (b.captions or {})|length > 1 %}<select name="lang" style="width:auto">{% for lg in b.captions %}<option value="{{ lg }}">{{ lg }}</option>{% endfor %}</select>{% endif %}<button class="btn">Rejaga qo'shish</button></form>
+{% if row.kind == 'idea' and b.format == 'reel' %}<a class="btn sec" href="/ig/ideas?k=script&topic={{ row.title|urlencode }}">Video ssenariy yozdirish</a>{% endif %}
+<form method="post" action="/ig/ideas/{{ row.id }}/status" class="actions" style="margin:0"><button class="btn sec" name="status" value="rejected">Rad etish</button><button class="btn sec" name="status" value="accepted">Qabul</button></form>
+<form method="post" action="/ig/ideas/{{ row.id }}/delete" style="margin:0"><button class="btn ghost">{{ ic('trash') }} O'chirish</button></form></div></div>
+{% endblock %}

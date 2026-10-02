@@ -4,7 +4,7 @@ import re
 import statistics
 from datetime import datetime, timedelta
 
-from . import ai, ch_ai, ch_data, ch_stats, ch_tg, ch_track, db
+from . import ai, ch_ai, ch_assist, ch_data, ch_stats, ch_tg, ch_track, db
 from .config import log
 
 FMT = "%Y-%m-%d %H:%M:%S"
@@ -229,9 +229,29 @@ Return ONLY JSON: {"theme": "month theme", "strategy": "4-6 sentences: what the 
 Dates must be inside the requested month and in ascending order."""
 
 
-def month_context(ch) -> str:
+def month_schedule_text(cid: int, month: str) -> str:
+    """Kontent rejada shu oyga allaqachon qo'yilgan postlar (AI ularga to'qnashmasligi uchun)."""
+    y, m = int(month[:4]), int(month[5:7])
+    start = datetime(y, m, 1)
+    end = datetime(y + (m == 12), (m % 12) + 1, 1) - timedelta(seconds=1)
+    rows = ch_assist.busy_slots(cid, start, end)
+    if not rows:
+        return f"ALREADY IN THE CONTENT PLAN for {month}: nothing yet."
+    lines = []
+    for r in rows:
+        t = db.one("SELECT text, media_type FROM ch_plan WHERE id=?", (r["id"],))
+        lines.append(f"- {r['t'].strftime('%Y-%m-%d %H:%M')} [{r['status']}] {r['title']} ({(t['media_type'] if t else '') or 'text'}): "
+                     f"{_clip(t['text'] if t else '', 140)}")
+    return (f"ALREADY IN THE CONTENT PLAN for {month} ({len(rows)} posts; they stay as they are). Fit the new plan AROUND them: "
+            f"do not duplicate their topics, do not put a new post within 2 hours of them, and keep at most {ch_assist.max_per_day()} posts per day in total "
+            f"(existing + new). Fill the free days and balance rubrics against what is already planned.\n" + "\n".join(lines))
+
+
+def month_context(ch, month: str | None = None) -> str:
     cid = ch["id"]
     parts = [ch_ai.build_context(ch, days=30, top_n=5, recent_n=3)]
+    if month:
+        parts.append(month_schedule_text(cid, month))
     s = ch_stats.source_stats(cid, 0, 30)
     parts.append("OWN POSTING PATTERN: " + ch_ai.stats_text(s))
     top = ch_track.top_links(cid, 8)
@@ -250,11 +270,57 @@ def month_context(ch) -> str:
     return "\n\n".join(parts)
 
 
+def resolve_conflicts(cid: int, items: list[dict], month: str, gap_h: float = 2.0) -> int:
+    """Yangi reja postlarini Kontent rejadagi mavjud postlar bilan to'qnashtirmaydi:
+    kunlik me'yordan oshsa yoki 2 soatdan yaqin bo'lsa, soatni siljitadi yoki eng yaqin bo'sh kunga ko'chiradi.
+    Qaytaradi: rejada allaqachon turgan postlar soni."""
+    y, m = int(month[:4]), int(month[5:7])
+    start = datetime(y, m, 1)
+    end = datetime(y + (m == 12), (m % 12) + 1, 1) - timedelta(seconds=1)
+    cap = ch_assist.max_per_day()
+    occ: dict[str, list[datetime]] = {}
+    existing = ch_assist.busy_slots(cid, start, end)
+    for b in existing:
+        occ.setdefault(b["t"].strftime("%Y-%m-%d"), []).append(b["t"])
+
+    def free(t: datetime) -> bool:
+        day = occ.get(t.strftime("%Y-%m-%d"), [])
+        return len(day) < cap and all(abs((t - o).total_seconds()) >= gap_h * 3600 for o in day)
+
+    for it in items:
+        t0 = datetime.strptime(f"{it['date']} {it['time']}", "%Y-%m-%d %H:%M")
+        cand = None
+        if free(t0):
+            cand = t0
+        else:
+            for dh in (1, -1, 2, -2, 3, -3, 4, -4, 5, -5):          # shu kunning o'zida soatni siljitish
+                t = t0 + timedelta(hours=dh)
+                if t.date() == t0.date() and 8 <= t.hour <= 22 and free(t):
+                    cand = t
+                    break
+            if cand is None:
+                for dd in (1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7):   # eng yaqin bo'sh kun
+                    t = t0 + timedelta(days=dd)
+                    if t.month == m and free(t):
+                        cand = t
+                        break
+        if cand is None:
+            it["conflict"] = True
+            it["moved_note"] = "Kontent rejada shu kunlar band: vaqtni o'zingiz tanlang"
+            cand = t0
+        elif cand != t0:
+            it["moved_from"] = f"{it['date']} {it['time']}"
+            it["moved_note"] = f"Kontent rejada band bo'lgani uchun {it['moved_from']} dan ko'chirildi"
+            it["date"], it["time"] = cand.strftime("%Y-%m-%d"), cand.strftime("%H:%M")
+        occ.setdefault(cand.strftime("%Y-%m-%d"), []).append(cand)
+    return len(existing)
+
+
 async def generate_month(cid: int, month: str, note: str = "") -> int:
     ch = ch_data.get(cid)
     y, m = int(month[:4]), int(month[5:7])
     days = (datetime(y + (m == 12), (m % 12) + 1, 1) - datetime(y, m, 1)).days
-    user = (f"{month_context(ch)}\n\n=== TASK ===\nMonth: {month} ({days} days). Language of topics/briefs: Uzbek (Latin).\n"
+    user = (f"{month_context(ch, month)}\n\n=== TASK ===\nMonth: {month} ({days} days). Language of topics/briefs: Uzbek (Latin).\n"
             f"Channel post frequency: {ch['post_freq'] or 'about 1 post per day'}.\n" + (f"Owner's note: {_clip(note, 500)}\n" if note.strip() else ""))
     data, meta = await ai.chat(cid, "idea", MONTH_SYSTEM, user, max_out=12000, note="oylik reja")
     items = (data or {}).get("items") if isinstance(data, dict) else None
@@ -269,6 +335,8 @@ async def generate_month(cid: int, month: str, note: str = "") -> int:
         it["time"] = t if re.match(r"^\d{2}:\d{2}$", t) else "19:00"
         it["date"] = d
         clean.append(it)
+    clean.sort(key=lambda x: (x["date"], x["time"]))
+    data["existing"] = resolve_conflicts(cid, clean, month)
     clean.sort(key=lambda x: (x["date"], x["time"]))
     data["items"] = clean
     return db.ex("INSERT INTO ch_month(channel_id,month,created_at,body_json,model,cost) VALUES(?,?,?,?,?,?)",

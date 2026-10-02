@@ -50,7 +50,7 @@ LOOP_TITLES = {
     "manager": "Akkauntlarni ulash", "auto_refresh": "Guruhlarni avto-yangilash", "leaver": "Guruhdan chiqish", "dailyreport": "Kunlik hisobot (Group Post)",
     "discovery": "Guruh qidirish", "auditor": "Guruh auditi", "ch_collect": "Kanal ma'lumotlarini yig'ish", "ch_plan": "Kontent reja yuboruvchi",
     "ch_learn": "Bilim xotirasi", "backup": "Baza zaxirasi", "ch_track": "Havola bosilishlarini olish", "ch_insight": "Statistika va viral kuzatuvi",
-    "ch_report": "Haftalik hisobot",
+    "ch_report": "Haftalik hisobot", "ig_collect": "Instagram: ma'lumot yig'ish", "ig_plan": "Instagram: reja (eslatma/joylash)",
 }
 
 
@@ -78,7 +78,7 @@ def _size(n: float) -> str:
 def _mod(text: str) -> str:
     t = text.lower()
     for words, name in ((("mysql", "pymysql", "aria", "operationalerror", "xampp"), "Baza (MySQL)"), (("openai", "ai.chat", "insufficient_quota", "rate limit"), "OpenAI"),
-                        (("floodwait", "telethon", "rpcerror", "session", "telegram"), "Telegram"), (("ffmpeg", "whisper", "transcri"), "Video → matn"),
+                        (("instagram", "ig_api", "ig_collect", "ig_plan", "igerror", "graph.instagram"), "Instagram"), (("floodwait", "telethon", "rpcerror", "session", "telegram"), "Telegram"), (("ffmpeg", "whisper", "transcri"), "Video → matn"),
                         (("diffusers", "cuda", "torch", "imagegen", "rasm"), "Rasm yaratish"), (("worker", "cloudflare", "track"), "Kuzatuv havolasi"),
                         (("reportlab", "openpyxl", "hisobot"), "Hisobot"), (("ch_plan", "send_item", "reja"), "Kontent reja"), (("sender", "joiner", "campaign"), "Group Post")):
         if any(w in t for w in words):
@@ -251,6 +251,49 @@ def check_content():
     return out
 
 
+def check_instagram():
+    g = "Instagram"
+    out = []
+    accs = db.q("SELECT * FROM ig_accounts ORDER BY username")
+    mode = "auto" if db.get_setting("ig_publish_mode", "reminder") == "auto" else "reminder"
+    out.append(item(g, "Joylash rejimi", INFO, "Avto (cloudflared tunnel)" if mode == "auto" else "Eslatma (qo'lda joylash): tunnel kerak emas", key="ig_mode"))
+    if not accs:
+        out.append(item(g, "Ulangan sahifalar", INFO, "Hali Instagram sahifa ulanmagan", "Instagram → Sahifalar.", key="ig_none"))
+        return out
+    for a in accs:
+        days = None
+        if a["token_expires"]:
+            try:
+                days = (datetime.strptime(a["token_expires"], "%Y-%m-%d %H:%M:%S") - datetime.now()).days
+            except ValueError:
+                pass
+        name = f"@{a['username']}"
+        if a["status"] == "token":
+            out.append(item(g, f"{name}: token", FAIL, (a["last_error"] or "token yaroqsiz")[:200], "Instagram → Sahifalar: yangi token kiriting.", key=f"ig_tok_{a['id']}"))
+        elif days is not None and days < 0:
+            out.append(item(g, f"{name}: token", FAIL, "Muddati o'tgan", "Instagram → Sahifalar: qayta ulang.", key=f"ig_tok_{a['id']}"))
+        elif days is not None and days <= 10:
+            out.append(item(g, f"{name}: token", WARN, f"{days} kun qoldi", "Dastur o'zi yangilaydi; yangilanmasa «Tokenni yangilash».", key=f"ig_tok_{a['id']}"))
+        else:
+            out.append(item(g, f"{name}: token", OK, f"{days} kun qoldi" if days is not None else "Faol", key=f"ig_tok_{a['id']}"))
+        sy = a["synced_at"]
+        stale = True
+        if sy:
+            try:
+                stale = datetime.now() - datetime.strptime(sy, "%Y-%m-%d %H:%M:%S") > timedelta(hours=12)
+            except ValueError:
+                pass
+        if a["status"] == "error":
+            out.append(item(g, f"{name}: ma'lumot yig'ish", WARN, (a["last_error"] or "")[:200], "Instagram → Diagnostika.", key=f"ig_sync_{a['id']}"))
+        else:
+            out.append(item(g, f"{name}: ma'lumot yig'ish", WARN if stale else OK, f"oxirgi: {sy[:16] if sy else 'hali yo`q'}", "Instagram → «Yangilash»." if stale else "", key=f"ig_sync_{a['id']}"))
+    late = db.one("SELECT COUNT(*) c FROM ig_plan WHERE status IN ('scheduled','reminded') AND scheduled_at < ?", ((datetime.now() - timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S"),))["c"]
+    failed = db.one("SELECT COUNT(*) c FROM ig_plan WHERE status IN ('failed','missed') AND scheduled_at >= ?", ((datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"),))["c"]
+    out.append(item(g, "Instagram postlari: kutayotgan/kechikkan", OK if not late else WARN, f"{late} ta vaqti o'tgan, hali belgilanmagan", "" if not late else "Instagram → Kontent reja: «Joylandi» deb belgilang yoki suring.", key="ig_late"))
+    out.append(item(g, "Oxirgi 7 kunda joylanmagan postlar", OK if not failed else WARN, f"{failed} ta", "" if not failed else "Kontent reja sahifasida xato sababi ko'rinadi.", key="ig_failed"))
+    return out
+
+
 def log_summary(hours=24, limit=8):
     """Log fayldagi ERROR/WARNING larni guruhlab beradi: qaysi bo'limda, necha marta."""
     lines = []
@@ -291,7 +334,7 @@ def events(limit=30):
 # ---------------------------------------------------------------- umumiy
 async def run_all() -> dict:
     items: list[dict] = []
-    for fn in (check_database, check_telegram, check_openai, check_media_tools, check_loops, check_content):
+    for fn in (check_database, check_telegram, check_openai, check_media_tools, check_loops, check_content, check_instagram):
         try:
             items += fn()
         except Exception as e:
@@ -301,11 +344,6 @@ async def run_all() -> dict:
         items += await check_worker()
     except Exception as e:
         items.append(item("Kuzatuv havolasi", "Cloudflare Worker", FAIL, str(e)[:200], key="worker"))
-    try:                                    # Majlislar (Zoom): holat qatorlari
-        from . import meet_sched
-        items += meet_sched.health_items()
-    except Exception as e:
-        items.append(item("Majlislar (Zoom)", "Tekshiruv", FAIL, f"{type(e).__name__}: {e}", "Loglarni ko'ring.", key="meet"))
     lg = log_summary()
     if lg["errors"]:
         top = lg["rows"][0] if lg["rows"] else None

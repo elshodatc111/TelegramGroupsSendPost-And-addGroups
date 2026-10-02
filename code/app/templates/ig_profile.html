@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% block title %}Profil va maqsad{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Profil va maqsad: @{{ a.username }}</h1><p class="sub">AI shu ma'lumotlarga tayanib g'oya, ssenariy va tavsiya beradi. Asosiy maqsad: sahifani rivojlantirish.</p></div></div>
+<div class="grid g2">
+<div class="card" style="margin:0"><div class="card-h"><h2>Sahifa haqida</h2></div>
+<form method="post" action="/ig/profile/save">
+<label class="l">Soha / sahifa nima haqida *</label><textarea name="niche" rows="2" placeholder="Masalan: Toshkentdagi koreys tili o'quv markazi" required>{{ a.niche or '' }}</textarea>
+<label class="l">Auditoriya (kim uchun)</label><textarea name="audience" rows="2" placeholder="Masalan: 16-30 yosh, Koreyada ishlash/o'qishni xohlovchilar">{{ a.audience or '' }}</textarea>
+<label class="l">Ohang (tone)</label><input type="text" name="tone" value="{{ a.tone or '' }}" placeholder="Do'stona, motivatsion, sodda">
+<label class="l">Nima taklif qilinadi / nimani reklama qilamiz</label><textarea name="offer" rows="2">{{ a.offer or '' }}</textarea>
+<div class="grid g2"><div><label class="l">Kontent tili</label><select name="lang">{% for k, l in langs.items() %}<option value="{{ k }}" {{ 'selected' if k == a.lang }}>{{ l }}</option>{% endfor %}</select></div></div>
+<label class="l">Qo'shimcha (taqiqlar, brend qoidalari)</label><textarea name="extra" rows="2">{{ a.extra or '' }}</textarea>
+<div class="actions" style="margin-top:12px"><button class="btn">Saqlash</button></div></form></div>
+<div class="card" style="margin:0"><div class="card-h"><h2>{{ ic('target') }} Maqsad</h2></div>
+{% if gp %}<div class="hint">Hozir {{ gp.current|num }} → maqsad {{ gp.target|num }} ({{ gp.pct }}%){% if gp.left_days is not none %} · {{ gp.left_days }} kun qoldi{% endif %}{% if gp.need_per_day %} · kuniga +{{ gp.need_per_day }} kerak{% endif %}</div><div class="ig-prog"><i style="width:{{ gp.pct }}%"></i></div>{% endif %}
+<form method="post" action="/ig/goal/save"><label class="l">Maqsad</label><textarea name="goal_text" id="g_text" rows="3" placeholder="Masalan: 60 kunda 5 000 ta obunachiga yetish">{{ a.goal_text or '' }}</textarea>
+<div class="grid g2"><div><label class="l">Obunachi maqsadi</label><input type="number" min="0" name="goal_target" id="g_target" value="{{ a.goal_target or '' }}"></div><div><label class="l">Muddat</label><input type="date" name="goal_date" id="g_date" value="{{ a.goal_date or '' }}"></div></div>
+<div class="actions" style="margin-top:10px"><button class="btn">Maqsadni saqlash</button></div></form>
+<hr style="border:0;border-top:1px solid var(--bd);margin:16px 0">
+<form method="post" action="/ig/goal/propose" data-busy="AI ma'lumotlarni tahlil qilib maqsad tuzmoqda..."><button class="btn sec" {{ '' if ai_ok else 'disabled' }}>{{ ic('bulb') }} AI maqsad taklif qilsin</button>
+<div class="hint">AI sahifa ma'lumotlari va haqiqiy statistikaga qarab real maqsad taklif qiladi. Taklif sizning maqsadingizni o'zgartirmaydi: pastdan «Qo'llash» bosasiz, xohlasangiz tahrirlaysiz.</div></form>
+{% if goal %}<div class="note" style="margin-top:12px;display:block"><b>AI taklifi</b>{% if goal_at %} <span class="hint">({{ goal_at[:16] }})</span>{% endif %}
+<p style="margin:6px 0"><b>{{ goal.goal }}</b><br>Maqsad: {{ goal.target_followers|num }} obunachi, {{ goal.days }} kunda</p><p class="small">{{ goal.why }}</p>
+{% if goal.kpis %}<ul class="small">{% for k in goal.kpis %}<li>{{ k.name }}: {{ k.now }} → <b>{{ k.target }}</b></li>{% endfor %}</ul>{% endif %}
+{% if goal.strategy %}<div class="small"><b>Strategiya:</b><ul>{% for s in goal.strategy %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+{% if goal.risks %}<div class="small mut"><b>Xavflar:</b> {{ goal.risks|join('; ') }}</div>{% endif %}
+<button type="button" class="btn sm" id="g_apply" data-t="{{ goal.goal|e }}" data-n="{{ goal.target_followers }}" data-d="{{ goal.days }}">Taklifni maydonlarga qo'llash</button></div>{% endif %}
+</div></div>
+{% endblock %}
+{% block scripts %}<script>
+(function(){var b=document.getElementById('g_apply');if(!b)return;b.onclick=function(){
+document.getElementById('g_text').value=b.dataset.t;document.getElementById('g_target').value=b.dataset.n;
+var d=new Date();d.setDate(d.getDate()+parseInt(b.dataset.d||'60',10));document.getElementById('g_date').value=d.toISOString().slice(0,10);
+window.scrollTo({top:0,behavior:'smooth'});};})();
+</script>{% endblock %}

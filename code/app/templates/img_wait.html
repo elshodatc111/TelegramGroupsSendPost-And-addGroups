@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block title %}{{ proj.title }}{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>{{ proj.title }}</h1><p class="sub">{{ brand.name if brand }} · {{ proj.fmt }}</p></div>
+<div class="actions"><a class="btn ghost" href="/img">Loyihalar</a></div></div>
+<div class="card">
+{% if proj.status == 'error' %}
+<div class="card-h"><h2>{{ ic('alert') }} Tahlil bajarilmadi</h2><span class="ig-pill error">Xato</span></div>
+<div class="ig-warn">{{ ic('alert') }}<div>{{ proj.error or proj.msg or 'Noma\'lum xato' }}</div></div>
+<form method="post" action="/img/p/{{ proj.id }}/reanalyze"><label class="l">Ssenariy (kerak bo'lsa tahrirlang)</label><textarea name="script" rows="8">{{ proj.script }}</textarea>
+<div class="actions" style="margin-top:10px"><button class="btn acc">Qayta urinish</button></div></form>
+<form method="post" action="/img/p/{{ proj.id }}/delete" onsubmit="return confirm('Loyiha o\'chirilsinmi?')" style="margin-top:8px"><button class="btn ghost sm">Loyihani o'chirish</button></form>
+{% else %}
+<div class="card-h"><h2>{{ ic('wand') }} Ssenariy o'rganilmoqda</h2><span class="ig-pill analyzing" id="st">{{ proj.msg or 'Navbatda' }}</span></div>
+<p class="mut">AI ssenariyni 5 soniyagacha bo'lgan sahnalarga bo'lmoqda va qaysi odamlar hamda joylar kerakligini aniqlamoqda. Sahifani yopsangiz ham jarayon davom etadi.</p>
+<div class="ig-prog"><i id="pg" style="width:{{ proj.progress or 5 }}%"></i></div>
+{% endif %}
+</div>
+{% endblock %}
+{% block scripts %}{% if proj.status != 'error' %}<script>
+(function(){
+  const pid={{ proj.id }};
+  async function tick(){
+    try{const j=await (await fetch('/img/p/'+pid+'/status.json',{cache:'no-store'})).json();
+      if(j.gone){location.href='/img';return}
+      if(j.status!=='analyzing'&&j.status!=='new'){location.reload();return}
+      document.getElementById('pg').style.width=Math.max(5,j.progress||0)+'%';document.getElementById('st').textContent=j.msg||j.status_uz}catch(e){}
+    setTimeout(tick,2000)}
+  setTimeout(tick,1500);
+})();
+</script>{% endif %}{% endblock %}

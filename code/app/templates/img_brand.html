@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% block title %}{{ b.name }}{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>{{ b.name }}</h1><p class="sub">Brend kartasi, odamlar va joylar.</p></div>
+<div class="actions"><a class="btn ghost" href="/img/brands">Brendlar</a><a class="btn acc" href="/img/new?brand={{ b.id }}">{{ ic('plus') }} Shu brend uchun loyiha</a></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('edit') }} Brend kartasi</h2></div>
+<form method="post" action="/img/brands/{{ b.id }}/save" enctype="multipart/form-data"><div class="grid g2">
+<div><label class="l">Brend nomi *</label><input type="text" name="name" value="{{ b.name }}" required></div>
+<div><label class="l">Logo {% if b.logo %}(hozirgi quyida){% endif %}</label><input type="file" name="logo" accept="image/*">{% if b.logo %}<img src="/img/f/{{ b.logo }}" style="height:56px;margin-top:6px;background:#fff;border-radius:8px;padding:4px" alt="">{% endif %}</div>
+<div style="grid-column:1/-1"><label class="l">Faoliyat turi *</label><textarea name="activity" rows="2" required>{{ b.activity }}</textarea></div>
+<div><label class="l">Auditoriya</label><input type="text" name="audience" value="{{ b.audience or '' }}"></div>
+<div><label class="l">Ohang</label><input type="text" name="tone" value="{{ b.tone or '' }}"></div>
+<div><label class="l">Ranglar</label><input type="text" name="colors" value="{{ b.colors or '' }}"></div>
+<div><label class="l">Shior</label><input type="text" name="slogan" value="{{ b.slogan or '' }}"></div>
+<div><label class="l">Brend haqida</label><input type="text" name="about" value="{{ b.about or '' }}"></div>
+<div><label class="l">Hech qachon ko'rsatilmasin</label><input type="text" name="avoid" value="{{ b.avoid or '' }}"></div></div>
+<div class="hint">Logo rasmlarga chizilmaydi: logo sahnalarida bo'sh joy qoldiriladi, logoni montajda qo'yasiz.</div>
+<div class="actions" style="margin-top:12px"><button class="btn">Saqlash</button></div></form>
+<form method="post" action="/img/brands/{{ b.id }}/delete" onsubmit="return confirm('Brend, uning odamlari, joylari va loyihalari butunlay o\'chiriladi. Davom etasizmi?')" style="margin-top:8px"><button class="btn ghost sm">Brendni o'chirish</button></form></div>
+
+<div class="card"><div class="card-h"><h2>{{ ic('users') }} Odamlar ({{ people|length }})</h2></div>
+<p class="mut small">Xodim, o'qituvchi yoki mijoz rasmlari. Referens rasmlar: ularni rasm/video platformasiga yuklaysiz va odam qiyofasi videolarda o'zgarmaydi. Roziligi olinmagan odam bilan loyiha boshlanmaydi.</p>
+{% for pe in people %}<div class="ig-role" id="p{{ pe.id }}"><form method="post" action="/img/people/{{ pe.id }}/save" enctype="multipart/form-data" id="pf{{ pe.id }}">
+<div class="grid g3"><div><label class="l">Ism</label><input type="text" name="name" value="{{ pe.name }}" required></div>
+<div><label class="l">Kim</label><select name="kind">{% for k, v in KINDS.items() %}<option value="{{ k }}" {{ 'selected' if pe.kind == k }}>{{ v }}</option>{% endfor %}</select></div>
+<div><label class="l">&nbsp;</label><label class="ig-chk"><input type="checkbox" name="consent" {{ 'checked' if pe.consent }}> Roziligi olingan</label></div>
+<div style="grid-column:1/-1"><label class="l">Tashqi ko'rinish (AI ga yordam)</label><input type="text" name="appearance" value="{{ pe.appearance or '' }}" placeholder="masalan: 30 yoshlar, qora soch, ko'zoynak"></div>
+<div style="grid-column:1/-1"><label class="l">Izoh</label><input type="text" name="note" value="{{ pe.note or '' }}"></div></div>
+<div class="ig-photos" style="margin:10px 0">{% for ph in pe.photos %}<div><div class="ig-photo"><img src="/img/f/{{ ph.path }}" alt="" loading="lazy"></div><button class="btn sm ghost" formaction="/img/people/{{ pe.id }}/photo/{{ ph.id }}/delete" formnovalidate onclick="return confirm('Rasm o\'chirilsinmi?')">{{ ic('trash') }}</button></div>{% else %}<span class="mut small">Rasm yo'q: kamera orqali 5 kadr oling.</span>{% endfor %}</div>
+<div class="row" style="align-items:end"><div><button type="button" class="btn acc sm" data-cam="#pf{{ pe.id }}" data-cam-submit>{{ ic('camera') }} Kamera orqali olish (5 kadr)</button></div><div><label class="l">yoki fayldan qo'shish</label><input type="file" name="photos" accept="image/*" multiple></div><div><label class="l">Rasm izohi (fayl uchun)</label><input type="text" name="label"></div></div>
+<div class="actions" style="margin-top:10px"><button class="btn sm">Saqlash</button><button class="btn sm ghost" formaction="/img/people/{{ pe.id }}/delete" formnovalidate onclick="return confirm('Odam o\'chirilsinmi?')">O'chirish</button></div></form></div>{% endfor %}
+<div class="ig-role"><b>{{ ic('plus') }} Yangi odam</b><form method="post" action="/img/brands/{{ b.id }}/people" enctype="multipart/form-data" style="margin-top:8px" id="np"><div class="grid g3">
+<div><label class="l">Ism *</label><input type="text" name="name" required></div>
+<div><label class="l">Kim</label><select name="kind">{% for k, v in KINDS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+<div><label class="l">&nbsp;</label><label class="ig-chk"><input type="checkbox" name="consent"> Roziligi olingan</label></div>
+<div style="grid-column:1/-1"><label class="l">Tashqi ko'rinish</label><input type="text" name="appearance"></div>
+<div><button type="button" class="btn acc sm" data-cam="#np">{{ ic('camera') }} Kamera orqali ro'yxatga olish (5 kadr)</button><div class="mut small" data-cam-note style="margin-top:6px"></div></div><div><label class="l">yoki fayldan</label><input type="file" name="photos" accept="image/*" multiple></div><div><label class="l">Rasm izohi</label><input type="text" name="label"></div></div>
+<div class="actions" style="margin-top:10px"><button class="btn acc">Odam qo'shish</button></div></form></div></div>
+
+<div class="card"><div class="card-h"><h2>{{ ic('map-pin') }} Joylar ({{ locs|length }})</h2><a class="btn sm sec" href="/img/locations?brand={{ b.id }}">Joylarni boshqarish</a></div>
+{% if locs %}<div>{% for lo in locs %}<span class="ig-tag pr">{{ lo.name }}</span>{% endfor %}</div>{% else %}<p class="mut">Hali joy yo'q.</p>{% endif %}</div>
+{% if projects %}<div class="card"><div class="card-h"><h2>{{ ic('image') }} Loyihalar</h2></div>{% for p in projects %}<div><a href="/img/p/{{ p.id }}">{{ p.title }}</a> <span class="ig-pill {{ p.status }}">{{ STATUS.get(p.status, p.status) }}</span></div>{% endfor %}</div>{% endif %}
+{% endblock %}
+
+{% block scripts %}<script src="/static/img_cam.js"></script>{% endblock %}

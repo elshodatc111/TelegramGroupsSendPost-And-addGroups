@@ -51,7 +51,7 @@ LOOP_TITLES = {
     "discovery": "Guruh qidirish", "auditor": "Guruh auditi", "ch_collect": "Kanal ma'lumotlarini yig'ish", "ch_plan": "Kontent reja yuboruvchi",
     "ch_learn": "Bilim xotirasi", "backup": "Baza zaxirasi", "ch_track": "Havola bosilishlarini olish", "ch_insight": "Statistika va viral kuzatuvi",
     "ch_report": "Haftalik hisobot", "ig_collect": "Instagram: ma'lumot yig'ish", "ig_plan": "Instagram: reja (eslatma/joylash)", "cf_watch": "Cloudflare R2: hajm nazorati",
-    "meet_sched": "Zoom Online: darslar sikli", "meet_bot": "Zoom Online: o'qituvchilar boti",
+    "meet_sched": "Zoom Online: darslar sikli", "meet_bot": "Zoom Online: o'qituvchilar boti", "img_work": "Image Generator: rasm yaratish navbati",
 }
 
 
@@ -300,6 +300,11 @@ def check_meet():
     return meet_sched.health_items()
 
 
+def check_imagegen():
+    from . import img_work
+    return img_work.health_items(item)
+
+
 def check_cloud():
     from . import cf
     return cf.health_items(item)
@@ -345,7 +350,7 @@ def events(limit=30):
 # ---------------------------------------------------------------- umumiy
 async def run_all() -> dict:
     items: list[dict] = []
-    for fn in (check_database, check_telegram, check_openai, check_media_tools, check_loops, check_content, check_instagram, check_meet, check_cloud):
+    for fn in (check_database, check_telegram, check_openai, check_media_tools, check_loops, check_content, check_instagram, check_meet, check_imagegen, check_cloud):
         try:
             items += fn()
         except Exception as e:

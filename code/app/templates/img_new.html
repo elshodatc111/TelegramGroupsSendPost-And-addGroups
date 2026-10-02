@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% block title %}Yangi loyiha{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Yangi loyiha</h1><p class="sub">1-bosqich: ssenariy va rasm formati. Keyin AI sahnalar, odamlar va joylarni aniqlaydi.</p></div></div>
+{% if not brands %}<div class="ig-warn">{{ ic('alert') }}<div>Brend yo'q. Avval <a href="/img/brands">brend yarating</a>.</div></div>{% endif %}
+<form method="post" action="/img/new" id="nf" data-busy="Yaratilmoqda...">
+<div class="card"><div class="card-h"><h2>{{ ic('users') }} Brend va nom</h2></div><div class="grid g2">
+<div><label class="l">Brend</label><select name="brand_id" id="brand" required>{% for b in brands %}<option value="{{ b.id }}" {{ 'selected' if bid == b.id }}>{{ b.name }}</option>{% endfor %}</select></div>
+<div><label class="l">Loyiha nomi (ixtiyoriy)</label><input type="text" name="title" maxlength="200" placeholder="masalan: Koreys tili kursi reklamasi"></div></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('edit') }} Ssenariy (o'zbek tilida, 20-60 soniya)</h2></div>
+<textarea name="script" id="script" rows="11" placeholder="Tayyor ssenariyni shu yerga tashlang yoki pastdagi mavzu orqali AI yozsin."></textarea>
+<div class="hint" id="cnt"></div>
+<div class="ig-role" style="margin-top:14px"><b>{{ ic('wand') }} AI ssenariy yozsin</b>
+<div class="grid g3" style="margin-top:8px"><div style="grid-column:span 2"><label class="l">Mavzu</label><input type="text" name="topic" id="topic" placeholder="masalan: 3 oyda koreys tilida gapirishni o'rganish"></div>
+<div><label class="l">Davomiyligi (soniya)</label><input type="number" id="sec" value="30" min="15" max="90"></div></div>
+<label class="l" style="margin-top:8px">Qo'shimcha istaklar (ixtiyoriy)</label><input type="text" id="extra" placeholder="uslub, qaysi odamlar qatnashishi...">
+<div class="actions" style="margin-top:10px"><button type="button" class="btn sec" id="gen" data-keep="1">{{ ic('wand') }} Ssenariy yozish</button><span class="mut small" id="genmsg"></span></div></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('image') }} Format va uslub</h2></div>
+<label class="l">Tomonlar nisbati (promptga yoziladi)</label>
+<div class="seg" style="margin-bottom:12px">{% for k, v in FORMATS.items() %}<label><input type="radio" name="fmt" value="{{ k }}" {{ 'checked' if k == '9:16' }}> {{ v }}</label>{% endfor %}</div>
+<label class="l">Uslub</label><select name="style" style="max-width:360px">{% for k, v in STYLES.items() %}<option value="{{ k }}">{{ v[0] }}</option>{% endfor %}</select></div>
+<div class="card"><div class="card-h"><h2>{{ ic('video') }} Platformalar</h2><a class="btn sm ghost" href="/img/settings#plat">Platformalarni sozlash</a></div>
+<p class="mut small" style="margin-top:0">Hech narsa yaratilmaydi: faqat tanlangan platformalar qoidasiga mos <b>promptlar</b> yoziladi. Rasm promptini tanlangan rasm platformasida ishlatasiz, video promptlar esa shu rasmni jonlantirish uchun.</p>
+<label class="l">Rasm qaysi platformada yaratiladi? (bittasi)</label>
+<div class="seg" style="margin-bottom:12px">{% for p in img_plats %}<label><input type="radio" name="image_platform" value="{{ p.name }}" {{ 'checked' if loop.first }}> {{ p.name }}</label>{% else %}<span class="mut small">Rasm platformasi yo'q: Sozlamalarda qo'shing.</span>{% endfor %}</div>
+<label class="l">Video qaysi platformalarda yaratiladi? (bir nechta tanlash mumkin)</label>
+<div class="ig-photos" style="gap:14px">{% for p in vid_plats %}<label class="ig-chk"><input type="checkbox" name="video_platforms" value="{{ p.name }}" {{ 'checked' if loop.first }}> {{ p.name }} <span class="mut tiny">({{ '%g'|format(p.max_sec) }} s{{ ', audio' if p.audio }})</span></label>{% else %}<span class="mut small">Video platforma yo'q.</span>{% endfor %}</div>
+<div class="hint">Har sahna ko'pi bilan 5 soniya. Har tanlangan platforma uchun alohida prompt yoziladi, shuning uchun keraklisini tanlang.</div></div>
+<div class="actions"><button class="btn acc lg" {{ 'disabled' if not brands }}>Ssenariyni o'rganish</button><a class="btn ghost" href="/img">Bekor qilish</a></div>
+</form>
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+  const s=document.getElementById('script'),c=document.getElementById('cnt');
+  const upd=()=>{const w=(s.value.trim().match(/\S+/g)||[]).length;c.textContent=w+' ta so\'z · taxminan '+Math.round(w/2.3)+' soniya (o\'rtacha nutq tezligida)'};
+  s.addEventListener('input',upd);upd();
+  document.getElementById('gen').addEventListener('click',async()=>{
+    const m=document.getElementById('genmsg'),b=document.getElementById('gen');
+    const fd=new FormData();fd.append('brand_id',document.getElementById('brand').value);fd.append('topic',document.getElementById('topic').value);fd.append('seconds',document.getElementById('sec').value);fd.append('extra',document.getElementById('extra').value);
+    b.disabled=true;m.textContent='AI yozmoqda...';
+    try{const r=await fetch('/img/script-ai',{method:'POST',body:fd});const j=await r.json();
+      if(j.ok){s.value=j.script||'';upd();m.textContent='Tayyor. Tahrirlab olishingiz mumkin.';const t=document.querySelector('input[name=title]');if(t&&!t.value&&j.title)t.value=j.title}
+      else m.textContent=j.err||'Xato'}catch(e){m.textContent='Ulanish xatosi'}
+    b.disabled=false});
+})();
+</script>{% endblock %}

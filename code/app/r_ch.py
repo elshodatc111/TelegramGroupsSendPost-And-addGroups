@@ -20,8 +20,8 @@ def _safe(next_: str, default="/ch") -> str:
 # ---------------------------------------------------------------- bo'lim va kanal tanlash
 @router.post("/ws/switch")
 async def ws_switch(ws: str = Form("posting")):
-    ws = ws if ws in ("channels", "system", "instagram", "meet") else "posting"
-    resp = RedirectResponse({"channels": "/ch", "system": "/sys", "instagram": "/ig", "meet": "/meet"}.get(ws, "/"), status_code=303)
+    ws = ws if ws in ("channels", "system", "instagram", "meet", "img") else "posting"
+    resp = RedirectResponse({"channels": "/ch", "system": "/sys", "instagram": "/ig", "meet": "/meet", "img": "/img"}.get(ws, "/"), status_code=303)
     resp.set_cookie("ws", ws, max_age=YEAR, samesite="lax")
     return resp
 

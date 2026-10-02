@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import auditor, backup, ch_ai, ch_collect, ch_data, ch_insight, ch_plan, ch_report, ch_track, dailyreport, cf, db, discovery, ig_collect, ig_data, ig_plan, jobops, leaver, meet_bot, meet_sched, syscheck
+from . import auditor, backup, ch_ai, ch_collect, ch_data, ch_insight, ch_plan, ch_report, ch_track, dailyreport, cf, db, discovery, ig_collect, ig_data, ig_plan, jobops, leaver, meet_bot, meet_sched, syscheck, img_work
 from .config import CODE_DIR, MEDIA_DIR, log
 from .core import joiner, manager, sender
 from .web import acc_id, page
@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
           sv("ch_collect", ch_collect.loop), sv("ch_plan", ch_plan.loop), sv("ch_learn", ch_ai.learn_loop), sv("backup", backup.loop),
           sv("ch_track", ch_track.loop), sv("ch_insight", ch_insight.loop), sv("ch_report", ch_report.loop),
           sv("ig_collect", ig_collect.loop), sv("ig_plan", ig_plan.loop), sv("cf_watch", cf.loop),
-          sv("meet_sched", meet_sched.loop), sv("meet_bot", meet_bot.loop)]
+          sv("meet_sched", meet_sched.loop), sv("meet_bot", meet_bot.loop), sv("img_work", img_work.loop)]
     log.info("Dastur ishga tushdi")
     yield
     for t in bg:
@@ -119,6 +119,10 @@ def _is_meet(path: str) -> bool:
     return path == "/meet" or path.startswith("/meet/")
 
 
+def _is_img(path: str) -> bool:
+    return path == "/img" or path.startswith("/img/")
+
+
 def _via_tunnel(request: Request) -> bool:
     """So'rov Cloudflare tunnel orqali (internetdan) keldimi?"""
     h = request.headers
@@ -147,9 +151,11 @@ async def guard(request: Request, call_next):
         return RedirectResponse("/sys", status_code=303)
     if path == "/" and request.cookies.get("ws") == "meet":
         return RedirectResponse("/meet", status_code=303)
+    if path == "/" and request.cookies.get("ws") == "img":
+        return RedirectResponse("/img", status_code=303)
     if path == "/" and request.cookies.get("ws") == "instagram":
         return RedirectResponse("/ig", status_code=303)
-    request.state.ws = "channels" if _is_ch(path) else "system" if _is_sys(path) else "instagram" if _is_ig(path) else "meet" if _is_meet(path) else "posting"
+    request.state.ws = "channels" if _is_ch(path) else "system" if _is_sys(path) else "instagram" if _is_ig(path) else "meet" if _is_meet(path) else "img" if _is_img(path) else "posting"
     if not path.startswith("/static") and not path.startswith("/media"):
         # Telegram Guruhlar akkauntlari (Telegram SMM akkaunti bu yerda ko'rinmaydi)
         ids = [r["id"] for r in db.q("SELECT id FROM accounts WHERE workspace='posting' ORDER BY id")]
@@ -184,8 +190,8 @@ async def on_error(request: Request, exc: Exception):
 
 
 from . import r_account, r_groups, r_inbox, r_join, r_posts, r_stats, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit, r_top50  # noqa: E402
-from . import r_ch, r_ch_ai, r_ch_comp, r_ch_more, r_ch_plan, r_ig, r_cf, r_meet, r_sys  # noqa: E402
+from . import r_ch, r_ch_ai, r_ch_comp, r_ch_more, r_ch_plan, r_ig, r_cf, r_meet, r_sys, r_img  # noqa: E402
 
 for r in (r_account, r_posts, r_groups, r_join, r_stats, r_inbox, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit, r_top50,
-          r_ch, r_ch_ai, r_ch_comp, r_ch_plan, r_ch_more, r_ig, r_cf, r_meet, r_sys):
+          r_ch, r_ch_ai, r_ch_comp, r_ch_plan, r_ch_more, r_ig, r_cf, r_meet, r_sys, r_img):
     app.include_router(r.router)

@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Brendlar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Brendlar</h1><p class="sub">Brend kartasi: AI rasmlarni shu brendning faoliyati va uslubiga moslab tayyorlaydi. Odamlar va joylar brendga bog'lanadi.</p></div></div>
+{% if brands %}<div class="ig-grid" style="margin-bottom:18px">{% for b in brands %}<a class="ig-proj" href="/img/brands/{{ b.id }}">
+<div class="th" style="aspect-ratio:3/2;background:#fff">{% if b.logo %}<img src="/img/f/{{ b.logo }}" style="object-fit:contain;padding:14px" alt="">{% else %}{{ ic('image') }}{% endif %}</div>
+<div class="bd"><b>{{ b.name }}</b><div class="mut small">{{ b.activity[:90] }}</div><div class="mut small" style="margin-top:6px">{{ b.n_people }} odam · {{ b.n_locs }} joy · {{ b.n_proj }} loyiha</div></div></a>{% endfor %}</div>{% endif %}
+<div class="card"><div class="card-h"><h2>{{ ic('plus') }} Yangi brend</h2></div>
+<form method="post" action="/img/brands" enctype="multipart/form-data"><div class="grid g2">
+<div><label class="l">Brend nomi *</label><input type="text" name="name" required maxlength="180"></div>
+<div><label class="l">Logo (ixtiyoriy)</label><input type="file" name="logo" accept="image/*"></div>
+<div style="grid-column:1/-1"><label class="l">Faoliyat turi *</label><textarea name="activity" rows="2" required placeholder="masalan: Koreys tili o'quv markazi, Toshkent"></textarea></div>
+<div><label class="l">Auditoriya</label><input type="text" name="audience" placeholder="ixtiyoriy"></div>
+<div><label class="l">Ohang (uslub)</label><input type="text" name="tone" placeholder="ixtiyoriy: samimiy, jiddiy..."></div>
+<div><label class="l">Brend ranglari</label><input type="text" name="colors" placeholder="ixtiyoriy"></div>
+<div><label class="l">Shior</label><input type="text" name="slogan" placeholder="ixtiyoriy"></div>
+<div><label class="l">Brend haqida</label><input type="text" name="about" placeholder="ixtiyoriy"></div>
+<div><label class="l">Hech qachon ko'rsatilmasin</label><input type="text" name="avoid" placeholder="ixtiyoriy"></div></div>
+<div class="actions" style="margin-top:12px"><button class="btn acc">Brend yaratish</button></div></form></div>
+{% endblock %}

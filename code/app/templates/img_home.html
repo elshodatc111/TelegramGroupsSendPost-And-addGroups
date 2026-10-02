@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Image Generator{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Loyihalar</h1><p class="sub">Ssenariydan sahnalar bo'yicha rasmlar, video va audio promptlar.</p></div>
+<div class="actions"><a class="btn acc" href="/img/new">{{ ic('plus') }} Yangi loyiha</a></div></div>
+{% if not ai_ok %}<div class="ig-warn">{{ ic('alert') }}<div>OpenAI kaliti kiritilmagan. <a href="/img/settings">Sozlamalar</a> da kiriting.</div></div>{% endif %}
+{% if not n_brands %}<div class="ig-warn">{{ ic('alert') }}<div>Avval brend yarating: brend nomi, logosi va faoliyat turi AI rasmlarni uslubga moslashi uchun kerak. <a href="/img/brands">Brendlar</a></div></div>{% endif %}
+<div class="grid g3" style="margin-bottom:18px">
+<div class="stat"><div class="k">{{ ic('image') }} Loyihalar</div><div class="v">{{ projects|length }}</div></div>
+<div class="stat"><div class="k">{{ ic('users') }} Brendlar</div><div class="v">{{ n_brands }}</div></div>
+<div class="stat"><div class="k">{{ ic('cpu') }} 30 kunlik xarajat (taxminiy)</div><div class="v">${{ '%.2f'|format(cost30) }}</div></div></div>
+{% if projects %}<div class="ig-grid">
+{% for p in projects %}<a class="ig-proj" href="/img/p/{{ p.id }}">
+<div class="th">{% if p.thumb %}<img src="/img/f/{{ p.thumb }}" loading="lazy" alt="">{% else %}{{ ic('image') }}{% endif %}</div>
+<div class="bd"><b>{{ p.title }}</b><div class="mut small">{{ p.brand_name or '—' }} · {{ p.fmt }}</div>
+<div style="margin-top:6px"><span class="ig-pill {{ p.status }}">{{ STATUS.get(p.status, p.status) }}</span> <span class="mut small">{{ p.n_done }}/{{ p.n_scenes }} sahna</span></div>
+{% if p.status in ('running','analyzing') %}<div class="ig-prog" style="height:8px;margin:8px 0 0"><i style="width:{{ p.progress or 0 }}%"></i></div>{% endif %}</div></a>{% endfor %}</div>
+{% else %}<div class="card empty"><p>Hali loyiha yo'q.</p><a class="btn acc" href="/img/new">Birinchi loyihani boshlash</a></div>{% endif %}
+{% endblock %}

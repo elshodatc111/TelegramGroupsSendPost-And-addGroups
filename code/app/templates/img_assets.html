@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% block title %}{{ proj.title }}{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>{{ proj.title }}</h1><p class="sub">2-bosqich: AI natijasini tekshiring, odamlarni tanlang va referens rasmlarini oling, keyin boshlang.</p></div>
+<div class="actions"><a class="btn ghost" href="/img">Loyihalar</a></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('video') }} Platformalar</h2></div><div class="small">Rasm: <span class="ig-tag pr">{{ proj.image_platform or 'umumiy' }}</span> &nbsp; Video: {% for v in p_vids %}<span class="ig-tag">{{ v.name }}</span>{% else %}<span class="mut">tanlanmagan</span>{% endfor %}</div></div>
+<div class="grid g3" style="margin-bottom:18px">
+<div class="stat"><div class="k">{{ ic('layers') }} Sahnalar</div><div class="v">{{ scenes|length }}</div></div>
+<div class="stat"><div class="k">{{ ic('users') }} Odamlar</div><div class="v">{{ roles|length }}</div></div>
+<div class="stat"><div class="k">{{ ic('map-pin') }} Joylar</div><div class="v">{{ plocs|length }}</div></div></div>
+{% if problems %}<div class="ig-warn">{{ ic('alert') }}<div><b>Boshlashdan oldin:</b><br>{% for x in problems %}• {{ x }}<br>{% endfor %}</div></div>{% else %}<div class="ig-warn ig-ok">{{ ic('check') }}<div>Hammasi tayyor. Boshlashingiz mumkin.</div></div>{% endif %}
+
+<div class="card"><div class="card-h"><h2>{{ ic('users') }} Odamlar</h2></div>
+<p class="mut small" style="margin-top:0">Odamning aniq rasmlari referens bo'ladi: ularni rasm/video platformasiga yuklaysiz, shunda yuz o'zgarmaydi. Rasmlarni kamera orqali oling (5 kadr) yoki yuklang.</p>
+{% if not roles %}<p class="mut">Bu ssenariyda odam kerak emas.</p>{% endif %}
+{% for r in roles %}<div class="ig-role" id="r{{ r.id }}">
+<div class="card-h" style="margin-bottom:8px"><b>{{ r.title }}</b>{% if r.person %}<span class="ig-pill done">{{ r.person.name }}</span>{% else %}<span class="ig-pill needs_assets">tanlanmagan</span>{% endif %}</div>
+<div class="mut small" style="margin-bottom:8px">{{ r.description }}</div>
+<form method="post" action="/img/p/{{ proj.id }}/role/{{ r.id }}/person" class="grid g3" style="align-items:end">
+<div><label class="l">Odam</label><select name="person_id" onchange="this.form.querySelector('.nw').style.display=this.value==='new'?'':'none'">
+<option value="">— tanlang —</option>{% for pe in people %}<option value="{{ pe.id }}" {{ 'selected' if r.person and r.person.id == pe.id }}>{{ pe.name }} ({{ KINDS.get(pe.kind, pe.kind) }})</option>{% endfor %}<option value="new">+ Yangi odam qo'shish</option></select></div>
+<div class="nw" style="display:none"><label class="l">Yangi odam ismi</label><input type="text" name="new_name"><select name="new_kind" style="margin-top:6px">{% for k, v in KINDS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+<div><label class="ig-chk"><input type="checkbox" name="consent" {{ 'checked' if r.person and r.person.consent }}> Odamning roziligi olingan</label><button class="btn sm sec" style="margin-top:8px">Saqlash</button></div></form>
+{% if r.person %}<div style="margin-top:12px"><b class="small">Referens rasmlar: {{ r.person.photos|length }} ta</b>{% if r.person.photos|length < 5 %} <span class="mut small">(5 ta tavsiya etiladi)</span>{% endif %}
+<div class="ig-photos" style="margin:8px 0">{% for ph in r.person.photos %}<div><div class="ig-photo"><img src="/img/f/{{ ph.path }}" alt="" loading="lazy"></div><div class="mut tiny">{{ ph.label or '' }}</div></div>{% else %}<span class="mut small">Rasm yo'q.</span>{% endfor %}</div>
+<form method="post" action="/img/people/{{ r.person.id }}/photos" enctype="multipart/form-data" id="cf{{ r.id }}" class="row" style="gap:8px;align-items:end">
+<input type="hidden" name="next" value="/img/p/{{ proj.id }}#r{{ r.id }}">
+<div><button type="button" class="btn acc sm" data-cam="#cf{{ r.id }}" data-cam-submit>{{ ic('camera') }} Kamera orqali olish</button></div>
+<div><label class="l">yoki fayldan</label><input type="file" name="photos" accept="image/*" multiple></div><button class="btn sm sec">Yuklash</button></form></div>{% endif %}
+</div>{% endfor %}</div>
+
+<div class="card"><div class="card-h"><h2>{{ ic('map-pin') }} Joylar</h2></div>
+{% for pl in plocs %}<div class="ig-loc" id="l{{ pl.id }}"><form method="post" action="/img/p/{{ proj.id }}/loc/{{ pl.id }}/save">
+<div class="grid g2"><div><label class="l">Joy nomi</label><input type="text" name="name" value="{{ pl.name }}"></div>
+<div><label class="l">Brend kutubxonasidan</label><select name="location_id"><option value="0">— yangi joy —</option>{% for lo in libs %}<option value="{{ lo.id }}" {{ 'selected' if pl.location_id == lo.id }}>{{ lo.name }}</option>{% endfor %}</select></div></div>
+<label class="l" style="margin-top:8px">Tavsif</label><textarea name="description" rows="3">{{ pl.description }}</textarea>
+<div class="actions" style="margin-top:8px"><button class="btn sm sec">Saqlash</button></div></form></div>{% else %}<p class="mut">Maxsus joy kerak emas.</p>{% endfor %}</div>
+
+<div class="card"><div class="card-h"><h2>{{ ic('layers') }} Sahnalar ({{ scenes|length }} ta)</h2></div>
+{% for s in scenes %}<div class="ig-loc" id="s{{ s.id }}"><form method="post" action="/img/p/{{ proj.id }}/scene/{{ s.id }}/save">
+<div class="card-h" style="margin-bottom:6px"><b><span class="ig-tag pr">{{ s.idx }}</span> {{ '%.1f'|format(s.t_from) }}–{{ '%.1f'|format(s.t_to) }} s</b><span class="mut small">{{ '%.1f'|format(s.duration) }} soniya</span></div>
+<label class="l">Ssenariydan shu qism (so'zlar)</label><input type="text" name="voice" value="{{ s.voice }}">
+<label class="l" style="margin-top:8px">Rasmda nima ko'rinadi (o'zbekcha)</label><textarea name="visual" rows="2">{{ s.visual }}</textarea>
+<input type="hidden" name="label" value="{{ s.label }}"><input type="hidden" name="onscreen" value="{{ s.onscreen }}">
+<div class="actions" style="margin-top:8px"><button class="btn sm sec">Saqlash</button></div></form></div>{% endfor %}</div>
+
+<div class="card"><div class="card-h"><h2>{{ ic('refresh') }} Ssenariyni o'zgartirish</h2></div>
+<form method="post" action="/img/p/{{ proj.id }}/reanalyze" onsubmit="return confirm('Ssenariy qayta tahlil qilinadi, obrazlar tanlovi tozalanadi. Davom etasizmi?')"><textarea name="script" rows="7">{{ proj.script }}</textarea>
+<div class="actions" style="margin-top:8px"><button class="btn sec">Qayta tahlil qilish</button></div></form></div>
+
+<div class="card ig-sticky"><div class="actions">
+<form method="post" action="/img/p/{{ proj.id }}/start" data-busy="Boshlanmoqda..." style="margin:0"><button class="btn acc lg" {{ 'disabled' if problems }}>Promptlarni yozishni boshlash</button></form>
+<form method="post" action="/img/p/{{ proj.id }}/delete" onsubmit="return confirm('Loyiha o\'chirilsinmi?')" style="margin:0"><button class="btn ghost">O'chirish</button></form></div></div>
+{% endblock %}
+{% block scripts %}<script src="/static/img_cam.js"></script>{% endblock %}

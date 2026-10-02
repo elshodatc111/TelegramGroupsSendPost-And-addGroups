@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block title %}Image Generator sozlamalari{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Sozlamalar</h1><p class="sub">OpenAI kaliti, matn modellari va rasm/video platformalar. Rasm va video yaratilmaydi: faqat promptlar yoziladi.</p></div></div>
+<div class="grid g3" style="margin-bottom:18px">
+<div class="stat"><div class="k">{{ ic('cpu') }} Jami AI xarajati (taxminiy)</div><div class="v">${{ '%.3f'|format(total) }}</div></div>
+<div class="stat"><div class="k">{{ ic('clock') }} Oxirgi 30 kun</div><div class="v">${{ '%.3f'|format(cost30) }}</div></div>
+<div class="stat"><div class="k">{{ ic('shield') }} OpenAI kaliti</div><div class="v" style="font-size:20px">{{ 'ulangan' if key_ok else 'yo\'q' }}</div></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('shield') }} OpenAI kaliti</h2>{% if key_ok %}<span class="badge b-good">Saqlangan</span>{% else %}<span class="badge b-warn">Yo'q</span>{% endif %}</div>
+<p class="mut small" style="margin-top:0">Kalit shifrlangan saqlanadi va Telegram SMM hamda Instagram bo'limlari bilan umumiy.</p>
+<form method="post" action="/img/settings/key" class="row" style="align-items:end"><div style="flex:1;min-width:280px"><label class="l">API kalit</label><input type="password" name="key" autocomplete="off" placeholder="{{ 'saqlangan; almashtirish uchun yangisini kiriting' if key_ok else 'sk-...' }}"></div><button class="btn sec">Saqlash</button></form></div>
+<form method="post" action="/img/settings">
+<div class="card"><div class="card-h"><h2>{{ ic('cpu') }} Modellar va xarajat</h2></div>
+<p class="mut small" style="margin-top:0">Hamma ish faqat matnli: tahlil 1 ta, odam/joy tavsifi 1 ta, promptlar esa sahnalar guruhlab bitta so'rovda yoziladi. Xarajatni kamaytirish uchun arzon (mini/nano) model tanlang.</p>
+<div class="grid g3">
+<div><label class="l">Tahlil va promptlar modeli</label><input type="text" name="model_text" value="{{ v.model_text_raw }}" list="mdl" placeholder="{{ defaults.text }}"><div class="hint">Bo'sh = umumiy standart</div></div>
+<div><label class="l">Ssenariy yozish modeli</label><input type="text" name="model_script" value="{{ v.model_script_raw }}" list="mdl" placeholder="{{ defaults.script }}"></div>
+<div><label class="l">Bir so'rovdagi sahnalar soni</label><input type="number" name="batch" min="1" max="10" value="{{ v.batch }}"><div class="hint">Ko'p bo'lsa so'rov kam (arzon), lekin javob uzunroq</div></div></div>
+{% if models %}<datalist id="mdl">{% for m in models %}<option value="{{ m }}">{% endfor %}</datalist>{% else %}<datalist id="mdl"></datalist>{% endif %}
+<div class="actions" style="margin-top:12px"><button class="btn acc">Saqlash</button><button class="btn sm sec" formaction="/img/settings/models" formnovalidate>OpenAI dagi modellar ro'yxatini olish</button></div></div></form>
+
+<div class="card" id="plat"><div class="card-h"><h2>{{ ic('video') }} Rasm va video platformalar</h2><form method="post" action="/img/settings/platform/restore" style="margin:0"><button class="btn sm sec">Standartlarini qaytarish</button></form></div>
+<p class="mut small" style="margin-top:0">Loyiha boshida shulardan tanlanadi: bitta rasm platformasi va bir nechta video platformalar. Har birining o'z prompt qoidasi bor, AI shunga qarab yozadi; qoidalarni o'zgartirish mumkin.</p>
+{% for pl in plats %}<div class="ig-role"><form method="post" action="/img/settings/platform/{{ pl.id }}/save"><div class="grid g3">
+<div><label class="l">Nomi</label><input type="text" name="name" value="{{ pl.name }}"></div>
+<div><label class="l">Turi</label><select name="kind"><option value="image" {{ 'selected' if pl.kind == 'image' }}>Rasm platformasi</option><option value="video" {{ 'selected' if pl.kind != 'image' }}>Video platforma</option></select></div>
+<div><label class="l">Klip uzunligi (s, video uchun)</label><input type="number" name="max_sec" step="0.5" value="{{ pl.max_sec }}"></div>
+<div><label class="ig-chk"><input type="checkbox" name="audio" {{ 'checked' if pl.audio }}> Audio o'zi yaratadi (video)</label></div></div>
+<label class="l" style="margin-top:8px">Prompt yozish qoidalari (inglizcha)</label><textarea name="rules" rows="4">{{ pl.rules }}</textarea>
+<div class="actions" style="margin-top:8px"><button class="btn sm">Saqlash</button>
+<button class="btn sm sec" formaction="/img/settings/platform/{{ pl.id }}/toggle" formnovalidate>{{ 'O\'chirib qo\'yish' if pl.active else 'Yoqish' }}</button>
+<span class="ig-pill {{ 'done' if pl.active else '' }}">{{ 'yoqilgan' if pl.active else 'o\'chirilgan' }}</span> <span class="ig-pill">{{ 'rasm' if pl.kind == 'image' else 'video' }}</span>
+<button class="btn sm ghost" formaction="/img/settings/platform/{{ pl.id }}/delete" formnovalidate onclick="return confirm('Platforma o\'chirilsinmi?')">{{ ic('trash') }}</button></div></form></div>{% endfor %}
+<div class="ig-role"><b>{{ ic('plus') }} Yangi platforma</b><form method="post" action="/img/settings/platform/add" style="margin-top:8px"><div class="grid g3">
+<div><label class="l">Nomi</label><input type="text" name="name" required placeholder="masalan: Pika"></div>
+<div><label class="l">Turi</label><select name="kind"><option value="image">Rasm platformasi</option><option value="video" selected>Video platforma</option></select></div>
+<div><label class="l">Klip uzunligi (s)</label><input type="number" name="max_sec" step="0.5" value="5"></div>
+<div><label class="ig-chk"><input type="checkbox" name="audio"> Audio o'zi yaratadi</label></div></div>
+<label class="l" style="margin-top:8px">Qoidalar</label><textarea name="rules" rows="3" required placeholder="Masalan: 30-50 so'z, faqat harakat va kamera haqida, salbiy prompt yozma."></textarea>
+<div class="actions" style="margin-top:8px"><button class="btn acc sm">Qo'shish</button></div></form></div></div>
+{% endblock %}

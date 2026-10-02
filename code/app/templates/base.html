@@ -3,6 +3,7 @@
   'channels': {'n': 'Telegram SMM', 'sub': 'Kanallarni rivojlantirish', 'ic': 'megaphone', 'cls': 'ws-ch', 'c': '#3949AB'},
   'instagram': {'n': 'Instagram SMM', 'sub': 'Sahifalarni rivojlantirish', 'ic': 'camera', 'cls': 'ws-ig', 'c': '#C13584'},
   'meet': {'n': 'Zoom Online', 'sub': 'Online darslar va majlislar', 'ic': 'video', 'cls': 'ws-meet', 'c': '#2D8CFF'},
+  'img': {'n': 'Image Generator', 'sub': 'Ssenariydan rasm va promptlar', 'ic': 'image', 'cls': 'ws-img', 'c': '#0F9D7A'},
   'system': {'n': 'Tizim tahlili', 'sub': 'Holat, loglar, yo\'riqnoma', 'ic': 'cpu', 'cls': 'ws-sys', 'c': '#475569'}} %}
 {% set S = SEC.get(ws, SEC['posting']) %}
 <html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -11,6 +12,7 @@
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/sections.css">
 {% if ws == 'meet' %}<link rel="stylesheet" href="/static/meet.css">{% endif %}
+{% if ws == 'img' %}<link rel="stylesheet" href="/static/img.css">{% endif %}
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23{{ S.c[1:] }}'/%3E%3Ccircle cx='16' cy='16' r='7' fill='white'/%3E%3C/svg%3E">
 </head><body class="{{ S.cls }}">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -27,7 +29,7 @@
     </button>
     <div class="menu">
       <div class="sec">Bo'lim</div>
-      {% for k in ('posting', 'channels', 'instagram', 'meet', 'system') %}{% set X = SEC[k] %}
+      {% for k in ('posting', 'channels', 'instagram', 'meet', 'img', 'system') %}{% set X = SEC[k] %}
       <form method="post" action="/ws/switch"><input type="hidden" name="ws" value="{{ k }}"><button class="mi {{ 'cur' if ws == k }}"><span class="ava sx-{{ k }}">{{ ic(X.ic) }}</span><span class="t"><b>{{ X.n }}</b><small>{{ X.sub }}</small></span>{% if ws == k %}<span class="chk">{{ ic('check') }}</span>{% endif %}</button></form>
       {% endfor %}
     </div>
@@ -95,6 +97,17 @@
     <a href="/meet/diag" class="{{ 'active' if p.startswith('/meet/diag') }}">{{ ic('activity') }} Diagnostika</a>
     <a href="/meet/guide" class="{{ 'active' if p.startswith('/meet/guide') }}">{{ ic('file-text') }} Yo'riqnoma</a>
   </nav>
+{% elif ws == 'img' %}
+  <nav class="nav">
+    <a href="/img" class="{{ 'active' if p == '/img' or p.startswith('/img/p/') }}">{{ ic('image') }} Loyihalar {% if img_busy %}<span class="cnt">{{ img_busy }}</span>{% endif %}</a>
+    <a href="/img/new" class="{{ 'active' if p.startswith('/img/new') }}">{{ ic('plus') }} Yangi loyiha</a>
+    <div class="nav-sec">Material</div>
+    <a href="/img/brands" class="{{ 'active' if p.startswith('/img/brands') }}">{{ ic('users') }} Brendlar va odamlar</a>
+    <a href="/img/locations" class="{{ 'active' if p.startswith('/img/locations') }}">{{ ic('map-pin') }} Joylar</a>
+    <div class="nav-sec">Tizim</div>
+    <a href="/img/settings" class="{{ 'active' if p.startswith('/img/settings') }}">{{ ic('settings') }} Sozlamalar</a>
+    <a href="/img/guide" class="{{ 'active' if p.startswith('/img/guide') }}">{{ ic('file-text') }} Yo'riqnoma</a>
+  </nav>
 {% elif ws == 'system' %}
   <nav class="nav">
     <a href="/sys" class="{{ 'active' if p == '/sys' }}">{{ ic('cpu') }} Holat tekshiruvi</a>
@@ -161,6 +174,9 @@
 {% elif ws == 'meet' %}
   <a class="mt-chip {{ 'ok' if pool and pool.free else 'bad' }}" href="/meet/zoom">{{ ic('video') }} Zoom: {{ pool.free if pool else 0 }}/{{ pool.enabled if pool else 0 }} bo'sh</a>
   <a class="mt-chip {{ 'ok' if bot_ok else 'bad' }}" href="/meet/settings">{{ ic('message') }} Bot {{ 'ulangan' if bot_ok else 'ulanmagan' }}</a>
+{% elif ws == 'img' %}
+  <a class="ig-chip {{ 'ok' if ai_ok else 'bad' }}" href="/img/settings">{{ ic('cpu') }} OpenAI {{ 'ulangan' if ai_ok else 'kalit yo\'q' }}</a>
+  {% if img_busy %}<span class="ig-chip ok">{{ ic('refresh') }} {{ img_busy }} ta ish ketmoqda</span>{% endif %}
 {% elif ws == 'system' %}
 {% else %}
   <div class="dd">
@@ -181,7 +197,7 @@
   </div>
 {% endif %}
   <div class="grow-sp"></div>
-  {% if ws not in ('channels', 'instagram', 'meet', 'system') %}<a class="iconbtn" href="/inbox" title="Inbox">{{ ic('inbox') }}{% if unread %}<span class="dotc">{{ unread }}</span>{% endif %}</a>{% endif %}
+  {% if ws not in ('channels', 'instagram', 'meet', 'img', 'system') %}<a class="iconbtn" href="/inbox" title="Inbox">{{ ic('inbox') }}{% if unread %}<span class="dotc">{{ unread }}</span>{% endif %}</a>{% endif %}
   {% if auth_on %}<form method="post" action="/logout" style="margin:0"><button class="iconbtn" title="Chiqish">{{ ic('log-out') }}</button></form>{% endif %}
 </header>
 <main class="main">

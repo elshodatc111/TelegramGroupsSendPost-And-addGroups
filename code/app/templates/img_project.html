@@ -1,0 +1,64 @@
+{% extends "base.html" %}{% block title %}{{ proj.title }}{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>{{ proj.title }}</h1><p class="sub">{{ brand.name if brand }} · {{ proj.fmt }} · {{ scenes|length }} sahna · AI xarajati taxminan ${{ '%.3f'|format(proj.cost or 0) }}</p></div>
+<div class="actions"><a class="btn ghost" href="/img">Loyihalar</a>
+{% if n_done %}<a class="btn sec" href="/img/p/{{ proj.id }}/zip">{{ ic('package') }} ZIP (rasm + promptlar)</a><a class="btn sec" href="/img/p/{{ proj.id }}/zip?history=1" title="Barcha versiyalar bilan">ZIP + tarix</a>{% endif %}</div></div>
+
+<div class="card" id="head"><div class="card-h"><h2>{{ ic('activity') }} Holat</h2><span class="ig-pill {{ proj.status }}" id="st">{{ STATUS.get(proj.status, proj.status) }}</span></div>
+<div class="ig-prog"><i id="pg" style="width:{{ proj.progress or 0 }}%"></i></div>
+<div class="row" style="align-items:center"><span class="mut small" id="msg">{{ proj.msg or '' }}</span><span class="small" style="text-align:right"><b id="nd">{{ n_done }}</b>/{{ scenes|length }} sahna tayyor</span></div>
+{% if proj.error %}<div class="ig-warn">{{ ic('alert') }}<div>{{ proj.error }}</div></div>{% endif %}
+{% if problems %}<div class="ig-warn">{{ ic('alert') }}<div>{% for x in problems %}• {{ x }}<br>{% endfor %}</div></div>{% endif %}
+<div class="actions" style="margin-top:10px">
+{% if proj.status == 'running' %}<form method="post" action="/img/p/{{ proj.id }}/stop" style="margin:0"><button class="btn sec">To'xtatish</button></form>
+{% elif proj.status in ('stopped','partial','error') %}<form method="post" action="/img/p/{{ proj.id }}/start" data-busy="Boshlanmoqda..." style="margin:0"><button class="btn acc">{{ 'Davom ettirish' if proj.status != 'partial' else 'Xatolilarini qayta urinish' }}</button></form>{% endif %}
+<form method="post" action="/img/p/{{ proj.id }}/delete" onsubmit="return confirm('Butun loyiha (rasmlar, versiyalar, promptlar) o\'chiriladi. Davom etasizmi?')" style="margin:0"><button class="btn ghost">O'chirish</button></form></div></div>
+
+<div class="card"><div class="card-h"><h2>{{ ic('video') }} Platformalar</h2></div><div class="small">Rasm: <span class="ig-tag pr">{{ proj.image_platform or 'umumiy' }}</span> &nbsp; Video: {% for v in p_vids %}<span class="ig-tag">{{ v.name }}</span>{% else %}<span class="mut">tanlanmagan</span>{% endfor %}</div>
+{% if roles %}<div class="small" style="margin-top:10px"><b>Referens rasmlar</b> (platformaga yuklang, yuz o'zgarmasligi uchun): {% for r in roles %}{% if r.person %}<span class="ig-tag">{{ r.title }} = {{ r.person.name }} ({{ r.person.photos|length }} ta rasm)</span>{% endif %}{% endfor %} <a href="/img/p/{{ proj.id }}/zip">ZIP ichida</a></div>
+{% for r in roles %}{% if r.person and r.person.photos %}<div class="ig-photos" style="margin-top:8px">{% for ph in r.person.photos %}<div class="ig-photo" style="width:64px;height:64px"><img src="/img/f/{{ ph.path }}" alt=""></div>{% endfor %}</div>{% endif %}{% endfor %}{% endif %}</div>
+{% for s in scenes %}{% set a = s.active %}
+<div class="ig-scene" id="s{{ s.id }}">
+<div><div class="ig-big" style="font-size:56px">{{ s.idx }}</div><div class="mut small">{{ '%.1f'|format(s.t_from) }}–{{ '%.1f'|format(s.t_to) }} s · {{ '%.1f'|format(s.duration) }} soniya</div>
+{% if s.roles %}<div style="margin-top:8px">{% for k in s.roles %}<span class="ig-tag pr">{{ k }}</span>{% endfor %}</div>{% endif %}
+{% if a and s.versions|length > 1 %}<div class="mut small" style="margin-top:12px">Versiyalar ({{ s.versions|length }}):</div><div class="ig-vers">{% for v in s.versions %}
+<form method="post" action="/img/s/{{ s.id }}/activate/{{ v.id }}" style="margin:0"><button class="{{ 'cur' if a.id == v.id }}" title="{{ v.note or 'asl nusxa' }}"><b>v{{ v.n }}</b></button></form>{% endfor %}</div>{% endif %}</div>
+<div>
+<h3>{{ s.label or 'Sahna' }} <span class="ig-pill {{ s.status }}" data-sp="{{ s.id }}">{{ s.status_uz }}</span></h3>
+{% if s.voice %}<div class="ig-script">«{{ s.voice }}»</div>{% endif %}
+<div class="mut small" style="margin:6px 0">{{ s.visual }}{% if s.onscreen %}<br>Ekran matni (montajda qo'shiladi): <b>{{ s.onscreen }}</b>{% endif %}</div>
+{% if s.error %}<div class="ig-warn">{{ ic('alert') }}<div>{{ s.error }}</div></div>{% endif %}
+{% if s.warn %}<div class="ig-warn">{{ ic('alert') }}<div>{{ s.warn }}</div></div>{% endif %}
+{% if a %}
+<div class="ig-tabs" data-tabs="{{ s.id }}"><button class="on" data-p="img">Rasm prompti</button>{% for pl in plats %}<button data-p="v{{ loop.index }}">{{ pl.name }}</button>{% endfor %}<button data-p="au">Audio</button></div>
+<div class="ig-pane on" data-pane="img-{{ s.id }}"><div class="ig-ph-h"><span>Rasm prompti (inglizcha): {{ proj.image_platform or 'umumiy' }} uchun</span><button class="btn sm sec" data-copy="ip{{ s.id }}">{{ ic('copy') }} Nusxa</button></div><div class="ig-ptxt" id="ip{{ s.id }}">{{ a.image_prompt }}</div></div>
+{% for pl in plats %}<div class="ig-pane" data-pane="v{{ loop.index }}-{{ s.id }}"><div class="ig-ph-h"><span>{{ pl.name }} video prompti</span>{% if s.video.get(pl.name) %}<button class="btn sm sec" data-copy="vp{{ s.id }}_{{ loop.index }}">{{ ic('copy') }} Nusxa</button>{% endif %}</div>
+{% if s.video.get(pl.name) %}<div class="ig-ptxt" id="vp{{ s.id }}_{{ loop.index }}">{{ s.video[pl.name] }}</div>{% else %}<div class="ig-ptxt mut">Hali yozilmagan.</div>{% endif %}</div>{% endfor %}
+<div class="ig-pane" data-pane="au-{{ s.id }}"><div class="ig-ph-h"><span>Audio prompt (ovoz, tezlik, matn)</span>{% if s.audio %}<button class="btn sm sec" data-copy="ap{{ s.id }}">{{ ic('copy') }} Nusxa</button>{% endif %}</div>
+{% if s.audio %}<div class="ig-ptxt" id="ap{{ s.id }}">{{ s.audio }}</div>{% else %}<div class="ig-ptxt mut">Hali yozilmagan.</div>{% endif %}</div>
+<details style="margin-top:10px"><summary class="b" style="cursor:pointer">Promptlarni o'zgartirish</summary>
+<form method="post" action="/img/s/{{ s.id }}/edit" data-busy="Yuborilmoqda..." style="margin-top:8px"><label class="l">Nimani o'zgartirish kerak? (o'zbekcha yozing: AI rasm promptini qayta yozadi va video/audio promptlarni unga moslaydi)</label>
+<textarea name="note" rows="2" placeholder="masalan: fon yorqinroq bo'lsin, o'qituvchi kulib turgan bo'lsin"></textarea>
+<div class="actions" style="margin-top:8px"><button class="btn sm acc">Tavsif bo'yicha yangilash</button></div></form>
+<div class="actions" style="margin-top:8px"><form method="post" action="/img/s/{{ s.id }}/reroll" style="margin:0"><button class="btn sm sec">{{ ic('refresh') }} Boshqa variant yozish</button></form></div></details>
+{% elif s.status == 'error' %}<form method="post" action="/img/s/{{ s.id }}/reroll" style="margin-top:8px"><button class="btn sm acc">Qayta urinish</button></form>{% endif %}
+</div></div>{% else %}<div class="card empty">Sahnalar yo'q.</div>{% endfor %}
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+  document.querySelectorAll('[data-tabs]').forEach(t=>{const id=t.dataset.tabs;t.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    t.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+    const root=t.parentElement;root.querySelectorAll('[data-pane]').forEach(p=>p.classList.toggle('on',p.dataset.pane===b.dataset.p+'-'+id))}))});
+  const pid={{ proj.id }};let sig=null;
+  async function tick(){
+    let busy=false;
+    try{const j=await (await fetch('/img/p/'+pid+'/status.json',{cache:'no-store'})).json();
+      if(j.gone){location.href='/img';return}
+      if(sig===null)sig=j.sig;else if(sig!==j.sig){const a=document.activeElement;if(!(a&&/TEXTAREA|INPUT/.test(a.tagName)&&a.value)){location.reload();return}}
+      document.getElementById('pg').style.width=(j.progress||0)+'%';document.getElementById('st').textContent=j.status_uz;document.getElementById('msg').textContent=j.msg||'';
+      Object.entries(j.scenes||{}).forEach(([k,v])=>{const e=document.querySelector('[data-sp="'+k+'"]');if(e)e.textContent=v});
+      busy=j.busy}catch(e){busy=true}
+    if(busy)setTimeout(tick,2500)}
+  tick();
+})();
+</script>{% endblock %}

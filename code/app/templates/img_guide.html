@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block title %}Image Generator yo'riqnomasi{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Yo'riqnoma</h1><p class="sub">Ssenariydan tayyor rasm va promptlargacha.</p></div></div>
+<div class="card"><div class="card-h"><h2>{{ ic('check') }} Bu bo'lim nima qiladi</h2></div>
+<p>Rasm yoki video <b>yaratilmaydi</b> (xarajat uchun). Ssenariydan chiqmagan holda har sahna uchun tayyor <b>promptlar</b> yoziladi: tanlangan rasm platformasi uchun rasm prompti, shu rasmni jonlantiradigan video promptlari (tanlangan platformalar uchun) va audio prompt (ovoz, tezlik, o'zbekcha matn). Siz ularni o'sha platformalarga o'zingiz qo'yasiz.</p></div>
+<div class="card"><div class="card-h"><h2>{{ ic('check') }} Tayyorgarlik (bir marta)</h2></div><ol>
+<li><b>OpenAI kaliti:</b> <a href="/img/settings">Sozlamalar</a> da kalitni kiriting. Arzon matn modelini tanlang.</li>
+<li><b>Platformalar:</b> Sozlamalarda rasm va video platformalar tayyor (Sora, Veo, Kling, Runway, Leonardo; gpt-image, Midjourney, Flux, Imagen). Keraklisini yoqing, qoidasini o'zgartiring yoki yangisini qo'shing.</li>
+<li><b>Brend:</b> <a href="/img/brands">Brendlar</a> da nom, faoliyat turi va (xohlasangiz) logo kiriting.</li>
+<li><b>Odamlar:</b> brend sahifasida odamni qo'shing va <b>«Kamera orqali ro'yxatga olish»</b> ni bosing: 5 ta kadr olinadi (to'g'ri, chap 3/4, o'ng 3/4, tabassum, biroz yuqoriga). Yaxshi yoritilgan joyda oling. Rozilik katagini belgilang. Bu rasmlar yuz o'zgarmasligi uchun referens bo'ladi.</li>
+<li><b>Joylar (ixtiyoriy):</b> <a href="/img/locations">Joylar</a> da dars xonasi, ofis kabi joylarni tavsiflang.</li></ol></div>
+<div class="card"><div class="card-h"><h2>{{ ic('play') }} Loyiha bosqichlari</h2></div><ol>
+<li><b>Ssenariy va platformalar.</b> «Yangi loyiha»: ssenariyni joylang (yoki mavzu yozib AI yozdiradi), tomonlar nisbati va uslubni, <b>rasm platformasini va video platformalarni</b> tanlang.</li>
+<li><b>Tahlil.</b> AI ssenariyni har biri 5 soniyagacha sahnalarga bo'ladi va kerakli odamlar, joylarni aniqlaydi.</li>
+<li><b>Odamlarni tanlash.</b> Har odam uchun brenddagi odamni tanlang, referens rasmlari (kamera orqali) borligini tekshiring.</li>
+<li><b>Yozish.</b> «Boshlash»: AI odam va joylarning qisqa tavsifini bir marta yozadi, so'ng sahnalarni guruhlab bitta so'rovda promptlarini yozadi. Hamma prompt ssenaridan chiqmaydi, odam tavsifi har sahnada bir xil.</li>
+<li><b>Natija.</b> Har sahnada: rasm prompti, har video platforma prompti, audio prompt, «Nusxa» tugmalari. Butun loyiha ZIP (promptlar + odamlarning referens rasmlari).</li></ol></div>
+<div class="card"><div class="card-h"><h2>{{ ic('video') }} Yuz o'zgarmasligi uchun</h2></div><ul>
+<li>Rasm platformasiga (masalan ChatGPT, Midjourney <code>--cref</code>, Flux, Imagen) shu odamning referens rasmlarini yuklang va promptni qo'ying.</li>
+<li>Tayyor rasmni video platformaga (Sora, Veo, Kling...) birinchi kadr sifatida bering; platforma referens funksiyasi bo'lsa odam rasmlarini ham qo'shing.</li>
+<li>Midjourney promptida <code>{CREF}</code> belgisi bor: o'rniga referens rasmning havolasini qo'ying.</li></ul></div>
+<div class="card"><div class="card-h"><h2>{{ ic('edit') }} Tahrirlash</h2></div><ul>
+<li>«Promptlarni o'zgartirish» ichida nimani o'zgartirishni o'zbekcha yozing: AI rasm promptini qayta yozadi va video hamda audio promptlarni yangi rasmga moslaydi.</li>
+<li>«Boshqa variant yozish» boshqa kadr/burchak beradi. Oldingi versiyalar saqlanadi (v1, v2...), bosib asosiy qilinadi.</li>
+<li>Logo va ekran matni promptlarga yozilmaydi: ularni montajda qo'shasiz.</li></ul></div>
+<div class="card"><div class="card-h"><h2>{{ ic('alert') }} Muammolar</h2></div><ul>
+<li><b>«Boshlashdan oldin» ro'yxati:</b> odam, rozilik, referens rasm yoki joy tavsifi yetishmaydi: shuni to'ldiring.</li>
+<li><b>Kamera ochilmadi:</b> brauzer manzil satridagi kamera belgisidan ruxsat bering (sahifa localhost orqali ochilgan bo'lishi kerak) yoki rasmlarni fayldan yuklang.</li>
+<li><b>«Billing/quota» xatosi:</b> OpenAI balansini to'ldiring.</li>
+<li><b>Dastur o'chib qolsa:</b> qayta ochilganda to'xtagan loyiha o'zi davom etadi; yozilgan sahnalar qayta yozilmaydi.</li></ul></div>
+{% endblock %}

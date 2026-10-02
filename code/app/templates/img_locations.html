@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}Joylar{% endblock %}
+{% block content %}
+<div class="page-h"><div><h1>Joylar kutubxonasi</h1><p class="sub">Brendga tegishli joylar tavsifi: har safar bir xil joy tavsifi promptlarga yoziladi.</p></div></div>
+<div class="card"><form method="get" class="row" style="align-items:end"><div><label class="l">Brend</label><select name="brand" onchange="this.form.submit()"><option value="">— tanlang —</option>{% for b in brands %}<option value="{{ b.id }}" {{ 'selected' if bid == b.id }}>{{ b.name }}</option>{% endfor %}</select></div></form></div>
+{% if bid %}
+<div class="card"><div class="card-h"><h2>{{ ic('plus') }} Yangi joy</h2></div>
+<form method="post" action="/img/locations"><input type="hidden" name="brand_id" value="{{ bid }}"><div class="grid g2">
+<div><label class="l">Joy nomi</label><input type="text" name="name" id="ln" required placeholder="masalan: Dars xonasi"></div>
+<div><label class="l">Tavsif (o'zbekcha)</label><textarea name="description" id="ld" rows="3" required></textarea><button type="button" class="btn sm sec" id="ldb" style="margin-top:6px" data-keep="1">{{ ic('wand') }} AI tavsif yozsin</button> <span class="mut small" id="ldm"></span></div></div>
+<div class="actions" style="margin-top:10px"><button class="btn acc">Joy qo'shish</button></div></form></div>
+<div class="ig-grid">{% for lo in locs %}<div class="ig-role" style="margin:0">
+<form method="post" action="/img/locations/{{ lo.id }}/save"><input type="text" name="name" value="{{ lo.name }}"><textarea name="description" rows="4" style="margin-top:6px">{{ lo.description }}</textarea>
+<div class="actions" style="margin-top:6px"><button class="btn sm sec">Saqlash</button></div></form>
+<form method="post" action="/img/locations/{{ lo.id }}/delete" onsubmit="return confirm('Joy o\'chirilsinmi?')" style="margin-top:6px"><button class="btn sm ghost">O'chirish</button></form></div>{% else %}<div class="card empty">Bu brendda joy yo'q.</div>{% endfor %}</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+(function(){const b=document.getElementById('ldb');if(!b)return;b.addEventListener('click',async()=>{
+  const m=document.getElementById('ldm');const fd=new FormData();fd.append('brand_id','{{ bid }}');fd.append('name',document.getElementById('ln').value);
+  b.disabled=true;m.textContent='AI yozmoqda...';
+  try{const j=await (await fetch('/img/locations/describe',{method:'POST',body:fd})).json();if(j.ok){document.getElementById('ld').value=j.description;m.textContent='Tayyor'}else m.textContent=j.err||'Xato'}catch(e){m.textContent='Ulanish xatosi'}
+  b.disabled=false})})();
+</script>{% endblock %}

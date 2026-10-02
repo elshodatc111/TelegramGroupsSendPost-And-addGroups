@@ -1,4 +1,4 @@
-"""Kanallarim: post rasmi yaratish.
+"""Telegram SMM: post rasmi yaratish.
 
 1) OpenAI rasm PROMPTINI yozadi (matn: sarlavha, qisqa izoh) — rasm chizmaydi.
 2) Lokal model (diffusers: SD-Turbo / SDXL-Turbo / SD 1.5) fon rasmini chizadi (video karta, bepul).

@@ -1,8 +1,8 @@
-{% extends "base.html" %}{% block title %}Kanallarim{% endblock %}
+{% extends "base.html" %}{% block title %}Telegram SMM{% endblock %}
 {% block content %}
 {% if not acc %}
 <div class="card empty" style="padding:56px 20px">{{ ic('shield') }}<h1 style="font-size:22px">1-qadam: Telegram akkaunt ulang</h1>
-  <p style="max-width:560px;margin:8px auto">Kanallaringizga <b>administrator</b> qilib biriktirilgan bitta Telegram akkaunt ulanadi. U Group Post bo'limi bilan umuman bog'lanmaydi (alohida raqam kerak).</p>
+  <p style="max-width:560px;margin:8px auto">Kanallaringizga <b>administrator</b> qilib biriktirilgan bitta Telegram akkaunt ulanadi. U Telegram Guruhlar bo'limi bilan umuman bog'lanmaydi (alohida raqam kerak).</p>
   <div class="actions" style="justify-content:center"><a class="btn lg" href="/ch/account">{{ ic('plus') }} Akkaunt ulash</a></div></div>
 {% elif not connected %}
 <div class="note red">{{ ic('alert') }}<div>Kanal akkaunti Telegram'ga ulanmagan. <a href="/ch/account"><b>Akkaunt</b></a> bo'limida qayta ulang.</div></div>
@@ -13,7 +13,7 @@
   <div class="actions" style="justify-content:center"><a class="btn lg" href="/ch/channels?scan=1">Kanallarni ko'rish</a></div></div>
 {% elif acc %}
 {% if not ai_ok %}<div class="note">{{ ic('alert') }}<div>AI ishlashi uchun <a href="/ch/settings"><b>Sozlamalar</b></a> da OpenAI kalitini kiriting.</div></div>{% endif %}
-<div class="page-h"><div><h1>{{ 'Kanal: ' ~ cur_ch.title if cur_ch else 'Kanallarim' }}</h1><p class="sub">{{ 'Tanlangan kanal bo\'yicha umumiy ko\'rinish' if cur_ch else 'Barcha biriktirilgan kanallar. Bitta kanal bilan ishlash uchun yuqoridagi tanlagichdan tanlang.' }}</p></div>
+<div class="page-h"><div><h1>{{ 'Kanal: ' ~ cur_ch.title if cur_ch else 'Telegram SMM' }}</h1><p class="sub">{{ 'Tanlangan kanal bo\'yicha umumiy ko\'rinish' if cur_ch else 'Barcha biriktirilgan kanallar. Bitta kanal bilan ishlash uchun yuqoridagi tanlagichdan tanlang.' }}</p></div>
   <div class="actions"><span class="badge">{{ month }} · AI sarfi: {{ total_cost|usd }}</span></div></div>
 <div class="grid {{ 'g2' if cards|length > 1 else '' }}">
 {% for c in cards %}{% set ch = c.ch %}

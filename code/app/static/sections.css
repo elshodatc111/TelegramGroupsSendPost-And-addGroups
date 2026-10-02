@@ -1,0 +1,68 @@
+/* ===== Bo'limlar dizayni: har bo'lim o'z dasturining rangi va belgisi bilan ===== */
+/* Telegram Guruhlar: ochiq Telegram ko'ki + qog'oz samolyot */
+body.ws-tg{--bg:#eef6fb;--surface2:#e9f3fa;--bd:#d3e5f2;--tx:#14232f;--mut:#5d7a8e;
+  --pri:#229ED9;--pri2:#1b86b9;--pri-soft:#d8eefa;--blue:#1565c0;--blue-soft:#dbeafe;--ok:#1565c0;--ok-soft:#dbeafe;--bub:#d8eefa;
+  --side1:#2AABEE;--side2:#1672a8;--side-tx:#eaf7ff;--sec:#229ED9}
+[data-theme=dark] body.ws-tg{--bg:#0e1621;--surface:#17212b;--surface2:#1d2b38;--bd:#26384a;--tx:#e6eef5;--mut:#8aa3b8;
+  --pri:#2AABEE;--pri2:#6ec6f5;--pri-soft:#12303f;--blue:#5aa9ff;--blue-soft:#12283f;--ok:#5aa9ff;--ok-soft:#12283f;--bub:#1d3a4f;
+  --side1:#17212b;--side2:#0b121a;--side-tx:#b7d3e6}
+/* Telegram SMM: to'q ko'k-indigo + karnay */
+body.ws-ch{--bg:#f1f2fa;--surface2:#eaecf7;--bd:#d6d9ee;--tx:#171b3a;--mut:#5f6591;
+  --pri:#3949AB;--pri2:#283593;--pri-soft:#e0e3f6;--blue:#1A237E;--blue-soft:#dfe3fa;--ok:#3949AB;--ok-soft:#e0e3f6;--bub:#e0e3f6;
+  --side1:#283593;--side2:#0f1553;--side-tx:#d3d8ff;--sec:#3949AB}
+[data-theme=dark] body.ws-ch{--bg:#0b0d24;--surface:#12163a;--surface2:#191e4a;--bd:#2a3170;--tx:#e6e8ff;--mut:#97a0d6;
+  --pri:#7986CB;--pri2:#aab4f0;--pri-soft:#1c2250;--blue:#8c9eff;--blue-soft:#1c2250;--ok:#8c9eff;--ok-soft:#1c2250;--bub:#1c2250;
+  --side1:#101444;--side2:#070920;--side-tx:#b9c0f5}
+/* Instagram SMM: binafsha-pushti-to'q sariq gradient + kamera */
+body.ws-ig{--bg:#fbf5fa;--surface2:#f7ecf5;--bd:#ecd6e8;--tx:#2a1330;--mut:#8a6a90;--sec:#C13584;--side1:#833ab4;--side2:#3b0f5c}
+[data-theme=dark] body.ws-ig{--bg:#12061a;--surface:#1c0b27;--surface2:#271236;--bd:#40204f;--tx:#f5e6fa;--mut:#b99bc4}
+/* Zoom Online: Zoom ko'ki + video */
+body.ws-meet{--sec:#2D8CFF}
+/* Tizim tahlili: grafit */
+body.ws-sys{--bg:#f1f3f6;--surface2:#e9ecf1;--bd:#d9dee6;--tx:#1b2330;--mut:#667085;
+  --pri:#475569;--pri2:#334155;--pri-soft:#e2e8f0;--blue:#334155;--blue-soft:#e2e8f0;--ok:#475569;--ok-soft:#e2e8f0;--bub:#e2e8f0;
+  --side1:#334155;--side2:#0f172a;--side-tx:#cbd5e1;--sec:#475569}
+[data-theme=dark] body.ws-sys{--bg:#0d1117;--surface:#161b22;--surface2:#1c232c;--bd:#2b3441;--tx:#e6edf3;--mut:#8b98a8;
+  --pri:#94a3b8;--pri2:#cbd5e1;--pri-soft:#222b36;--blue:#94a3b8;--blue-soft:#222b36;--ok:#94a3b8;--ok-soft:#222b36;--bub:#222b36;
+  --side1:#12171e;--side2:#07090c;--side-tx:#a9b4c2}
+body.ws-tg,body.ws-ch,body.ws-ig,body.ws-sys,body.ws-meet{background:var(--bg)}
+/* umumiy: yuqori chiziq, sarlavha, karta, faol menyu, fon belgisi */
+body[class*="ws-"] .top{border-bottom:3px solid var(--sec)}
+body[class*="ws-"] .page-h h1{display:inline-block;padding-bottom:6px;border-bottom:4px solid var(--sec)}
+body[class*="ws-"] .card{border-top:3px solid var(--sec);border-radius:16px}
+body[class*="ws-"] .card-h h2 .ic{color:var(--sec)}
+body[class*="ws-"] .nav a.active{background:#fff;color:var(--pri2);font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+[data-theme=dark] body[class*="ws-"] .nav a.active{background:rgba(255,255,255,.14);color:#fff}
+body[class*="ws-"] .nav a:hover{background:rgba(255,255,255,.12)}
+body[class*="ws-"] .ws-btn .logo{background:#fff;color:var(--sec)}
+body[class*="ws-"] .content{background-repeat:no-repeat;background-position:right -50px bottom -50px;background-size:380px;background-attachment:fixed}
+body.ws-tg .content{background-image:url("data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23229ED9" stroke-opacity="0.16" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round"%3E%3Cline x1="22" y1="2" x2="11" y2="13"/%3E%3Cpolygon points="22 2 15 22 11 13 2 9 22 2"/%3E%3C/svg%3E")}
+body.ws-ch .content{background-image:url("data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%233949AB" stroke-opacity="0.16" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpath d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/%3E%3Cpath d="M15 9a4 4 0 0 1 0 6"/%3E%3Cpath d="M18 6a8 8 0 0 1 0 12"/%3E%3C/svg%3E")}
+body.ws-ig .content{background-image:url("data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23C13584" stroke-opacity="0.16" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpath d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/%3E%3Ccircle cx="12" cy="13" r="4"/%3E%3C/svg%3E")}
+body.ws-meet .content{background-image:url("data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%232D8CFF" stroke-opacity="0.18" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpolygon points="23 7 16 12 23 17 23 7"/%3E%3Crect x="1" y="5" width="15" height="14" rx="2"/%3E%3C/svg%3E")}
+body.ws-sys .content{background-image:url("data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23475569" stroke-opacity="0.14" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round"%3E%3Crect x="4" y="4" width="16" height="16" rx="2"/%3E%3Crect x="9" y="9" width="6" height="6"/%3E%3Cline x1="9" y1="1" x2="9" y2="4"/%3E%3Cline x1="15" y1="1" x2="15" y2="4"/%3E%3Cline x1="9" y1="20" x2="9" y2="23"/%3E%3Cline x1="15" y1="20" x2="15" y2="23"/%3E%3Cline x1="20" y1="9" x2="23" y2="9"/%3E%3Cline x1="20" y1="14" x2="23" y2="14"/%3E%3Cline x1="1" y1="9" x2="4" y2="9"/%3E%3Cline x1="1" y1="14" x2="4" y2="14"/%3E%3C/svg%3E")}
+body.ws-tg .btn:not(.sec):not(.ghost):not(.ok):not(.bad),body.ws-ch .btn:not(.sec):not(.ghost):not(.ok):not(.bad){background:var(--pri);color:#fff}
+body.ws-tg .btn:not(.sec):not(.ghost):not(.ok):not(.bad){background:linear-gradient(135deg,#2AABEE,#229ED9)}
+body.ws-ch .btn:not(.sec):not(.ghost):not(.ok):not(.bad){background:linear-gradient(135deg,#3949AB,#283593)}
+body.ws-ig .nav a.active{color:#833ab4}
+body.ws-ig .top{border-image:linear-gradient(90deg,#833ab4,#c13584,#f77737) 1}
+body.ws-ig .page-h h1{border-image:linear-gradient(90deg,#833ab4,#c13584,#f77737) 1}
+body.ws-ig .card{border-image:linear-gradient(90deg,#833ab4,#c13584,#f77737) 1 0 0 0}
+body.ws-ig .side{background:linear-gradient(180deg,#833ab4 0%,#c13584 55%,#f77737 130%)}
+[data-theme=dark] body.ws-ig .side{background:linear-gradient(180deg,#2a0f3d,#13061d)}
+/* bo'lim belgisi (yuqori panelda) */
+.sec-badge{display:flex;align-items:center;gap:10px;padding:4px 14px 4px 5px;border-radius:99px;background:var(--sec,var(--pri));color:#fff;font-size:13px;line-height:1.15}
+.sec-badge .sb-ic{width:30px;height:30px;border-radius:50%;background:#fff;color:var(--sec,var(--pri));display:grid;place-items:center;flex:none}
+.sec-badge .sb-ic .ic,.sec-badge .sb-ic svg{width:16px;height:16px}
+.sec-badge b{display:block;font-size:13.5px}.sec-badge small{display:block;opacity:.85;font-size:11px}
+body.ws-ig .sec-badge{background:linear-gradient(135deg,#833ab4,#c13584 55%,#f77737)}
+body.ws-tg .sec-badge{background:linear-gradient(135deg,#2AABEE,#229ED9)}
+@media(max-width:720px){.sec-badge small{display:none}}
+/* bo'lim ro'yxatidagi ikonlar */
+.ava[class*="sx-"]{color:#fff}.ava[class*="sx-"] .ic,.ava[class*="sx-"] svg{width:18px;height:18px}
+.ava.sx-posting{background:linear-gradient(135deg,#2AABEE,#229ED9)}
+.ava.sx-channels{background:linear-gradient(135deg,#3949AB,#1A237E)}
+.ava.sx-instagram{background:linear-gradient(135deg,#833ab4,#c13584 55%,#f77737)}
+.ava.sx-meet{background:linear-gradient(135deg,#2D8CFF,#0B5CFF)}
+.ava.sx-system{background:linear-gradient(135deg,#64748b,#334155)}
+.ava.mt{background:linear-gradient(135deg,#2D8CFF,#0B5CFF)}

@@ -1,4 +1,4 @@
-"""Majlislar: o'qituvchilar uchun Telegram boti (Bot API, uzoq so'rov / long polling).
+"""Zoom Online: o'qituvchilar uchun Telegram boti (Bot API, uzoq so'rov / long polling).
 
 Bot faqat o'qituvchilar uchun:
   /start             — @username bo'yicha o'qituvchini taniydi va chat'ini bog'laydi
@@ -166,7 +166,7 @@ async def handle_start(msg: dict):
         return
     t = S.teacher_by_username(un)
     if not t:
-        await _reply(chat, f"@{Z.esc(un)} o'qituvchilar ro'yxatida topilmadi. Administratorga ayting: «Majlislar → O'qituvchilar» bo'limiga sizni "
+        await _reply(chat, f"@{Z.esc(un)} o'qituvchilar ro'yxatida topilmadi. Administratorga ayting: «Zoom Online → O'qituvchilar» bo'limiga sizni "
                            f"<b>@{Z.esc(un)}</b> bilan qo'shsin, so'ng /start ni qayta yuboring.", keyboard=False)
         return
     db.ex("UPDATE zoom_teachers SET chat_id=?, bot_linked_at=? WHERE id=?", (chat, S.fmt(S.now()), t["id"]))

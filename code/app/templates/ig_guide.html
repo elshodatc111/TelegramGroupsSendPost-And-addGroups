@@ -31,6 +31,13 @@
 <li>Tunnel faqat joylash paytida ochiladi, faqat bitta faylga bir martalik havola beradi, qolgan sahifalaringiz tashqaridan ochilmaydi; joylangach yopiladi.</li>
 <li>Avto joylash ishlamasa, post «Xato» holatida qoladi va bildirishnoma chiqadi: eslatma rejimidagidek qo'lda joylashingiz mumkin.</li>
 <li>Talablar: rasm JPEG (dastur o'zi o'giradi), Reels uchun MP4/MOV vertikal video, karusel 2-10 fayl. Instagram sutkasiga ~50-100 ta API post limiti qo'yadi.</li></ul></div>
+<div class="card" id="cloud"><div class="card-h"><h2>Cloudflare bulut (R2): fayllar ombori</h2></div><ol style="line-height:1.9;padding-left:20px;margin:0">
+<li>dash.cloudflare.com da bepul hisob oching → chap menyuda <b>R2 Object Storage</b> → «Subscribe» (bepul tarif 10 GB; karta so'raladi, 10 GB dan oshmasangiz pul yechilmaydi, dastur esa 9 GB da ogohlantiradi).</li>
+<li><b>Create bucket</b> → nom bering (masalan <code>igfiles</code>).</li>
+<li>Bucket → <b>Settings → Public Development URL → Enable</b> → ko'rsatilgan <code>https://pub-xxxx.r2.dev</code> havolasini nusxalang. (Instagram faylni shu havoladan yuklab oladi.)</li>
+<li>R2 bosh sahifasi → <b>Manage API tokens → Create API token</b> → ruxsat: <b>Object Read &amp; Write</b> (shu bucket) → <b>Access Key ID</b> va <b>Secret Access Key</b> ni nusxalang (Secret faqat bir marta ko'rinadi). Account ID shu sahifaning o'ng tomonida.</li>
+<li>Instagram SMM → <a href="/ig/cloud">Cloudflare</a> → Sozlamalar: 4 qiymat va ochiq havolani kiriting → «Ulanishni tekshirish». Uchala belgi ✓ bo'lsa tayyor.</li>
+<li>Kontent rejada «Bulutdan tanlash» tugmasi bilan fayl tanlanadi. Bulutdagi fayl bilan avto joylashda tunnel kerak emas. Joylangach fayl avto o'chadi (Sozlamalarda o'chirish mumkin).</li></ol></div>
 <div class="card"><div class="card-h"><h2>6. Statistika haqida bilish kerak</h2></div><ul style="line-height:1.9;padding-left:20px;margin:0">
 <li>Yangi ko'rsatkichlar Instagram'da 48 soatgacha kechikishi mumkin. Obunachi soni dastur har kuni saqlab boradi (shuning uchun dastur ochiq turgani muhim).</li>
 <li>Auditoriya (yosh, jins, shahar) Instagram tomonidan faqat <b>100 va undan ko'p obunachi</b>da beriladi.</li>
@@ -41,6 +48,6 @@
 <li><b>«Professional emas»</b>: Instagram ilovasida akkaunt turini o'zgartiring.</li>
 <li><b>Statistika bo'sh</b>: yangi akkauntda 48 soat kuting; Diagnostika → «Statistika (insights)» ruxsatni ko'rsatadi; tokenda manage_insights bo'lishi kerak.</li>
 <li><b>Joylab bo'lmadi</b>: Diagnostika → «Joylash ruxsati» va «Tunnel sinovi». Antivirus cloudflared'ni to'sgan bo'lishi mumkin.</li>
-<li><b>AI ishlamayapti</b>: OpenAI kaliti va hisobdagi mablag'ni tekshiring (Kanallarim → Sozlamalar).</li>
+<li><b>AI ishlamayapti</b>: OpenAI kaliti va hisobdagi mablag'ni tekshiring (Telegram SMM → Sozlamalar).</li>
 <li>Tushunarsiz xato: Tizim tahlili → Instagram bo'limi va «AI xulosa so'rash».</li></ul></div>
 {% endblock %}

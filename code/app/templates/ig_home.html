@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-h"><div><h1>Instagram sahifalar</h1><p class="sub">Barcha ulangan sahifalar bir joyda. Joylash rejimi: <b>{{ 'Avto (cloudflared)' if mode == 'auto' else 'Eslatma (qo\'lda joylash)' }}</b>.</p></div>
   <div class="actions"><a class="btn sm sec" href="/ig/accounts">{{ ic('plus') }} Sahifa qo'shish</a></div></div>
-{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div>AI uchun <a href="/ch/settings"><b>Kanallarim → Sozlamalar</b></a> da OpenAI kalitini kiriting (barcha bo'limlar uchun umumiy).</div></div>{% endif %}
+{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div>AI uchun <a href="/ch/settings"><b>Telegram SMM → Sozlamalar</b></a> da OpenAI kalitini kiriting (barcha bo'limlar uchun umumiy).</div></div>{% endif %}
 {% if due %}<div class="card" style="border-color:var(--pri)"><div class="card-h"><h2>{{ ic('clock') }} Hozir joylash vaqti ({{ due|length }})</h2></div>
 {% for p in due %}<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--bd)"><div><b>@{{ p.username }}</b> · {{ p.title }} <span class="hint">{{ p.scheduled_at[:16] }}</span></div>
 <form method="post" action="/ig/select" style="margin:0"><input type="hidden" name="id" value="{{ p.account_id }}"><input type="hidden" name="next" value="/ig/plan"><button class="btn sm">Ochish</button></form></div>{% endfor %}</div>{% endif %}

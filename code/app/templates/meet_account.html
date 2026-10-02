@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}Telegram akkaunt{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Telegram akkaunt (Majlislar)</h1><p class="sub">Bitta alohida akkaunt: o'quvchilar guruhiga havola/eslatma yuboradi. Group Post va Kanallarim akkauntlaridan alohida (o'qituvchilar bilan bot ishlaydi).</p></div></div>
-{% if not api_ok %}<div class="note red">{{ ic('alert') }}<div>Avval <a href="/settings"><b>Group Post → Sozlamalar</b></a>da Telegram <b>API ID</b> va <b>API HASH</b> ni kiriting (my.telegram.org dan).</div></div>{% endif %}
+<div class="page-h"><div><h1>Telegram akkaunt (Zoom Online)</h1><p class="sub">Bitta alohida akkaunt: o'quvchilar guruhiga havola/eslatma yuboradi. Telegram Guruhlar va Telegram SMM akkauntlaridan alohida (o'qituvchilar bilan bot ishlaydi).</p></div></div>
+{% if not api_ok %}<div class="note red">{{ ic('alert') }}<div>Avval <a href="/settings"><b>Telegram Guruhlar → Sozlamalar</b></a>da Telegram <b>API ID</b> va <b>API HASH</b> ni kiriting (my.telegram.org dan).</div></div>{% endif %}
 {% if login_id %}<div class="card" style="border-color:var(--acc)"><div class="card-h"><h2>{{ ic('lock') }} Akkauntni ulash</h2></div>
 {% if step == 'password' %}<form method="post" action="/meet/account/{{ login_id }}/password"><label class="l">2 bosqichli parol</label><input type="password" name="password" autofocus required><div class="actions" style="margin-top:12px"><button class="btn">Kirish</button><a class="btn sec" href="/meet/account">Bekor qilish</a></div></form>
 {% else %}<form method="post" action="/meet/account/{{ login_id }}/code"><label class="l">Telegram'ga kelgan kod</label><input type="text" name="code" autofocus required autocomplete="off" inputmode="numeric" style="max-width:260px"><div class="actions" style="margin-top:12px"><button class="btn">Tasdiqlash</button><a class="btn sec" href="/meet/account">Bekor qilish</a></div></form>{% endif %}</div>{% endif %}
@@ -12,6 +12,6 @@
 <form method="post" action="/meet/account/{{ acc.id }}/logout" onsubmit="return confirm('Akkauntdan chiqilsinmi?')"><button class="btn ghost sm">Chiqish</button></form>
 {% else %}<form method="post" action="/meet/account/{{ acc.id }}/reconnect" class="actions" style="display:flex"><input type="text" name="phone" placeholder="+998901234567" required style="width:200px"><button class="btn sm">Qayta ulash</button></form>{% endif %}
 <form method="post" action="/meet/account/{{ acc.id }}/delete" onsubmit="return confirm('Akkaunt o\'chiriladi (guruhlar va jadval saqlanadi). Davom etasizmi?')"><button class="btn ghost sm">{{ ic('trash') }} Akkauntni almashtirish (o'chirish)</button></form></div></div>
-{% elif not login_id %}<div class="card"><div class="card-h"><h2>{{ ic('plus') }} Akkaunt ulash</h2></div><form method="post" action="/meet/account/add"><label class="l">Akkaunt nomi (ixtiyoriy)</label><input type="text" name="name" placeholder="Masalan: Majlislar">
+{% elif not login_id %}<div class="card"><div class="card-h"><h2>{{ ic('plus') }} Akkaunt ulash</h2></div><form method="post" action="/meet/account/add"><label class="l">Akkaunt nomi (ixtiyoriy)</label><input type="text" name="name" placeholder="Masalan: Zoom Online">
 <label class="l">Telefon raqam</label><input type="text" name="phone" placeholder="+998901234567" required><div class="hint">Boshqa bo'limlarda ishlatilgan raqamni kiritib bo'lmaydi.</div><div class="actions" style="margin-top:12px"><button class="btn" {{ '' if api_ok else 'disabled' }}>Kod yuborish</button></div></form></div>{% endif %}
 {% endblock %}

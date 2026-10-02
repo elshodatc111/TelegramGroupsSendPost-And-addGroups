@@ -1,4 +1,4 @@
-"""Majlislar: oy yordamchilari va kunlik hisobotga qo'shiladigan bitta varaq (Excel, «Majlislar»)."""
+"""Zoom Online: oy yordamchilari va kunlik hisobotga qo'shiladigan bitta varaq (Excel, «Zoom Online»)."""
 from datetime import datetime
 
 from openpyxl.styles import Font, PatternFill
@@ -39,7 +39,7 @@ def add_daily_sheet(wb, day: str):
     rows = daily_rows(day)
     if not rows:
         return
-    ws = wb.create_sheet("Majlislar")
+    ws = wb.create_sheet("Zoom Online")
     ws.append(["Vaqt", "Guruh", "O'qituvchi", "Holat", "Zoom majlislar soni", "Zoom akkauntlar"])
     for c in ws[1]:
         c.font = Font(bold=True, color="FFFFFF")

@@ -47,10 +47,11 @@ def supervise(name: str, factory, restart_after: int = 60):
 
 ONESHOT = {"manager"}          # bir marta bajarilib tugaydigan vazifalar (xato emas)
 LOOP_TITLES = {
-    "manager": "Akkauntlarni ulash", "auto_refresh": "Guruhlarni avto-yangilash", "leaver": "Guruhdan chiqish", "dailyreport": "Kunlik hisobot (Group Post)",
+    "manager": "Akkauntlarni ulash", "auto_refresh": "Guruhlarni avto-yangilash", "leaver": "Guruhdan chiqish", "dailyreport": "Kunlik hisobot (Telegram Guruhlar)",
     "discovery": "Guruh qidirish", "auditor": "Guruh auditi", "ch_collect": "Kanal ma'lumotlarini yig'ish", "ch_plan": "Kontent reja yuboruvchi",
     "ch_learn": "Bilim xotirasi", "backup": "Baza zaxirasi", "ch_track": "Havola bosilishlarini olish", "ch_insight": "Statistika va viral kuzatuvi",
-    "ch_report": "Haftalik hisobot", "ig_collect": "Instagram: ma'lumot yig'ish", "ig_plan": "Instagram: reja (eslatma/joylash)",
+    "ch_report": "Haftalik hisobot", "ig_collect": "Instagram: ma'lumot yig'ish", "ig_plan": "Instagram: reja (eslatma/joylash)", "cf_watch": "Cloudflare R2: hajm nazorati",
+    "meet_sched": "Zoom Online: darslar sikli", "meet_bot": "Zoom Online: o'qituvchilar boti",
 }
 
 
@@ -80,7 +81,7 @@ def _mod(text: str) -> str:
     for words, name in ((("mysql", "pymysql", "aria", "operationalerror", "xampp"), "Baza (MySQL)"), (("openai", "ai.chat", "insufficient_quota", "rate limit"), "OpenAI"),
                         (("instagram", "ig_api", "ig_collect", "ig_plan", "igerror", "graph.instagram"), "Instagram"), (("floodwait", "telethon", "rpcerror", "session", "telegram"), "Telegram"), (("ffmpeg", "whisper", "transcri"), "Video → matn"),
                         (("diffusers", "cuda", "torch", "imagegen", "rasm"), "Rasm yaratish"), (("worker", "cloudflare", "track"), "Kuzatuv havolasi"),
-                        (("reportlab", "openpyxl", "hisobot"), "Hisobot"), (("ch_plan", "send_item", "reja"), "Kontent reja"), (("sender", "joiner", "campaign"), "Group Post")):
+                        (("reportlab", "openpyxl", "hisobot"), "Hisobot"), (("ch_plan", "send_item", "reja"), "Kontent reja"), (("sender", "joiner", "campaign"), "Telegram Guruhlar")):
         if any(w in t for w in words):
             return name
     return "Boshqa"
@@ -132,7 +133,7 @@ def check_telegram():
     except OSError as e:
         out.append(item(g, "Telegram'ga internet", FAIL, f"Ulanib bo'lmadi: {e}", "Internet, VPN yoki antivirus/firewall'ni tekshiring.", key="tg_net"))
     from .core import manager
-    for ws, label in (("posting", "Group Post"), ("channels", "Kanallarim")):
+    for ws, label in (("posting", "Telegram Guruhlar"), ("channels", "Telegram SMM")):
         rows = db.q("SELECT * FROM accounts WHERE workspace=?", (ws,))
         if not rows:
             out.append(item(g, f"Akkaunt — {label}", INFO, "Akkaunt qo'shilmagan", "Bo'limning «Akkaunt» sahifasidan ulang." if ws == "channels" else "Akkauntlar sahifasidan ulang.", key=f"acc_{ws}"))
@@ -151,7 +152,7 @@ def check_telegram():
 def check_openai():
     g = "OpenAI"
     if not ai.configured():
-        return [item(g, "OpenAI kaliti", WARN, "Kiritilmagan", "Kanallarim → Sozlamalar → OpenAI kalitini kiriting (g'oya, tahlil, rasm prompti uchun).", key="openai")]
+        return [item(g, "OpenAI kaliti", WARN, "Kiritilmagan", "Telegram SMM → Sozlamalar → OpenAI kalitini kiriting (g'oya, tahlil, rasm prompti uchun).", key="openai")]
     out = [item(g, "OpenAI kaliti", OK, "Kiritilgan", key="openai")]
     bad = db.q("SELECT info, ts FROM sys_events WHERE source IN ('ai','openai') AND kind='error' ORDER BY id DESC LIMIT 1")
     month = datetime.now().strftime("%Y-%m")
@@ -236,7 +237,7 @@ def check_loops():
 
 
 def check_content():
-    g = "Kanallarim ishi"
+    g = "Telegram SMM ishi"
     out = []
     late = db.one("SELECT COUNT(*) c FROM ch_plan WHERE status='scheduled' AND scheduled_at < ?", ((datetime.now() - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"),))["c"]
     failed = db.one("SELECT COUNT(*) c FROM ch_plan WHERE status IN ('failed','missed') AND scheduled_at >= ?", ((datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"),))["c"]
@@ -294,6 +295,16 @@ def check_instagram():
     return out
 
 
+def check_meet():
+    from . import meet_sched
+    return meet_sched.health_items()
+
+
+def check_cloud():
+    from . import cf
+    return cf.health_items(item)
+
+
 def log_summary(hours=24, limit=8):
     """Log fayldagi ERROR/WARNING larni guruhlab beradi: qaysi bo'limda, necha marta."""
     lines = []
@@ -334,7 +345,7 @@ def events(limit=30):
 # ---------------------------------------------------------------- umumiy
 async def run_all() -> dict:
     items: list[dict] = []
-    for fn in (check_database, check_telegram, check_openai, check_media_tools, check_loops, check_content, check_instagram):
+    for fn in (check_database, check_telegram, check_openai, check_media_tools, check_loops, check_content, check_instagram, check_meet, check_cloud):
         try:
             items += fn()
         except Exception as e:

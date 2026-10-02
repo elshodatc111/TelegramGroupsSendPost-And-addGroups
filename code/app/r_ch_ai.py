@@ -1,4 +1,4 @@
-"""Kanallarim: g'oyalar, AI sarfi (token) va sozlamalar."""
+"""Telegram SMM: g'oyalar, AI sarfi (token) va sozlamalar."""
 import io
 import json
 import os

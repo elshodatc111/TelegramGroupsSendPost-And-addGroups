@@ -1,4 +1,4 @@
-"""Kanallarim: raqobatchilar, sinxron, tahlil va o'z postlari."""
+"""Telegram SMM: raqobatchilar, sinxron, tahlil va o'z postlari."""
 import asyncio
 import json
 

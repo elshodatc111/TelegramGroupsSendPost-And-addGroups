@@ -1,4 +1,4 @@
-"""Kanallarim: kontent reja — rejalashtirilgan postlarni o'z kanalimizga yuborish."""
+"""Telegram SMM: kontent reja — rejalashtirilgan postlarni o'z kanalimizga yuborish."""
 import asyncio
 import json
 from datetime import datetime, timedelta

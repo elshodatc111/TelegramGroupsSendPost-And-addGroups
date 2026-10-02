@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-h"><div><h1>Instagram sozlamalari</h1><p class="sub">Kalitlar shifrlangan holda saqlanadi va faqat shu kompyuterda ochiladi.</p></div></div>
 <div class="card"><div class="card-h"><h2>OpenAI</h2>{% if ai_ok %}<span class="badge b-good">Kalit bor</span>{% else %}<span class="badge b-bad">Kalit yo'q</span>{% endif %}</div>
-<p class="small">OpenAI kaliti, modellar va oylik chegara barcha bo'limlar uchun umumiy: <a href="/ch/settings"><b>Kanallarim → Sozlamalar</b></a>. Har Instagram sahifaning sarfi alohida hisoblanadi (AI sarfi sahifasi).</p></div>
+<p class="small">OpenAI kaliti, modellar va oylik chegara barcha bo'limlar uchun umumiy: <a href="/ch/settings"><b>Telegram SMM → Sozlamalar</b></a>. Har Instagram sahifaning sarfi alohida hisoblanadi (AI sarfi sahifasi).</p></div>
 <div class="card"><div class="card-h"><h2>Joylash va umumiy</h2></div>
 <form method="post" action="/ig/settings/general"><div class="grid g3">
 <div><label class="l">Joylash rejimi</label><select name="mode"><option value="reminder" {{ 'selected' if mode == 'reminder' }}>Eslatma (qo'lda joylash, hech narsa o'rnatilmaydi)</option><option value="auto" {{ 'selected' if mode == 'auto' }}>Avto (cloudflared tunnel orqali)</option></select></div>

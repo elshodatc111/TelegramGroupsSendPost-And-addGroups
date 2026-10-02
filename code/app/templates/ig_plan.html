@@ -5,7 +5,7 @@
 <style>
 .pv-wrap{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
 @media(max-width:980px){.pv-wrap{grid-template-columns:1fr}}
-.pv-box{position:sticky;top:12px;background:var(--surface2,#eef2f7);border:1px solid var(--bd);border-radius:16px;padding:14px}
+.pv-box{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;background:var(--surface2,#eef2f7);border:1px solid var(--bd);border-radius:16px;padding:14px}
 .pv-box h3{margin:0 0 10px;font-size:14px;color:var(--mut)}
 .pv-count{font-size:12.5px;margin-top:8px;color:var(--mut)}.pv-count.bad{color:#dc2626;font-weight:600}
 .sc-row{display:grid;grid-template-columns:90px 1fr 34px;gap:8px;align-items:center;font-size:13px;margin:4px 0}
@@ -18,18 +18,37 @@
 .tm button:hover{border-color:var(--pri)}.tm b{display:block}.tm small{color:var(--mut)}
 .ready{border:2px solid var(--pri);border-radius:14px;padding:12px 14px;margin:10px 0;background:var(--surface)}
 .ready pre{white-space:pre-wrap;background:var(--surface2);border-radius:10px;padding:10px;font:inherit;font-size:14px;margin:8px 0}
+.pv-tabs{display:flex;gap:6px;margin-bottom:10px;background:var(--surface);border:1px solid var(--bd);border-radius:99px;padding:3px}.pv-tabs button{flex:1;border:0;background:none;border-radius:99px;padding:6px 8px;font:inherit;font-size:13px;font-weight:600;color:var(--mut);cursor:pointer}.pv-tabs button.on{background:var(--pri);color:#fff}
+#pv_stage{display:flex;justify-content:center}.ig-mock{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--bd);border-radius:14px;overflow:hidden;color:var(--tx)}
+.ig-mock .hd{display:flex;gap:8px;align-items:center;padding:9px 12px;font-size:13.5px}.ig-mock .hd .sp{margin-left:auto;font-size:12px}.ig-mock .hd .mo{color:var(--mut);display:flex}.ava.sm{width:30px;height:30px;font-size:12px}
+.slot{position:relative;background:#000;overflow:hidden}.mm{position:relative;width:100%;overflow:hidden;background:#111}.mm.empty{display:grid;place-items:center;background:var(--surface2);color:var(--mut);font-size:13px}
+.mm img,.mm video{position:absolute;inset:0;width:100%;height:100%;user-select:none;-webkit-user-drag:none}.mm.drag{cursor:grab;touch-action:none}.mm.drag:active{cursor:grabbing}
+.mm .mm-bg{object-fit:cover;filter:blur(18px) brightness(.85);transform:scale(1.2)}
+.badges{position:absolute;right:10px;top:10px;display:flex;gap:6px}.badges span{background:rgba(0,0,0,.65);color:#fff;border-radius:99px;padding:2px 9px;font-size:12px;display:flex;align-items:center}
+.nv{position:absolute;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;border:0;background:rgba(255,255,255,.88);color:#111;font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center}.nv.l{left:8px}.nv.r{right:8px}.nv[disabled]{display:none}
+.ig-mock .acts{display:flex;gap:14px;padding:9px 12px 4px;color:var(--tx)}.ig-mock .acts .rt{margin-left:auto}.dots{display:flex;gap:4px;justify-content:center;margin-top:-22px;position:relative;height:6px}.dots i{width:6px;height:6px;border-radius:50%;background:#c4c4c4}.dots i.on{background:#0095f6}
+.ig-mock .likes{padding:2px 12px;font-weight:600;font-size:13.5px}.ig-mock .cap{padding:2px 12px 4px;font-size:13.5px;line-height:1.45;word-break:break-word}.ig-mock .cap b{margin-right:2px}.ig-mock .sm2{padding:0 12px 10px;font-size:12.5px}
+.tg{color:#00376b}[data-theme=dark] .tg{color:#8ec5ff}.lnk{border:0;background:none;color:var(--mut);cursor:pointer;font:inherit;padding:0}
+.phone{position:relative;width:100%;max-width:260px;aspect-ratio:9/16;border-radius:26px;overflow:hidden;background:#000;border:6px solid #1f2937}.phone .slot{position:absolute;inset:0}.phone .mm{height:100%}
+.sz{position:absolute;left:0;right:0;pointer-events:none;background:rgba(255,255,255,.14);border:1px dashed rgba(255,255,255,.45)}.sz.top{top:0;height:13%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;font-size:9px;color:#fff;opacity:.85}.sz.bot{bottom:0;height:18%}
+.rail{position:absolute;right:8px;bottom:22%;display:flex;flex-direction:column;gap:14px;color:#fff;align-items:center}.rcap{position:absolute;left:10px;right:56px;bottom:19%;color:#fff;font-size:12px;text-shadow:0 1px 3px rgba(0,0,0,.6)}.rcap .rh{display:flex;gap:6px;align-items:center;margin-bottom:4px}.rcap .fl{border:1px solid #fff;border-radius:6px;padding:0 6px;font-size:11px}.rcap .ra{margin-top:4px;font-size:11px;opacity:.9}
+.gridp{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--bd);border-radius:14px;padding:10px}.gh{display:flex;gap:10px;align-items:center;margin-bottom:10px}.gg{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}.gt{aspect-ratio:3/4;background:var(--surface2);position:relative}.gt.me{background:#000}.gi{position:absolute;right:5px;top:5px;color:#fff;display:flex;gap:3px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+.fitbox{margin-top:12px;border-top:1px solid var(--bd);padding-top:10px}.fb-h{font-weight:700;font-size:13.5px;margin-bottom:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}.chips button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd);background:var(--surface);color:inherit;border-radius:10px;padding:5px 9px;font:inherit;font-size:12.5px;cursor:pointer}.chips button.on,.chips input.on{border-color:var(--pri);box-shadow:0 0 0 2px var(--pri-soft);color:var(--pri2);font-weight:600}
+.chips button i{display:inline-block;height:16px;border:1.5px solid currentColor;border-radius:3px}.chips input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--bd);border-radius:8px;background:none;cursor:pointer}
+.fl{display:block;font-size:12.5px;margin:6px 0}.fl input[type=range]{width:100%}#fit_info .w{margin-top:4px;color:#b45309;font-weight:600}#fit_info .okc{color:#15803d;font-weight:600}#fit_info code{background:var(--surface);padding:0 4px;border-radius:4px}
 </style>
 {% if ready %}<div class="card" style="border-color:var(--pri)"><div class="card-h"><h2>{{ ic('clock') }} Hozir joylash vaqti ({{ ready|length }})</h2></div>
 {% for it in ready %}<div class="ready"><b>{{ it.title }}</b> <span class="hint">{{ it.scheduled_at[:16] }} · {{ mtypes.get(it.mtype, it.mtype) }}</span>
 <pre id="cap{{ it.id }}">{{ it.caption }}</pre>
 <div class="actions"><button type="button" class="btn sm" data-copy-from="cap{{ it.id }}">Tavsifni nusxalash</button>
-{% for n in media(it) %}<a class="btn sm sec" href="/media/{{ n }}" download>{{ ic('download') }} Fayl {{ loop.index }}</a>{% endfor %}</div>
+{% for m in media(it) %}{% if not m.missing %}<a class="btn sm sec" href="{{ m.u }}" {{ 'target="_blank" rel="noopener"' if m.cloud else 'download' }}>{{ ic('download') }} {{ m.label|truncate(22, True) if m.cloud else 'Fayl ' ~ loop.index }}</a>{% endif %}{% endfor %}</div>
 <div class="hint">Instagram ilovasi → «+» → faylni tanlang → nusxalangan tavsifni qo'ying → Ulashish. Keyin pastdan «Joylandi» ni bosing.</div>
 <div class="actions" style="margin-top:8px"><form method="post" action="/ig/plan/{{ it.id }}/done" class="actions" style="margin:0"><input type="text" name="permalink" placeholder="Post havolasi (ixtiyoriy)" style="width:260px"><button class="btn sm ok">Joylandi ✓</button></form>
 <form method="post" action="/ig/plan/{{ it.id }}/snooze" style="margin:0"><button class="btn sm sec" name="minutes" value="30">30 daqiqa keyin</button></form></div></div>{% endfor %}</div>{% endif %}
 <div class="card"><div class="card-h"><h2>{{ 'Tahrirlash' if edit else 'Yangi post' }}</h2></div>
 <div class="pv-wrap"><div>
-<form method="post" action="/ig/plan/save" enctype="multipart/form-data" data-busy="Saqlanmoqda..." id="planform">
+<form method="post" action="/ig/plan/save" enctype="multipart/form-data" data-busy="Saqlanmoqda (fayl moslash bir necha daqiqa olishi mumkin)..." id="planform">
   <input type="hidden" name="id" value="{{ edit.id if edit else 0 }}">
   <label class="l">Sarlavha (faqat o'zingiz uchun)</label><input type="text" name="title" value="{{ edit.title if edit else '' }}">
   <label class="l">Tavsif (caption)</label><textarea name="caption" id="f_text" rows="9">{{ edit.caption if edit else '' }}</textarea>
@@ -37,25 +56,48 @@
     <div><label class="l">Joylash vaqti (bo'sh = qoralama)</label><input type="datetime-local" name="when" id="f_when" value="{{ (edit.scheduled_at[:16]|replace(' ','T')) if edit and edit.scheduled_at else '' }}"></div>
     <div><label class="l">Joylash usuli</label><select name="mode"><option value="">Umumiy ({{ modes[mode] }})</option>{% for k, l in modes.items() %}<option value="{{ k }}" {{ 'selected' if edit and edit.mode == k }}>{{ l }}</option>{% endfor %}</select></div></div>
   <label class="l">Rasm / video {{ '(yangisi eskisini almashtiradi)' if edit }}</label><input type="file" name="files" id="f_files" multiple accept="image/*,video/mp4,video/quicktime">
-  <div class="hint">Rasm JPEG'ga o'giriladi. Reels uchun vertikal video (9:16), karusel uchun 2-10 ta fayl. Avto rejimda fayl shart.</div>
+  <div class="actions" style="margin:8px 0 0"><button type="button" class="btn sm sec" id="b_cloud">{{ ic('cloud') }} Bulutdan tanlash{{ ' (' ~ cloud_n ~ ')' if cloud_ok }}</button><a class="small" href="/ig/cloud">Bulutni boshqarish</a></div>
+  <input type="hidden" name="cloud_ids" id="f_cloud" value=""><input type="hidden" name="media_touch" id="f_touch" value="">
+  <div id="picked" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+  <div class="hint">Rasm JPEG'ga o'giriladi. Reels uchun vertikal video (9:16), karusel uchun 2-10 ta fayl (bulut + yangi fayllar aralash bo'lishi mumkin). Avto rejimda fayl shart.</div>
   <label class="l">Eslatma o'zingiz uchun (ixtiyoriy)</label><textarea name="notes" rows="2">{{ edit.notes if edit else '' }}</textarea>
   <div class="actions" style="margin-top:12px"><button class="btn">Saqlash</button>
     <button type="button" class="btn sec" id="b_review" {{ 'disabled' if not ai_ok }}>{{ ic('bulb') }} AI tahlil</button>
     <button type="button" class="btn ghost" id="b_times">{{ ic('clock') }} Vaqt taklifi</button>
     {% if edit %}<a class="btn sec" href="/ig/plan">Bekor qilish</a>{% endif %}</div>
-  {% if not ai_ok %}<div class="hint">AI tahlil uchun OpenAI kaliti kerak (Kanallarim → Sozlamalar). «Vaqt taklifi» AI'siz ishlaydi.</div>{% endif %}
+  {% if not ai_ok %}<div class="hint">AI tahlil uchun OpenAI kaliti kerak (Telegram SMM → Sozlamalar). «Vaqt taklifi» AI'siz ishlaydi.</div>{% endif %}
 </form></div>
-<div class="pv-box"><h3>Jonli ko'rinish: Instagram'da shunday ko'rinadi</h3>
+<div class="pv-box" id="pvbox"><h3>Jonli ko'rinish: Instagram'da shunday ko'rinadi</h3>
+  <div class="pv-tabs" id="pv_tabs"><button type="button" data-t="feed" class="on">Lenta</button><button type="button" data-t="reel">Reels / Stories</button><button type="button" data-t="grid">Profil</button></div>
   <div class="pv-toggle" id="pv_toggle" style="display:none;gap:6px;margin-bottom:8px"><button type="button" class="btn sm" data-mode="mine">Mening matnim</button><button type="button" class="btn sm sec" data-mode="alt">AI taklifi</button></div>
-  <div class="ig-mock"><div class="hd"><span class="ava ig" style="width:28px;height:28px;font-size:12px">{{ a.username[:1]|upper }}</span>{{ a.username }}</div><div class="ph" id="pv_ph">Rasm / video</div><div class="cap" id="pv_cap"></div></div>
+  <div id="pv_stage"></div>
   <div class="pv-count" id="pv_count"></div>
+  <div class="fitbox"><div class="fb-h">Instagram formatiga moslash</div>
+   <div class="chips" id="fit_fmt"><button type="button" data-v="auto" class="on">Avto</button><button type="button" data-v="4:5"><i style="aspect-ratio:4/5"></i>4:5 Post</button><button type="button" data-v="1:1"><i style="aspect-ratio:1/1"></i>1:1</button><button type="button" data-v="1.91:1"><i style="aspect-ratio:1.91/1"></i>1.91:1</button><button type="button" data-v="9:16"><i style="aspect-ratio:9/16"></i>9:16 Reels/Story</button></div>
+   <div id="fit_opts" style="display:none">
+    <div class="chips" id="fit_mode"><button type="button" data-v="cover" class="on">Kesish (to'ldirish)</button><button type="button" data-v="contain">Butunligicha + fon</button></div>
+    <div class="chips" id="fit_bgrow" style="display:none"><span class="small mut">Fon:</span><button type="button" data-v="blur" class="on">Xira</button><button type="button" data-v="white">Oq</button><button type="button" data-v="black">Qora</button><input type="color" id="fit_color" value="#e11d48" title="Rang tanlash"></div>
+    <div id="fit_pos"><label class="fl">Kattalashtirish <b id="z_l">100%</b><input type="range" id="fit_zoom" min="1" max="3" step="0.05" value="1"></label>
+     <label class="fl">Chap ↔ o'ng<input type="range" id="fit_x" min="0" max="100" value="50"></label><label class="fl">Tepa ↕ past<input type="range" id="fit_y" min="0" max="100" value="50"></label>
+     <div class="actions" style="margin-top:6px"><button type="button" class="btn sm sec" id="fit_reset">Tiklash</button><span class="hint">Rasmni sichqoncha bilan surib ham joylashtirasiz.</span></div></div>
+   </div>
+   <div class="hint" id="fit_info"></div>
+   <div class="hint">Moslash «Saqlash» bosilganda bajariladi (rasm 1080 px JPEG, video MP4). Asl fayl o'zgarmaydi: bulutda moslangan nusxa alohida saqlanadi.</div>
+   <input type="hidden" form="planform" name="fit_fmt" id="fit_fmt_v" value="auto"><input type="hidden" form="planform" name="fit_mode" id="fit_mode_v" value="cover"><input type="hidden" form="planform" name="fit_bg" id="fit_bg_v" value="blur">
+   <input type="hidden" form="planform" name="fit_zoom" id="fit_zoom_v" value="1"><input type="hidden" form="planform" name="fit_x" id="fit_x_v" value="50"><input type="hidden" form="planform" name="fit_y" id="fit_y_v" value="50"><input type="hidden" form="planform" name="fit_cloud" id="fit_cloud" value="">
+  </div>
   <div class="hint" style="margin-top:6px">Instagram tavsifning faqat birinchi ~125 belgisini ko'rsatadi, qolgani «ko'proq» orqasida. Shuning uchun birinchi qator eng muhim.</div></div></div>
 <div id="ai_panel" style="display:none;margin-top:14px"></div></div>
+<div id="cmodal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;align-items:center;justify-content:center;padding:16px"><div class="card" style="width:min(820px,100%);max-height:86vh;overflow:auto;margin:0">
+<div class="card-h"><h2>{{ ic('cloud') }} Bulutdan fayl tanlash</h2><button type="button" class="btn sm sec" id="c_close">Yopish</button></div>
+<input type="text" id="c_q" placeholder="Nom bo'yicha qidirish" style="margin-bottom:10px"><div id="c_list" class="cm-grid"></div>
+<div class="actions" style="margin-top:12px"><button type="button" class="btn" id="c_ok">Tanlanganlarni qo'shish</button><span class="hint" id="c_cnt"></span></div></div></div>
+<style>.cm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.cm-it{border:2px solid var(--bd);border-radius:12px;padding:6px;cursor:pointer;background:var(--surface);font-size:12px;position:relative}.cm-it.on{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-soft)}.cm-it .t{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--surface2);display:block}.cm-it b{display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cm-it .n{position:absolute;top:10px;left:10px;background:var(--pri);color:#fff;border-radius:99px;min-width:22px;height:22px;text-align:center;line-height:22px;font-weight:700}.pk{display:flex;align-items:center;gap:6px;border:1px solid var(--pri);border-radius:99px;padding:3px 6px 3px 3px;font-size:12.5px;background:var(--surface)}.pk img,.pk video{width:28px;height:28px;border-radius:99px;object-fit:cover}.pk button{border:0;background:none;cursor:pointer;color:inherit;font-size:16px}</style>
 <div class="card"><div class="card-h"><h2>Postlar</h2></div>
 {% if items %}<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th>Vaqt</th><th>Post</th><th>Tur</th><th>Media</th><th>Holat</th><th></th></tr></thead><tbody>
 {% for it in items %}<tr><td>{{ (it.scheduled_at or it.created_at)[:16] }}</td>
 <td style="max-width:420px"><b>{{ it.title }}</b><div class="hint">{{ (it.caption or '')[:120] }}</div>{% if it.error %}<div class="red small">{{ it.error }}</div>{% endif %}{% if it.permalink %}<a class="small" href="{{ it.permalink }}" target="_blank" rel="noopener">Instagram'da ochish</a>{% endif %}</td>
-<td>{{ mtypes.get(it.mtype, it.mtype)|truncate(12, True, '') }}</td><td>{{ media(it)|length or '—' }}</td><td><span class="badge b-{{ BADGE.get(it.status, 'waiting') }}">{{ STATUS_L.get(it.status, it.status) }}</span></td>
+<td>{{ mtypes.get(it.mtype, it.mtype)|truncate(12, True, '') }}</td><td>{{ media(it)|length or '—' }}{% if media(it)|selectattr('cloud')|list %} <span title="Bulutdan">{{ ic('cloud') }}</span>{% endif %}</td><td><span class="badge b-{{ BADGE.get(it.status, 'waiting') }}">{{ STATUS_L.get(it.status, it.status) }}</span></td>
 <td><div class="actions" style="justify-content:flex-end">
 {% if it.status in ('scheduled','reminded','failed','missed') %}<form method="post" action="/ig/plan/{{ it.id }}/publish-now"><button class="btn sm" title="Hozir API orqali joylash (cloudflared kerak)">Hozir joyla</button></form>
 <form method="post" action="/ig/plan/{{ it.id }}/done"><button class="btn sm ok" title="Qo'lda joyladim">Joylandi ✓</button></form>{% endif %}
@@ -67,19 +109,112 @@
 {% block scripts %}<script>
 (function(){
 var $=function(i){return document.getElementById(i)},cap=$('f_text'),ph=$('pv_ph'),pc=$('pv_cap'),cnt=$('pv_count');
-var alt=null,mode='mine',urls=[],existing={{ (media(edit)|tojson) if edit else '[]' }};
+var alt=null,mode='mine',urls=[],existing={{ (media(edit)|tojson) if edit else '[]' }},picked=existing.filter(function(x){return x.cloud&&!x.missing}).map(function(x){return{id:x.fid,name:x.label,u:x.u,v:x.v}}),touched=false;
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function render(){var t=(mode==='alt'&&alt)?alt:cap.value;var first=t.slice(0,125),rest=t.slice(125);
- pc.innerHTML='<b>{{ a.username }}</b>'+esc(first).replace(/\n/g,'<br>')+(rest?'<span class="more"> ... yana</span>':'');
- var n=t.length,tags=(t.match(/#[\p{L}\p{N}_]+/gu)||[]).length;cnt.className='pv-count'+((n>2200||tags>30)?' bad':'');
- cnt.textContent=n+' / 2200 belgi · '+tags+' ta hashtag'+(n>2200?' · LIMITDAN OSHDI':'')+(tags>30?' · 30 tadan ko\'p hashtag Instagram\'da rad etiladi':'')}
-function media(){ph.innerHTML='';var src=urls.length?urls:existing.map(function(n){return{u:'/media/'+n,v:/\.(mp4|mov|m4v)$/i.test(n)}});
- if(!src.length){ph.textContent='Rasm / video';return}var s=src[0],e=document.createElement(s.v?'video':'img');e.src=s.u;if(s.v){e.muted=true;e.controls=false}ph.appendChild(e);
- if(src.length>1){var b=document.createElement('div');b.style.cssText='position:absolute;right:8px;top:8px;background:rgba(0,0,0,.6);color:#fff;border-radius:99px;padding:2px 9px;font-size:12px';b.textContent='1/'+src.length;ph.style.position='relative';ph.appendChild(b)}}
+var fit={fmt:'auto',mode:'cover',bg:'blur',color:'#e11d48',zoom:1,x:50,y:50},tab='feed',idx=0,dims={},expanded=false,AV='{{ a.username[:1]|upper }}',UN='{{ a.username }}';
+var IC={heart:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5 6.4 5c2 0 3.6 1.1 4.6 2.7C12 6.1 13.600 5 15.600 5 19 5 20.800 8.600 19.500 11.800 17.500 16.400 12 21 12 21z"/></svg>',
+ chat:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20.500 11.500a8.500 8.500 0 1 1-3.300-6.700L21 3.500l-1.300 3.800a8.400 8.400 0 0 1 .8 4.200z"/></svg>',
+ send:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M22 3 9.500 11.500M22 3l-7 18-5.500-9.500L3 6z"/></svg>',
+ save:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.500L6 21z"/></svg>',
+ more:'<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><circle cx="5" cy="12" r="1.600"/><circle cx="12" cy="12" r="1.600"/><circle cx="19" cy="12" r="1.600"/></svg>',
+ vid:'<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+ car:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg>'};
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmtText(s){return esc(s).replace(/(#[\p{L}\p{N}_]+|@[A-Za-z0-9_.]+)/gu,'<span class="tg">$1</span>').replace(/\n/g,'<br>')}
+function curText(){return (mode==='alt'&&alt)?alt:cap.value}
+function list(){var base=touched?[]:existing.filter(function(x){return !x.cloud&&!x.missing}).map(function(x){return{u:x.u,v:x.v,fit:false}});
+ var n=urls.length?urls.map(function(x){return{u:x.u,v:x.v,fit:true}}):base;
+ return picked.map(function(p){return{u:p.u,v:p.v,fit:!!p.fresh}}).concat(n)}
+function loadDims(it){if(dims[it.u])return;dims[it.u]={w:0,h:0,d:0};
+ if(it.v){var v=document.createElement('video');v.preload='metadata';v.onloadedmetadata=function(){dims[it.u]={w:v.videoWidth,h:v.videoHeight,d:v.duration};stage()};v.src=it.u}
+ else{var im=new Image();im.onload=function(){dims[it.u]={w:im.naturalWidth,h:im.naturalHeight,d:0};stage()};im.src=it.u}}
+function nat(it){var d=dims[it.u];return d&&d.w?d.w/d.h:0}
+function parseR(f){if(f==='4:5')return 4/5;if(f==='1:1')return 1;if(f==='1.91:1')return 1.91;if(f==='9:16')return 9/16;return 0}
+function feedR(it){if(fit.fmt!=='auto')return parseR(fit.fmt);var r=nat(it);return r?Math.min(1.91,Math.max(0.8,r)):1}
+function media_el(it,cls){var e=document.createElement(it.v?'video':'img');e.src=it.u;e.className=cls||'';if(it.v){e.muted=true;e.loop=true;e.autoplay=true;e.playsInline=true;e.setAttribute('playsinline','');var p=e.play&&e.play();if(p&&p.catch)p.catch(function(){})}else{e.alt='';e.draggable=false}return e}
+function mm(it,R,useFit){var box=document.createElement('div');box.className='mm';box.style.aspectRatio=String(R);
+ var r=nat(it),mode2='cover',bgm='blur';
+ if(useFit&&fit.fmt!=='auto'&&it.fit){mode2=fit.mode;bgm=fit.bg}
+ else if(useFit&&fit.fmt==='auto'&&it.fit&&r&&(r<0.795||r>1.915)){mode2='contain';bgm='blur'}
+ if(mode2==='contain'){
+  if(bgm==='blur'){var b=media_el(it,'mm-bg');box.appendChild(b)}else{box.style.background=bgm==='white'?'#fff':bgm==='black'?'#000':fit.color}
+  var f=media_el(it,'mm-fg');f.style.objectFit='contain';box.appendChild(f)}
+ else{var f2=media_el(it,'mm-fg');f2.style.objectFit='cover';
+  if(useFit&&fit.fmt!=='auto'&&it.fit){f2.style.objectPosition=fit.x+'% '+fit.y+'%';f2.style.transformOrigin=fit.x+'% '+fit.y+'%';f2.style.transform='scale('+fit.zoom+')';box.classList.add('drag')}
+  box.appendChild(f2)}
+ return box}
+function capHtml(){var t=curText().replace(/\s+$/,''),first=t.slice(0,125),rest=t.slice(125);
+ if(!t)return'<span class="mut">Tavsif yo\'q</span>';
+ if(!rest||expanded)return'<b>'+UN+'</b> '+fmtText(t)+(rest?' <button type="button" class="lnk" data-act="less">kamroq</button>':'');
+ return'<b>'+UN+'</b> '+fmtText(first)+'<span class="mut">… </span><button type="button" class="lnk" data-act="more">ko\'proq</button>'}
+function stage(){var st=$('pv_stage');if(!st)return;var L=list();L.forEach(loadDims);if(idx>=L.length)idx=Math.max(0,L.length-1);var it=L[idx];
+ var h='';
+ if(tab==='feed'){h='<div class="ig-mock"><div class="hd"><span class="ava ig sm">'+AV+'</span><b>'+UN+'</b><span class="mut sp">Hozir</span><span class="mo">'+IC.more+'</span></div><div class="slot" id="mslot"></div>'+
+  '<div class="acts"><span>'+IC.heart+'</span><span>'+IC.chat+'</span><span>'+IC.send+'</span><span class="rt">'+IC.save+'</span></div>'+
+  (L.length>1?'<div class="dots">'+L.map(function(_,i){return'<i class="'+(i===idx?'on':'')+'"></i>'}).join('')+'</div>':'')+
+  '<div class="likes">0 ta yoqtirish</div><div class="cap" id="pv_cap">'+capHtml()+'</div><div class="mut sm2">Barcha izohlarni ko\'rish</div></div>'}
+ else if(tab==='reel'){h='<div class="phone"><div class="slot" id="mslot"></div><div class="sz top"><span>Instagram interfeysi bu yerni yopadi</span></div><div class="sz bot"></div>'+
+  '<div class="rail"><span>'+IC.heart+'</span><span>'+IC.chat+'</span><span>'+IC.send+'</span><span>'+IC.more+'</span></div>'+
+  '<div class="rcap"><div class="rh"><span class="ava ig sm">'+AV+'</span><b>'+UN+'</b><span class="fl">Kuzatish</span></div><div class="rt">'+esc(curText().slice(0,90)||'Tavsif yo\'q')+(curText().length>90?'… <u>ko\'proq</u>':'')+'</div><div class="ra">♪ Asl audio · '+UN+'</div></div></div>'}
+ else{h='<div class="gridp"><div class="gh"><span class="ava ig">'+AV+'</span><div><b>'+UN+'</b><div class="mut sm2">Profil setkasi: Instagram har bir postni 3:4 qilib o\'rtasidan ko\'rsatadi</div></div></div><div class="gg" id="gg"><div class="gt me" id="mslot"></div>'+
+  '<div class="gt"></div><div class="gt"></div><div class="gt"></div><div class="gt"></div><div class="gt"></div></div></div>'}
+ st.innerHTML=h;var slot=$('mslot');
+ if(!it){if(slot){slot.innerHTML='<div class="mm empty" style="aspect-ratio:'+(tab==='feed'?'1':tab==='reel'?String(9/16):'0.75')+'">Rasm / video tanlang</div>'}}
+ else if(tab==='feed'){slot.appendChild(mm(it,feedR(it),true));
+  var nm=document.createElement('div');nm.className='badges';var bh='';if(L.length>1)bh+='<span>'+(idx+1)+'/'+L.length+'</span>';if(it.v)bh+='<span>'+IC.vid+'</span>';nm.innerHTML=bh;slot.appendChild(nm);
+  if(L.length>1){slot.insertAdjacentHTML('beforeend','<button type="button" class="nv l" data-nv="-1"'+(idx?'':' disabled')+'>&lsaquo;</button><button type="button" class="nv r" data-nv="1"'+(idx<L.length-1?'':' disabled')+'>&rsaquo;</button>')}}
+ else if(tab==='reel'){var R2=9/16;if(fit.fmt==='9:16'){slot.appendChild(mm(it,R2,true))}else{var b2=mm(it,R2,false);b2.firstChild.style.objectFit='contain';b2.style.background='#000';slot.appendChild(b2)}}
+ else{var tile=slot,box=mm(it,fit.fmt==='auto'?feedR(it):parseR(fit.fmt),true);box.style.position='absolute';box.style.left='50%';box.style.top='50%';box.style.transform='translate(-50%,-50%)';box.style.aspectRatio='';tile.style.position='relative';tile.style.overflow='hidden';tile.appendChild(box);
+  var tw=tile.clientWidth||100,th=tw*4/3,R3=fit.fmt==='auto'?feedR(it):parseR(fit.fmt);var bw,bh2;if(R3>0.75){bh2=th;bw=th*R3}else{bw=tw;bh2=tw/R3}box.style.width=bw+'px';box.style.height=bh2+'px';
+  var ib='';if(L.length>1)ib+=IC.car;if(it.v)ib+=IC.vid;if(ib)tile.insertAdjacentHTML('beforeend','<span class="gi">'+ib+'</span>')}
+ info(L,it)}
+function info(L,it){var el=$('fit_info');if(!el)return;var r=it?nat(it):0,d=it&&dims[it.u]?dims[it.u]:null,h='';
+ if(!it){el.innerHTML='Fayl tanlang: o\'lcham va nisbat shu yerda ko\'rinadi.';return}
+ if(r){h='<b>Fayl:</b> '+d.w+'×'+d.h+' ('+r.toFixed(2)+':1)'+(it.v&&d.d?' · '+Math.round(d.d)+' soniya':'');
+  if(fit.fmt==='auto'){if(!it.v&&(r<0.795||r>1.915)){h+='<div class="w">Lentaga to\'g\'ri kelmaydi (4:5 dan 1.91:1 gacha ruxsat). «Avto» rejimida saqlaganda rasm fon bilan sig\'diriladi; yoki format tanlang.</div>'}else if(it.v&&(r<0.795||r>1.915)&&tab==='feed'){h+='<div class="w">Video nisbati lentaga mos emas: format tanlab moslang.</div>'}else{h+=' · <span class="okc">Instagramga mos</span>'}}
+  else if(!it.fit){h+='<div class="w">Bu fayl avval saqlangan: moslash faqat yangi yuklangan yoki bulutdan yangi tanlangan fayllarga qo\'llanadi.</div>'}
+  else if(it.v&&!{{ 'true' if ffmpeg_ok else 'false' }}){h+='<div class="w">Videoni moslash uchun ffmpeg kerak: PowerShell\'da <code>winget install Gyan.FFmpeg</code>, so\'ng dasturni qayta ishga tushiring.</div>'}}
+ if(it.v&&d&&d.d){if(tab==='reel'&&d.d>90)h+='<div class="w">Reels 90 soniyadan uzun bo\'lsa lentada to\'liq ko\'rinmasligi mumkin.</div>';if(d.d<3)h+='<div class="w">Reels kamida 3 soniya bo\'lishi kerak.</div>'}
+ el.innerHTML=h}
+function render(){var t=curText(),n=t.length,tags=(t.match(/#[\p{L}\p{N}_]+/gu)||[]).length;cnt.className='pv-count'+((n>2200||tags>30)?' bad':'');
+ cnt.textContent=n+' / 2200 belgi · '+tags+' ta hashtag'+(n>2200?' · LIMITDAN OSHDI':'')+(tags>30?' · 30 tadan ko\'p hashtag Instagram\'da rad etiladi':'');
+ var c=$('pv_cap');if(c)c.innerHTML=capHtml()}
+function media(){idx=Math.min(idx,Math.max(0,list().length-1));stage()}
+function syncFit(){$('fit_fmt_v').value=fit.fmt;$('fit_mode_v').value=fit.mode;$('fit_bg_v').value=fit.bg==='color'?fit.color:fit.bg;$('fit_zoom_v').value=fit.zoom;$('fit_x_v').value=fit.x;$('fit_y_v').value=fit.y;
+ $('fit_opts').style.display=fit.fmt==='auto'?'none':'block';$('fit_bgrow').style.display=(fit.fmt!=='auto'&&fit.mode==='contain')?'flex':'none';$('fit_pos').style.display=(fit.fmt!=='auto'&&fit.mode==='cover')?'block':'none';
+ $('z_l').textContent=Math.round(fit.zoom*100)+'%';
+ document.querySelectorAll('#fit_fmt button').forEach(function(b){b.classList.toggle('on',b.dataset.v===fit.fmt)});
+ document.querySelectorAll('#fit_mode button').forEach(function(b){b.classList.toggle('on',b.dataset.v===fit.mode)});
+ document.querySelectorAll('#fit_bgrow button').forEach(function(b){b.classList.toggle('on',b.dataset.v===fit.bg)});$('fit_color').classList.toggle('on',fit.bg==='color')}
+document.querySelectorAll('#fit_fmt button').forEach(function(b){b.onclick=function(){fit.fmt=b.dataset.v;if(fit.fmt==='9:16'&&tab==='feed'){}syncFit();stage()}});
+document.querySelectorAll('#fit_mode button').forEach(function(b){b.onclick=function(){fit.mode=b.dataset.v;syncFit();stage()}});
+document.querySelectorAll('#fit_bgrow button').forEach(function(b){b.onclick=function(){fit.bg=b.dataset.v;syncFit();stage()}});
+$('fit_color').oninput=function(){fit.bg='color';fit.color=this.value;syncFit();stage()};
+$('fit_zoom').oninput=function(){fit.zoom=+this.value;syncFit();stage()};
+$('fit_x').oninput=function(){fit.x=+this.value;$('fit_x_v').value=fit.x;stage()};$('fit_y').oninput=function(){fit.y=+this.value;$('fit_y_v').value=fit.y;stage()};
+$('fit_reset').onclick=function(){fit.zoom=1;fit.x=50;fit.y=50;$('fit_zoom').value=1;$('fit_x').value=50;$('fit_y').value=50;syncFit();stage()};
+document.querySelectorAll('#pv_tabs button').forEach(function(b){b.onclick=function(){tab=b.dataset.t;document.querySelectorAll('#pv_tabs button').forEach(function(x){x.classList.toggle('on',x===b)});stage()}});
+var drag=null;
+$('pv_stage').addEventListener('pointerdown',function(e){var box=e.target.closest('.mm.drag');if(!box)return;var it=list()[idx],d=it&&dims[it.u];if(!d||!d.w)return;drag={x:e.clientX,y:e.clientY,fx:fit.x,fy:fit.y,bw:box.clientWidth,bh:box.clientHeight,d:d};box.setPointerCapture(e.pointerId);e.preventDefault()});
+$('pv_stage').addEventListener('pointermove',function(e){if(!drag)return;var d=drag.d,s=Math.max(drag.bw/d.w,drag.bh/d.h),rx=d.w*s*fit.zoom-drag.bw,ry=d.h*s*fit.zoom-drag.bh;
+ if(rx>1)fit.x=Math.round(Math.max(0,Math.min(100,drag.fx-(e.clientX-drag.x)*100/rx)));if(ry>1)fit.y=Math.round(Math.max(0,Math.min(100,drag.fy-(e.clientY-drag.y)*100/ry)));
+ $('fit_x').value=fit.x;$('fit_y').value=fit.y;$('fit_x_v').value=fit.x;$('fit_y_v').value=fit.y;var f=document.querySelector('#pv_stage .mm.drag .mm-fg');if(f){f.style.objectPosition=fit.x+'% '+fit.y+'%';f.style.transformOrigin=fit.x+'% '+fit.y+'%'}});
+['pointerup','pointercancel'].forEach(function(n){$('pv_stage').addEventListener(n,function(){drag=null})});
+$('pv_stage').addEventListener('click',function(e){var b=e.target.closest('[data-nv]');if(b){idx=Math.max(0,idx+(+b.dataset.nv));stage();return}var a=e.target.closest('[data-act]');if(a){expanded=a.dataset.act==='more';var c=$('pv_cap');if(c)c.innerHTML=capHtml()}});
 cap.addEventListener('input',render);
-$('f_files').addEventListener('change',function(){urls.forEach(function(x){URL.revokeObjectURL(x.u)});urls=Array.prototype.map.call(this.files,function(f){return{u:URL.createObjectURL(f),v:f.type.indexOf('video')===0}});media()});
+$('f_files').addEventListener('change',function(){urls.forEach(function(x){URL.revokeObjectURL(x.u)});urls=Array.prototype.map.call(this.files,function(f){return{u:URL.createObjectURL(f),v:f.type.indexOf('video')===0}});idx=0;media()});
 document.querySelectorAll('#pv_toggle button').forEach(function(b){b.onclick=function(){mode=b.dataset.mode;document.querySelectorAll('#pv_toggle button').forEach(function(x){x.className='btn sm'+(x===b?'':' sec')});render()}});
-render();media();
+function pk(){var h='';picked.forEach(function(p,i){h+='<span class="pk">'+(p.v?'<video src="'+p.u+'#t=0.5" muted></video>':'<img src="'+p.u+'" alt="">')+esc(p.name)+' <button type="button" data-rm="'+i+'" title="Olib tashlash">&times;</button></span>'});$('picked').innerHTML=h;$('f_cloud').value=picked.map(function(p){return p.id}).join(',');$('fit_cloud').value=picked.filter(function(p){return p.fresh}).map(function(p){return p.id}).join(',');$('f_touch').value=touched?'1':'';media()}
+$('picked').addEventListener('click',function(e){var b=e.target.closest('[data-rm]');if(b){picked.splice(+b.dataset.rm,1);touched=true;pk()}});
+var cm=$('cmodal'),sel=[],cfiles=[];
+function clist(){var h='';cfiles.forEach(function(f){var i=sel.indexOf(f.id),taken=picked.some(function(p){return p.id===f.id});h+='<div class="cm-it'+(i>=0?' on':'')+'" data-id="'+f.id+'" '+(taken?'style="opacity:.45" title="Allaqachon qo\'shilgan"':'')+'>'+(i>=0?'<span class="n">'+(i+1)+'</span>':'')+(f.kind==='video'?'<video class="t" src="'+f.url+'#t=0.5" muted preload="metadata"></video>':'<img class="t" loading="lazy" src="'+f.url+'" alt="">')+'<b>'+esc(f.name)+'</b><span class="mut">'+f.size+(f.used?' · '+f.used+'x':'')+'</span></div>'});
+ $('c_list').innerHTML=h||'<div class="empty">Bulutda fayl yo\'q yoki ulanmagan. <a href="/ig/cloud">Bulutga o\'tish</a></div>';$('c_cnt').textContent=sel.length?sel.length+' ta tanlandi (tartib = post tartibi)':''}
+function cload(){fetch('/ig/cloud/list.json?q='+encodeURIComponent($('c_q').value)).then(function(r){return r.json()}).then(function(j){cfiles=j.files||[];clist()})}
+$('b_cloud').onclick=function(){sel=[];cm.style.display='flex';cload()};$('c_close').onclick=function(){cm.style.display='none'};
+$('c_q').addEventListener('input',function(){clearTimeout(window._cq);window._cq=setTimeout(cload,250)});
+$('c_list').addEventListener('click',function(e){var d=e.target.closest('.cm-it');if(!d)return;var id=+d.dataset.id,i=sel.indexOf(id);if(i>=0)sel.splice(i,1);else if(!picked.some(function(p){return p.id===id}))sel.push(id);clist()});
+$('c_ok').onclick=function(){sel.forEach(function(id){var f=cfiles.filter(function(x){return x.id===id})[0];if(f)picked.push({id:f.id,name:f.name,u:f.url,v:f.kind==='video',fresh:true})});if(sel.length)touched=true;cm.style.display='none';pk()};
+syncFit();pk();render();
 var panel=$('ai_panel');
 function post(url,fd){return fetch(url,{method:'POST',body:fd}).then(function(r){return r.json()})}
 function timesHtml(t){if(!t||!t.times||!t.times.length)return '<div class="hint">Mos bo\'sh vaqt topilmadi.</div>';
@@ -89,7 +224,7 @@ panel.addEventListener('click',function(e){var b=e.target.closest('button[data-a
 $('b_times').onclick=function(){var q=new URLSearchParams();{% if edit %}q.set('plan_id','{{ edit.id }}');{% endif %}
  fetch('/ig/plan/times?'+q).then(function(r){return r.json()}).then(function(j){panel.style.display='block';panel.innerHTML='<div class="card" style="margin:0"><div class="card-h"><h2>Vaqt taklifi</h2></div>'+(j.ok?timesHtml(j.data):'<div class="red">'+esc(j.error)+'</div>')+'</div>'})};
 var br=$('b_review');if(br)br.onclick=function(){var fd=new FormData();fd.set('caption',cap.value);fd.set('title',document.querySelector('[name=title]').value);fd.set('mtype',$('f_type').value);
- fd.set('media_n',(urls.length||existing.length));fd.set('when',$('f_when').value);{% if edit %}fd.set('plan_id','{{ edit.id }}');{% endif %}
+ fd.set('media_n',(picked.length+(urls.length||(touched?0:existing.filter(function(x){return !x.cloud}).length))));fd.set('when',$('f_when').value);{% if edit %}fd.set('plan_id','{{ edit.id }}');{% endif %}
  br.disabled=true;panel.style.display='block';panel.innerHTML='<div class="card" style="margin:0"><div class="empty small">AI tahlil qilmoqda (20-60 soniya)...</div></div>';
  post('/ig/plan/ai-review',fd).then(function(j){br.disabled=false;if(!j.ok){panel.innerHTML='<div class="note red"><div>'+esc(j.error)+'</div></div>';return}
   var d=j.data,h='<div class="card" style="margin:0"><div class="card-h"><h2>AI tahlil</h2><span class="badge">Umumiy: '+d.score.overall+'/10</span></div>';

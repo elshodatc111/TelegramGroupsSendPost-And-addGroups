@@ -1,12 +1,12 @@
 {% extends "base.html" %}{% block title %}Sozlamalar{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Kanallarim sozlamalari</h1><p class="sub">Kalitlar shifrlangan holda saqlanadi va faqat shu kompyuterda ochiladi.</p></div></div>
+<div class="page-h"><div><h1>Telegram SMM sozlamalari</h1><p class="sub">Kalitlar shifrlangan holda saqlanadi va faqat shu kompyuterda ochiladi.</p></div></div>
 
 <div class="card"><div class="card-h"><h2>Telegram API</h2></div>
 <form method="post" action="/ch/settings/api"><div class="grid g2">
   <div><label class="l">API ID</label><input type="text" name="api_id" value="{{ api_id }}" required></div>
   <div><label class="l">API HASH {% if has_hash %}<span class="badge b-good">saqlangan</span>{% endif %}</label><input type="password" name="api_hash" placeholder="{{ 'o\'zgartirish uchun kiriting' if has_hash else '' }}" autocomplete="off"></div></div>
-  <div class="hint">my.telegram.org → API development tools. Group Post bilan umumiy.</div>
+  <div class="hint">my.telegram.org → API development tools. Telegram Guruhlar bilan umumiy.</div>
   <div class="actions" style="margin-top:12px"><button class="btn sm">Saqlash</button></div></form></div>
 
 <div class="card"><div class="card-h"><h2>OpenAI</h2>{% if has_key %}<span class="badge b-good">Kalit ...{{ key_tail }}</span>{% else %}<span class="badge b-bad">Kalit yo'q</span>{% endif %}</div>

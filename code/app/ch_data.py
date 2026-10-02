@@ -1,4 +1,4 @@
-"""Kanallarim: ma'lumotlarga kirish yordamchilari (Group Post jadvallariga tegmaydi)."""
+"""Telegram SMM: ma'lumotlarga kirish yordamchilari (Telegram Guruhlar jadvallariga tegmaydi)."""
 import json
 import shutil
 
@@ -26,7 +26,7 @@ def log_event(channel_id, kind, info=""):
 
 # ---------------------------------------------------------------- akkaunt
 def channel_account():
-    """Kanallarim bo'limidagi yagona akkaunt (yo'q bo'lsa None)."""
+    """Telegram SMM bo'limidagi yagona akkaunt (yo'q bo'lsa None)."""
     return db.one("SELECT * FROM accounts WHERE workspace='channels' ORDER BY id LIMIT 1")
 
 
@@ -187,14 +187,14 @@ def lead_footer(ch) -> str:
     return text or url
 
 
-# ---------------------------------------------------------------- media yuklash (Kanallarim uchun alohida papka)
+# ---------------------------------------------------------------- media yuklash (Telegram SMM uchun alohida papka)
 IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 VID_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
 
 
 async def save_uploads(cid, files) -> tuple[list[str], str | None]:
     """Yuklangan fayllarni data/media/ch/<kanal>/ ga saqlaydi. (nomlar ro'yxati, media_type) qaytaradi.
-    Group Post media kutubxonasi bilan aralashmasligi uchun alohida papka."""
+    Telegram Guruhlar media kutubxonasi bilan aralashmasligi uchun alohida papka."""
     import uuid
     from pathlib import Path
     dest = MEDIA_DIR / "ch" / str(cid)

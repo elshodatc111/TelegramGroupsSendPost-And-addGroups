@@ -1,4 +1,4 @@
-"""Kanallarim: kunlik/oylik statistika, auditoriya, rasmiy Telegram grafiklari va viral ogohlantirish."""
+"""Telegram SMM: kunlik/oylik statistika, auditoriya, rasmiy Telegram grafiklari va viral ogohlantirish."""
 import asyncio
 import json
 import statistics

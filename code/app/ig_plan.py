@@ -2,7 +2,7 @@
 import asyncio
 from datetime import datetime, timedelta
 
-from . import db, ig_api, ig_data, ig_stats, ig_tunnel, notify
+from . import cf, db, ig_api, ig_data, ig_stats, ig_tunnel, notify
 from .config import log
 
 FMT = "%Y-%m-%d %H:%M:%S"
@@ -84,14 +84,23 @@ async def publish_item(item_id: int) -> bool:
     opened = False
     db.ex("UPDATE ig_plan SET status='publishing', error=NULL WHERE id=?", (item_id,))
     try:
-        base = await ig_tunnel.open_tunnel()
-        opened = True
-        urls = [ig_tunnel.public_url(base, n, ig_tunnel.grant(n)) for n in names]
+        items = ig_data.media_items(names)
+        if any(x["missing"] for x in items):
+            raise RuntimeError("Bulutdagi fayl o'chirilgan: postga boshqa fayl tanlang")
+        base = None
+        if any(not x["cloud"] for x in items):
+            base = await ig_tunnel.open_tunnel()
+            opened = True
+        urls = [x["u"] if x["cloud"] else ig_tunnel.public_url(base, x["name"], ig_tunnel.grant(x["name"])) for x in items]
         res = await ig_api.publish(ig_data.token(acc), acc["ig_user_id"], it["mtype"] or "IMAGE", urls, it["caption"] or "")
         db.ex("UPDATE ig_plan SET status='published', ig_media_id=?, permalink=?, sent_at=?, error=NULL WHERE id=?",
               (res["id"], res.get("permalink"), db.now(), item_id))
         ig_data.log_event(acc["id"], "post", f"reja #{item_id} joylandi: {res.get('permalink')}")
         notify.toast("Instagram", f"@{acc['username']}: post joylandi")
+        try:
+            await cf.after_post(item_id)
+        except Exception:
+            log.warning("cf.after_post", exc_info=True)
         return True
     except Exception as e:
         msg = f"{type(e).__name__}: {e}"[:480]

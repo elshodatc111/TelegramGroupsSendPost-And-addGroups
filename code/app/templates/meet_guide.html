@@ -1,10 +1,10 @@
 {% extends "base.html" %}{% block title %}Yo'riqnoma{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Yo'riqnoma</h1><p class="sub">Majlislarni birinchi marta sozlash: Zoom akkauntlar, o'qituvchilar boti, Telegram akkaunt, o'qituvchi, jadval, 40 daqiqalik zanjir va muammolar.</p></div></div>
+<div class="page-h"><div><h1>Yo'riqnoma</h1><p class="sub">Zoom Onlineni birinchi marta sozlash: Zoom akkauntlar, o'qituvchilar boti, Telegram akkaunt, o'qituvchi, jadval, 40 daqiqalik zanjir va muammolar.</p></div></div>
 <div class="card mt-guide"><div class="card-h"><h2>{{ ic('link') }} 1. Zoom akkaunt (har biri uchun ~5 daqiqa, bepul)</h2></div>
 <p class="mut small">Har bir Zoom akkaunt uchun alohida «Server-to-Server OAuth» ilova yaratiladi. Pul to'lash kerak emas. Akkauntlar turli odamlarniki bo'lishi mumkin: har birining egasi quyidagi qadamlarni bajarib, sizga 4 ta qiymat beradi.</p><ol>
 <li><b>Marketplace'ga kiring.</b> <code>marketplace.zoom.us</code> → o'ng yuqorida <b>Develop → Build App</b> (akkaunt egasining Zoom emaili bilan).</li>
-<li><b>Ilova turi:</b> <b>Server-to-Server OAuth App</b> → <b>Create</b> → nom: <code>Majlislar</code>.</li>
+<li><b>Ilova turi:</b> <b>Server-to-Server OAuth App</b> → <b>Create</b> → nom: <code>Zoom Online</code>.</li>
 <li><b>Ma'lumot:</b> <b>App Credentials</b> sahifasidan <b>Account ID</b>, <b>Client ID</b>, <b>Client Secret</b> ni nusxalang.</li>
 <li><b>Ruxsatlar (Scopes → Add Scopes):</b> <div style="margin-top:6px">{% for s in scopes %}<div><code>{{ s }}</code></div>{% endfor %}</div><div class="hint">Zoom ba'zan boshqacha nom ishlatadi; xato matnida kerakli scope ko'rsatiladi: shuni qo'shing.</div></li>
 <li><b>Faollashtiring:</b> <b>Activation → Activate your app</b>.</li>

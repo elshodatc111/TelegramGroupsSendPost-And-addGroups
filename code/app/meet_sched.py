@@ -1,7 +1,7 @@
-"""Majlislar (Zoom darslari): sxema, sozlamalar, o'qituvchi/guruh/jadval, Zoom akkauntlar puli,
+"""Zoom Online (Zoom darslari): sxema, sozlamalar, o'qituvchi/guruh/jadval, Zoom akkauntlar puli,
 40 daqiqalik majlis zanjiri, Telegram xabarlari, ogohlantirishlar va fon sikli.
 
-Bu modul Group Post / Kanallarim jadvallariga tegmaydi: faqat zoom_* jadvallari va workspace='meet' akkaunti.
+Bu modul Telegram Guruhlar / Telegram SMM jadvallariga tegmaydi: faqat zoom_* jadvallari va workspace='meet' akkaunti.
 Vaqt: hamma joyda Asia/Tashkent (bazada oddiy "YYYY-MM-DD HH:MM:SS" matn, Toshkent vaqti).
 
 Ish tartibi (qisqacha):
@@ -85,7 +85,7 @@ _ready = False
 
 
 def ensure_schema():
-    """Majlislar jadvallarini yaratadi (mavjud bo'lsa tegmaydi) va eski Google Meet (mt_*) jadvallarini olib tashlaydi."""
+    """Zoom Online jadvallarini yaratadi (mavjud bo'lsa tegmaydi) va eski Google Meet (mt_*) jadvallarini olib tashlaydi."""
     global _ready
     if db.IS_MYSQL:
         from . import mysqldb
@@ -731,7 +731,7 @@ async def move_lesson(lid, new_start: datetime, duration=None) -> str:
     return "Dars ko'chirildi"
 
 
-# ---------------------------------------------------------------- Telegram (Majlislar akkaunti: guruhlarga va admin)
+# ---------------------------------------------------------------- Telegram (Zoom Online akkaunti: guruhlarga va admin)
 class TgFail(Exception):
     pass
 
@@ -757,11 +757,11 @@ async def _client():
     from .core import manager
     acc = meet_account()
     if not acc:
-        raise TgFail("Majlislar uchun Telegram akkaunt ulanmagan")
+        raise TgFail("Zoom Online uchun Telegram akkaunt ulanmagan")
     try:
         c = await manager.get(acc["id"])._get_client()
         if not await c.is_user_authorized():
-            raise TgFail("Majlislar Telegram akkaunti ulanmagan (Akkaunt sahifasida qayta ulang)")
+            raise TgFail("Zoom Online Telegram akkaunti ulanmagan (Akkaunt sahifasida qayta ulang)")
     except TgFail:
         raise
     except Exception as e:
@@ -791,7 +791,7 @@ async def tg_send(target, text: str):
 
 
 async def tg_groups() -> list[dict]:
-    """Majlislar akkaunti a'zo bo'lgan guruhlar (tanlash uchun)."""
+    """Zoom Online akkaunti a'zo bo'lgan guruhlar (tanlash uchun)."""
     c = await _client()
     out = []
     async for d in c.iter_dialogs():
@@ -820,7 +820,7 @@ def add_alert(kind, text, level="warn", lesson_id=None, group_id=None, copy=None
                 (fmt(now()), kind, level, lesson_id, group_id, text[:1500], copy, dedupe))
     try:
         notify.event("warn" if level != "info" else "info", "majlis", text)
-        notify.toast("Majlislar", text)
+        notify.toast("Zoom Online", text)
     except Exception:
         pass
     return aid or None
@@ -1132,15 +1132,15 @@ async def loop():
             raise
         except Exception:
             log.exception("meet_sched.loop")
-            notify.event("error", "majlis", "Majlislar siklida xato (loglarga qarang)")
+            notify.event("error", "majlis", "Zoom Online siklida xato (loglarga qarang)")
         await asyncio.sleep(20)
 
 
 # ---------------------------------------------------------------- kalendar (ICS eksport)
-def ics(lessons: list[dict], name="Majlislar") -> str:
+def ics(lessons: list[dict], name="Zoom Online") -> str:
     def esc(s):
         return str(s).replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
-    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Telegram Group Post//Majlislar//UZ", f"X-WR-CALNAME:{esc(name)}", "X-WR-TIMEZONE:Asia/Tashkent"]
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Telegram Group Post//Zoom Online//UZ", f"X-WR-CALNAME:{esc(name)}", "X-WR-TIMEZONE:Asia/Tashkent"]
     for l in lessons:
         if l["status"] == "cancelled":
             continue
@@ -1156,14 +1156,14 @@ def ics(lessons: list[dict], name="Majlislar") -> str:
 def health_items() -> list[dict]:
     """syscheck.run_all() ga bitta chaqiruv bilan qo'shiladi."""
     ready()
-    g = "Majlislar (Zoom)"
+    g = "Zoom Online (Zoom)"
 
     def it(title, state, detail="", fix="", key=None):
         return {"group": g, "title": title, "state": state, "detail": detail, "fix": fix, "key": key or title}
     out = []
     ps = pool_summary()
     if ps["total"] == 0:
-        out.append(it("Zoom akkauntlar", "info", "Hali qo'shilmagan", "Majlislar → Zoom akkauntlar: akkaunt qo'shing (Yo'riqnoma 1-qism).", "zoom_pool"))
+        out.append(it("Zoom akkauntlar", "info", "Hali qo'shilmagan", "Zoom Online → Zoom akkauntlar: akkaunt qo'shing (Yo'riqnoma 1-qism).", "zoom_pool"))
     else:
         st = "ok" if ps["free"] > 0 else "warn"
         out.append(it("Zoom akkauntlar", st, f"jami {ps['total']}, bo'sh {ps['free']}, band {ps['busy']}, xato {ps['error']}",
@@ -1172,13 +1172,13 @@ def health_items() -> list[dict]:
     if errs:
         out.append(it("Zoom akkaunt xatolari", "fail" if len(errs) == len(accounts(True)) else "warn",
                       "; ".join(f"{a['label']}: {(a.get('last_err') or '')[:80]}" for a in errs[:3]),
-                      "Majlislar → Zoom akkauntlar → «Tekshirish»: sababi ko'rsatiladi.", "zoom_err"))
+                      "Zoom Online → Zoom akkauntlar → «Tekshirish»: sababi ko'rsatiladi.", "zoom_err"))
     pp = pool_problems()
     if pp:
         out.append(it("Bo'sh akkaunt yetishmayapti", "fail", pp[0]["text"], "Zoom akkaunt qo'shing yoki darslar vaqtini o'zgartiring.", "zoom_busy"))
     tok = get("bot_token")
     if not tok:
-        out.append(it("O'qituvchilar boti", "info", "Bot tokeni kiritilmagan", "Majlislar → Sozlamalar: @BotFather dan olingan tokenni kiriting.", "zoom_bot"))
+        out.append(it("O'qituvchilar boti", "info", "Bot tokeni kiritilmagan", "Zoom Online → Sozlamalar: @BotFather dan olingan tokenni kiriting.", "zoom_bot"))
     else:
         err = get("bot_err")
         ts = teachers(True)
@@ -1192,18 +1192,18 @@ def health_items() -> list[dict]:
                   + ("; " + ", ".join(f"{s['title']} {s['start_at'][11:16]}" for s in soon) if soon else ""), key="zoom_live"))
     unseen = db.one("SELECT COUNT(*) c FROM zoom_alerts WHERE seen=0 AND kind='send_fail'")["c"]
     if unseen:
-        out.append(it("Yetmagan xabarlar", "warn", f"{unseen} ta xabar yetmagan", "Majlislar → Ogohlantirishlar: havolani qo'lda nusxalab yuboring.", "zoom_sendfail"))
+        out.append(it("Yetmagan xabarlar", "warn", f"{unseen} ta xabar yetmagan", "Zoom Online → Ogohlantirishlar: havolani qo'lda nusxalab yuboring.", "zoom_sendfail"))
     if not meet_account():
-        out.append(it("Telegram akkaunt (Majlislar)", "info", "Ulanmagan", "Majlislar → Telegram akkaunt.", "zoom_tg"))
+        out.append(it("Telegram akkaunt (Zoom Online)", "info", "Ulanmagan", "Zoom Online → Telegram akkaunt.", "zoom_tg"))
     else:
         from .core import manager
         svc = manager.services.get(meet_account()["id"])
-        out.append(it("Telegram akkaunt (Majlislar)", "ok" if svc and svc.info else "fail", f"+{svc.info['phone']}" if svc and svc.info else "Ulanmagan",
-                      "" if svc and svc.info else "Majlislar → Telegram akkaunt: qayta ulang.", "zoom_tg"))
+        out.append(it("Telegram akkaunt (Zoom Online)", "ok" if svc and svc.info else "fail", f"+{svc.info['phone']}" if svc and svc.info else "Ulanmagan",
+                      "" if svc and svc.info else "Zoom Online → Telegram akkaunt: qayta ulang.", "zoom_tg"))
     try:
         from . import syscheck
         beats = {r["name"]: r for r in db.q("SELECT * FROM sys_beat WHERE name IN ('meet_sched','meet_bot')")}
-        for nm, title in (("meet_sched", "Majlislar: jadval va eslatmalar"), ("meet_bot", "Majlislar: o'qituvchilar boti")):
+        for nm, title in (("meet_sched", "Zoom Online: jadval va eslatmalar"), ("meet_bot", "Zoom Online: o'qituvchilar boti")):
             tk, b = syscheck.TASKS.get(nm), beats.get(nm)
             if tk is None:
                 out.append(it(title, "info", "Kuzatilmayapti", key=nm))

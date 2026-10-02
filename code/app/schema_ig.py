@@ -38,6 +38,10 @@ TABLES = [
     f"""CREATE TABLE IF NOT EXISTS ig_log(
         id INT AUTO_INCREMENT PRIMARY KEY, account_id INT, ts VARCHAR(32), kind VARCHAR(20), info TEXT,
         INDEX idx_iglog(account_id, ts)) {T}""",
+    f"""CREATE TABLE IF NOT EXISTS cf_files(
+        id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, `key` VARCHAR(300) NOT NULL, size BIGINT DEFAULT 0,
+        ctype VARCHAR(80), kind VARCHAR(10), created_at VARCHAR(32), used_n INT DEFAULT 0, last_used_at VARCHAR(32),
+        UNIQUE KEY u_cfkey(`key`), INDEX idx_cfname(name)) {T}""",
 ]
 
-TABLE_NAMES = ["ig_accounts", "ig_daily", "ig_media", "ig_demo", "ig_plan", "ig_ideas", "ig_reports", "ig_log"]
+TABLE_NAMES = ["ig_accounts", "ig_daily", "ig_media", "ig_demo", "ig_plan", "ig_ideas", "ig_reports", "ig_log", "cf_files"]

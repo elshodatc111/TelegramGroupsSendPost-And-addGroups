@@ -1,4 +1,4 @@
-"""Kanallarim: o'z kanal va raqobatchi kanallardan postlar/ko'rsatkichlarni yig'ish (faqat o'qish)."""
+"""Telegram SMM: o'z kanal va raqobatchi kanallardan postlar/ko'rsatkichlarni yig'ish (faqat o'qish)."""
 import asyncio
 from datetime import datetime
 

@@ -1,4 +1,4 @@
-"""Kanallarim: AI tahlil, kunlik g'oya, post taklifi, video ssenariy va bilimni boyitib borish (OpenAI)."""
+"""Telegram SMM: AI tahlil, kunlik g'oya, post taklifi, video ssenariy va bilimni boyitib borish (OpenAI)."""
 import asyncio
 import json
 from datetime import datetime, timedelta

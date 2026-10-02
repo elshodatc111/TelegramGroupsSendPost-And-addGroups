@@ -195,7 +195,7 @@ def many(sql, seq):
 USER_KEYS = {"api_id", "api_hash", "default_min", "default_max", "join_min", "join_max", "join_daily",
              "leave_on", "leave_bad", "leave_low", "leave_min_posts", "leave_min_views"}
 # Shifrlab saqlanadigan kalitlar (Windows DPAPI / kompyuterga bog'liq kalit)
-SECRET_KEYS = {"api_hash", "openai_key", "secret", "cf_key", "ig_app_secret"}
+SECRET_KEYS = {"api_hash", "openai_key", "secret", "cf_key", "ig_app_secret", "r2_secret"}
 cur_uid: ContextVar[int] = ContextVar("cur_uid", default=1)
 
 

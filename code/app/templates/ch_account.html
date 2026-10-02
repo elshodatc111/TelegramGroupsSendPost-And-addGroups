@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}Akkaunt{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Kanal akkaunti</h1><p class="sub">Bitta Telegram akkaunt ulanadi. U rivojlantiriladigan kanallarga <b>administrator</b> qilib biriktirilgan bo'lishi kerak. Bu akkaunt Group Post bo'limi bilan umuman bog'lanmaydi.</p></div></div>
+<div class="page-h"><div><h1>Kanal akkaunti</h1><p class="sub">Bitta Telegram akkaunt ulanadi. U rivojlantiriladigan kanallarga <b>administrator</b> qilib biriktirilgan bo'lishi kerak. Bu akkaunt Telegram Guruhlar bo'limi bilan umuman bog'lanmaydi.</p></div></div>
 {% if not api_ok %}<div class="note red">{{ ic('alert') }}<div>Avval <a href="/ch/settings"><b>Sozlamalar</b></a> da Telegram <b>API ID</b> va <b>API HASH</b> ni kiriting (my.telegram.org dan olinadi).</div></div>{% endif %}
 {% if login_id %}
 <div class="card" style="border-color:var(--pri)"><div class="card-h"><h2>{{ ic('lock') }} Akkauntni ulash</h2></div>
@@ -27,7 +27,7 @@
   <form method="post" action="/ch/account/add">
     <label class="l">Akkaunt nomi (ixtiyoriy)</label><input type="text" name="name" placeholder="Masalan: Kanal admin">
     <label class="l">Telefon raqam (xalqaro formatda)</label><input type="text" name="phone" placeholder="+998901234567" required>
-    <div class="hint">Group Post bo'limida ishlatilgan raqamni kiritib bo'lmaydi: u yerda ko'p xabar yuboriladi va cheklov olishi mumkin, kanal boshqaruvi xavf ostida qolmasligi uchun alohida raqam kerak.</div>
+    <div class="hint">Telegram Guruhlar bo'limida ishlatilgan raqamni kiritib bo'lmaydi: u yerda ko'p xabar yuboriladi va cheklov olishi mumkin, kanal boshqaruvi xavf ostida qolmasligi uchun alohida raqam kerak.</div>
     <div class="actions" style="margin-top:14px"><button class="btn" {{ '' if api_ok else 'disabled' }}>Kod yuborish</button></div></form></div>
 <div class="card"><div class="card-h"><h2>Akkauntni kanalga admin qilish</h2></div>
   <ol class="small" style="line-height:1.9;margin:0;padding-left:20px"><li>Telegram'da kanalingizni oching → <b>Administratorlar</b> → <b>Administrator qo'shish</b>.</li>

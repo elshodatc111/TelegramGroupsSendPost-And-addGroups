@@ -1,4 +1,4 @@
-"""Kanallarim: haftalik hisobot (PDF + Excel). Dushanba 09:00 da avtomatik (dastur ochiq bo'lsa) yoki qo'lda."""
+"""Telegram SMM: haftalik hisobot (PDF + Excel). Dushanba 09:00 da avtomatik (dastur ochiq bo'lsa) yoki qo'lda."""
 import asyncio
 import json
 from datetime import datetime, timedelta

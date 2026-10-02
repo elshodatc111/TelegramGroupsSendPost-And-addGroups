@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}Guruhlar{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Guruhlar va jadval</h1><p class="sub">Har Telegram guruh uchun o'qituvchi va haftalik jadval. Guruhga Majlislar Telegram akkaunti a'zo bo'lishi kerak.</p></div>
+<div class="page-h"><div><h1>Guruhlar va jadval</h1><p class="sub">Har Telegram guruh uchun o'qituvchi va haftalik jadval. Guruhga Zoom Online Telegram akkaunti a'zo bo'lishi kerak.</p></div>
   <div class="actions"><a class="btn acc" href="/meet/groups?scan=1">{{ ic('search') }} Telegramdan tanlash</a></div></div>
 {% if not acc %}<div class="mt-warn">{{ ic('alert') }}<div>Avval <a href="/meet/account"><b>Telegram akkaunt</b></a>ni ulang.</div></div>{% endif %}
 {% if scanned %}<div class="card" style="border-color:var(--acc)"><div class="card-h"><h2>Akkaunt a'zo bo'lgan guruhlar</h2></div>

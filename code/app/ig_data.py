@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from . import db, secure
+from . import cf, db, secure
 from .config import MEDIA_DIR, log
 
 IMG_EXT = {".jpg", ".jpeg", ".png", ".webp"}
@@ -151,11 +151,37 @@ async def save_uploads(aid, files) -> list[str]:
     return names
 
 
+def is_video(name: str) -> bool:
+    fid = cf.ref_id(name)
+    if fid:
+        r = cf.get(fid)
+        return bool(r and r["kind"] == "video")
+    return Path(name).suffix.lower() in VID_EXT
+
+
+def media_items(names: list[str]) -> list[dict]:
+    """Rejadagi media: mahalliy fayl (/media/...) yoki bulut fayli (cf:<id> → ochiq R2 havolasi)."""
+    out = []
+    for n in names:
+        fid = cf.ref_id(n)
+        if fid:
+            r = cf.get(fid)
+            out.append({"name": n, "cloud": True, "fid": fid, "missing": not r, "label": r["name"] if r else f"(o'chirilgan fayl #{fid})",
+                        "u": cf.public_url(r) if r else "", "v": bool(r and r["kind"] == "video")})
+        else:
+            out.append({"name": n, "cloud": False, "fid": 0, "missing": False, "label": Path(n).name, "u": "/media/" + n, "v": is_video(n)})
+    return out
+
+
+def media_urls(item) -> list[dict]:
+    return media_items(media_list(item))
+
+
 def guess_mtype(names: list[str], want: str | None = None) -> str:
     if want in MTYPES:
         return want
     if len(names) > 1:
         return "CAROUSEL"
-    if names and Path(names[0]).suffix.lower() in VID_EXT:
+    if names and is_video(names[0]):
         return "REELS"
     return "IMAGE"

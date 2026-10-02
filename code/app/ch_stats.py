@@ -1,4 +1,4 @@
-"""Kanallarim: saqlangan postlardan ko'rsatkichlar (AI'siz, oddiy hisob-kitob)."""
+"""Telegram SMM: saqlangan postlardan ko'rsatkichlar (AI'siz, oddiy hisob-kitob)."""
 import statistics
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta

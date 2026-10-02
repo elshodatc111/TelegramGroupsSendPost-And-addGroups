@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 
-from . import ai, charts, db, ig_ai, ig_api, ig_collect, ig_data, ig_diag, ig_plan, ig_stats, ig_tunnel, notify
-from .config import log
+from . import ai, cf, charts, db, ig_fit, ig_ai, ig_api, ig_collect, ig_data, ig_diag, ig_plan, ig_stats, ig_tunnel, notify
+from .config import MEDIA_DIR, TMP_DIR, log
 from .web import go, page
 
 router = APIRouter()
@@ -375,7 +375,63 @@ async def ig_plan_page(request: Request):
         edit = db.one("SELECT * FROM ig_plan WHERE id=? AND account_id=?", (int(request.query_params["edit"]), a["id"]))
     ready = [i for i in items if i["status"] == "reminded"]
     return page(request, "ig_plan.html", a=a, items=items, counts=counts, flt=flt, edit=edit, ai_ok=_ai_ok(), STATUS_L=STATUS, BADGE=BADGE,
-                media=ig_data.media_list, mtypes=ig_data.MTYPES, mode=ig_data.publish_mode(), ready=ready, modes=ig_data.MODE_LABELS)
+                media=ig_data.media_urls, mtypes=ig_data.MTYPES, mode=ig_data.publish_mode(), ready=ready, modes=ig_data.MODE_LABELS,
+                cloud_ok=cf.configured(), ffmpeg_ok=bool(ig_fit.ffmpeg()), cloud_n=db.one("SELECT COUNT(*) c FROM cf_files")["c"])
+
+
+async def _apply_fit(aid, uploads: list[str], fresh_ids: list[int], fp: dict, story: bool):
+    """Yangi yuklangan fayllar va bulutdan yangi tanlanganlarni Instagram formatiga moslaydi.
+    Qaytaradi: (yangi mahalliy nomlar, {eski bulut id: yangi bulut id}). Xatoda ig_fit.FitError / cf.CFError."""
+    import httpx
+    import uuid as _uuid
+    from pathlib import Path
+    out, remap = [], {}
+    for n in uploads:
+        src = MEDIA_DIR / n
+        if ig_data.is_video(n):
+            if fp["fmt"] == "auto":
+                out.append(n)
+                continue
+            dst = src.with_name(_uuid.uuid4().hex[:12] + ".mp4")
+            await ig_fit.fit_video(src, dst, fp)
+        else:
+            fmt = fp["fmt"] if fp["fmt"] != "auto" else ig_fit.auto_target(*ig_fit.image_size(src), story=story)
+            if not fmt:
+                out.append(n)
+                continue
+            dst = ig_fit.fit_image(src, src.with_name(_uuid.uuid4().hex[:12] + ".jpg"), fp, fmt)
+        src.unlink(missing_ok=True)
+        out.append(f"ig/{aid}/{dst.name}")
+    for fid in fresh_ids:
+        row = cf.get(fid)
+        if not row:
+            continue
+        ext = Path(row["key"]).suffix.lower()
+        tmp = TMP_DIR / f"fit_{_uuid.uuid4().hex[:8]}{ext}"
+        res = TMP_DIR / f"fit_{_uuid.uuid4().hex[:8]}{'.mp4' if row['kind'] == 'video' else '.jpg'}"
+        try:
+            async with httpx.AsyncClient(timeout=300, follow_redirects=True) as cl:
+                r = await cl.get(cf.public_url(row))
+            if r.status_code != 200:
+                raise ig_fit.FitError(f"Bulutdagi «{row['name']}» faylini yuklab bo'lmadi (HTTP {r.status_code})")
+            tmp.write_bytes(r.content)
+            if row["kind"] == "video":
+                if fp["fmt"] == "auto":
+                    continue
+                await ig_fit.fit_video(tmp, res, fp)
+                label = ig_fit.LABELS[fp["fmt"]]
+            else:
+                fmt = fp["fmt"] if fp["fmt"] != "auto" else ig_fit.auto_target(*ig_fit.image_size(tmp), story=story)
+                if not fmt:
+                    continue
+                ig_fit.fit_image(tmp, res, fp, fmt)
+                label = ig_fit.LABELS[fmt]
+            new = await cf.upload(res, f"{row['name']} · {label}", res.name)
+            remap[fid] = new["id"]
+        finally:
+            tmp.unlink(missing_ok=True)
+            res.unlink(missing_ok=True)
+    return out, remap
 
 
 @router.post("/ig/plan/save")
@@ -386,13 +442,32 @@ async def ig_plan_save(request: Request):
     form = await request.form()
     caption = (form.get("caption") or "").strip()
     pid = int(form.get("id") or 0)
-    names = await ig_data.save_uploads(a["id"], form.getlist("files"))
+    uploads = await ig_data.save_uploads(a["id"], form.getlist("files"))
     old = db.one("SELECT * FROM ig_plan WHERE id=? AND account_id=?", (pid, a["id"])) if pid else None
     if pid and (not old or old["status"] == "published"):
         return go("/ig/plan", err="Bu postni tahrirlab bo'lmaydi")
-    if not names and old:
+    picks = []
+    for x in (form.get("cloud_ids") or "").split(","):
+        if x.strip().isdigit() and cf.get(int(x)) and f"cf:{int(x)}" not in picks:
+            picks.append(f"cf:{int(x)}")
+    fp = ig_fit.params(form)
+    story = form.get("mtype") == "STORIES" or (not form.get("mtype") and fp["fmt"] == "9:16" and not any(ig_data.is_video(n) for n in uploads))
+    fresh = [int(x) for x in (form.get("fit_cloud") or "").split(",") if x.strip().isdigit()]
+    if uploads or fresh:
+        try:
+            uploads, remap = await _apply_fit(a["id"], uploads, fresh, fp, story)
+        except (ig_fit.FitError, cf.CFError) as e:
+            return go(f"/ig/plan?edit={pid}" if pid else "/ig/plan", err=str(e)[:500])
+        except Exception as e:
+            log.warning("Moslash xato: %s", e, exc_info=True)
+            return go(f"/ig/plan?edit={pid}" if pid else "/ig/plan", err=f"Faylni moslab bo'lmadi: {type(e).__name__}: {e}"[:500])
+        picks = [f"cf:{remap[int(x[3:])]}" if x[3:].isdigit() and int(x[3:]) in remap else x for x in picks]
+    names = picks + uploads
+    if old and not uploads and not form.get("media_touch"):
         names = ig_data.media_list(old)
     mtype = ig_data.guess_mtype(names, form.get("mtype"))
+    if not form.get("mtype") and fp["fmt"] == "9:16" and mtype == "IMAGE":
+        mtype = "STORIES"
     mode = form.get("mode") if form.get("mode") in ("auto", "reminder") else None
     when = _when(form.get("when"))
     back = f"/ig/plan?edit={pid}" if pid else "/ig/plan"
@@ -436,6 +511,7 @@ async def ig_plan_done(request: Request, pid: int, permalink: str = Form("")):
     a = cur_ig(request)
     if db.one("SELECT id FROM ig_plan WHERE id=? AND account_id=?", (pid, a["id"])):
         ig_plan.mark_done(pid, permalink.strip()[:590])
+        _bg(cf.after_post(pid))
         ig_data.log_event(a["id"], "post", f"reja #{pid} qo'lda joylandi deb belgilandi")
     return go("/ig/plan", msg="Joylandi deb belgilandi")
 
@@ -591,8 +667,6 @@ async def ig_usage(request: Request):
 # ================================================================ sozlamalar va diagnostika
 @router.get("/ig/settings")
 async def ig_settings(request: Request):
-    if (r := need_ig(request)):
-        return r
     c = ig_data.app_conf()
     return page(request, "ig_settings.html", conf=c, has_secret=bool(c["secret"]), mode=ig_data.publish_mode(), remind=ig_data.remind_min(),
                 cap=ig_data.max_per_day(), sync_h=db.get_setting("ig_sync_hours", 3), exe=ig_tunnel.find_exe(), exe_path=db.get_setting("ig_cloudflared", "") or "",

@@ -1,7 +1,7 @@
 """MySQL / MariaDB (XAMPP) backend: ulanish, SQL tarjimoni, sxema.
 
 Dastur kodi SQLite sintaksisida yozilgan (`?`, INSERT OR IGNORE, ON CONFLICT ...). Bu modul shu so'rovlarni
-MySQL'ga avtomatik tarjima qiladi, shuning uchun Group Post bo'limining kodini qayta yozish shart emas.
+MySQL'ga avtomatik tarjima qiladi, shuning uchun Telegram Guruhlar bo'limining kodini qayta yozish shart emas.
 """
 import json
 import queue

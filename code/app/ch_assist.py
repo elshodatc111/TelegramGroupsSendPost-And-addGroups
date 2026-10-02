@@ -1,4 +1,4 @@
-"""Kanallarim: post yozishda yordamchi — AI tahlil (matn va dizayn takliflari), vaqt taklifi, rasm uchun AI maslahat.
+"""Telegram SMM: post yozishda yordamchi — AI tahlil (matn va dizayn takliflari), vaqt taklifi, rasm uchun AI maslahat.
 
 Muhim: foydalanuvchi yozgan matn HECH QACHON o'zgartirilmaydi. AI faqat taklif beradi, almashtirishni foydalanuvchi o'zi bosadi.
 Vaqt taklifi AI'siz, kanalning haqiqiy statistikasi va Kontent rejadagi band vaqtlar asosida hisoblanadi.

@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import auditor, backup, ch_ai, ch_collect, ch_data, ch_insight, ch_plan, ch_report, ch_track, dailyreport, db, discovery, ig_collect, ig_data, ig_plan, jobops, leaver, syscheck
+from . import auditor, backup, ch_ai, ch_collect, ch_data, ch_insight, ch_plan, ch_report, ch_track, dailyreport, cf, db, discovery, ig_collect, ig_data, ig_plan, jobops, leaver, meet_bot, meet_sched, syscheck
 from .config import CODE_DIR, MEDIA_DIR, log
 from .core import joiner, manager, sender
 from .web import acc_id, page
@@ -73,6 +73,7 @@ async def lifespan(app: FastAPI):
     if wiped:
         db.set_setting("machine_notice", "Bu boshqa kompyuter: avvalgi akkauntlar va ma'lumotlar tozalandi. Akkauntni qaytadan qo'shib faollashtiring.")
     scan_media()
+    meet_sched.ready()
     db.ex("UPDATE jobs SET status='interrupted', next_at=NULL WHERE status IN ('running','queued')")
     db.ex("UPDATE job_targets SET status='pending' WHERE status='sending'")
     db.ex("UPDATE join_batches SET status='interrupted', next_at=NULL WHERE status IN ('running','queued')")
@@ -83,7 +84,8 @@ async def lifespan(app: FastAPI):
           sv("dailyreport", dailyreport.loop), sv("discovery", discovery.loop), sv("auditor", auditor.loop),
           sv("ch_collect", ch_collect.loop), sv("ch_plan", ch_plan.loop), sv("ch_learn", ch_ai.learn_loop), sv("backup", backup.loop),
           sv("ch_track", ch_track.loop), sv("ch_insight", ch_insight.loop), sv("ch_report", ch_report.loop),
-          sv("ig_collect", ig_collect.loop), sv("ig_plan", ig_plan.loop)]
+          sv("ig_collect", ig_collect.loop), sv("ig_plan", ig_plan.loop), sv("cf_watch", cf.loop),
+          sv("meet_sched", meet_sched.loop), sv("meet_bot", meet_bot.loop)]
     log.info("Dastur ishga tushdi")
     yield
     for t in bg:
@@ -113,6 +115,10 @@ def _is_ig(path: str) -> bool:
     return path == "/ig" or path.startswith("/ig/")
 
 
+def _is_meet(path: str) -> bool:
+    return path == "/meet" or path.startswith("/meet/")
+
+
 def _via_tunnel(request: Request) -> bool:
     """So'rov Cloudflare tunnel orqali (internetdan) keldimi?"""
     h = request.headers
@@ -134,23 +140,25 @@ async def guard(request: Request, call_next):
     user = db.one("SELECT * FROM users WHERE id=1")
     request.state.user = user
     db.cur_uid.set(1)
-    # ---- bo'lim: Group Post (posting) yoki Kanallarim (channels) ----
+    # ---- bo'lim: Telegram Guruhlar (posting) yoki Telegram SMM (channels) ----
     if path == "/" and request.cookies.get("ws") == "channels":
         return RedirectResponse("/ch", status_code=303)
     if path == "/" and request.cookies.get("ws") == "system":
         return RedirectResponse("/sys", status_code=303)
+    if path == "/" and request.cookies.get("ws") == "meet":
+        return RedirectResponse("/meet", status_code=303)
     if path == "/" and request.cookies.get("ws") == "instagram":
         return RedirectResponse("/ig", status_code=303)
-    request.state.ws = "channels" if _is_ch(path) else "system" if _is_sys(path) else "instagram" if _is_ig(path) else "posting"
+    request.state.ws = "channels" if _is_ch(path) else "system" if _is_sys(path) else "instagram" if _is_ig(path) else "meet" if _is_meet(path) else "posting"
     if not path.startswith("/static") and not path.startswith("/media"):
-        # Group Post akkauntlari (Kanallarim akkaunti bu yerda ko'rinmaydi)
+        # Telegram Guruhlar akkauntlari (Telegram SMM akkaunti bu yerda ko'rinmaydi)
         ids = [r["id"] for r in db.q("SELECT id FROM accounts WHERE workspace='posting' ORDER BY id")]
         try:
             cid = int(request.cookies.get("acc", "0"))
         except ValueError:
             cid = 0
         request.state.account_id = cid if cid in ids else (ids[0] if ids else None)
-        # Kanallarim: faol kanallar va tanlangani
+        # Telegram SMM: faol kanallar va tanlangani
         chs = ch_data.channels()
         request.state.channels = chs
         request.state.ch_account = ch_data.channel_account()
@@ -176,8 +184,8 @@ async def on_error(request: Request, exc: Exception):
 
 
 from . import r_account, r_groups, r_inbox, r_join, r_posts, r_stats, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit, r_top50  # noqa: E402
-from . import r_ch, r_ch_ai, r_ch_comp, r_ch_more, r_ch_plan, r_ig, r_sys  # noqa: E402
+from . import r_ch, r_ch_ai, r_ch_comp, r_ch_more, r_ch_plan, r_ig, r_cf, r_meet, r_sys  # noqa: E402
 
 for r in (r_account, r_posts, r_groups, r_join, r_stats, r_inbox, r_warmup, r_analytics, r_calendar, r_autojoin, r_audit, r_top50,
-          r_ch, r_ch_ai, r_ch_comp, r_ch_plan, r_ch_more, r_ig, r_sys):
+          r_ch, r_ch_ai, r_ch_comp, r_ch_plan, r_ch_more, r_ig, r_cf, r_meet, r_sys):
     app.include_router(r.router)

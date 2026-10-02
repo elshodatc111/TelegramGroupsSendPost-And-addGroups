@@ -1,0 +1,61 @@
+{% extends "base.html" %}{% block title %}Cloudflare bulut{% endblock %}
+{% block content %}
+<style>
+.cf-bar{position:relative;height:16px;border-radius:99px;background:var(--surface2);overflow:visible;margin:12px 0 6px}
+.cf-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#f6821f,#fbad41)}
+.cf-bar.warn i{background:linear-gradient(90deg,#f59e0b,#ef4444)}.cf-bar.full i{background:#dc2626}
+.cf-bar em{position:absolute;top:-4px;bottom:-4px;width:2px;background:#6b7280}
+.cf-bar em span{position:absolute;top:22px;left:-26px;font-size:11px;color:var(--mut);white-space:nowrap;font-style:normal}
+.cf-alert{border:1px solid #f59e0b;background:rgba(245,158,11,.12);border-radius:12px;padding:10px 14px;margin-bottom:14px}
+.cf-alert.full{border-color:#dc2626;background:rgba(220,38,38,.1)}
+.cf-th{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--surface2);display:block}
+.cf-drop{border:2px dashed #f6821f;border-radius:14px;padding:16px;background:rgba(246,130,31,.06)}
+.cf-name{display:flex;gap:6px;align-items:center}.cf-name input{min-width:150px}
+</style>
+<div class="page-h"><div><h1>Cloudflare bulut</h1><p class="sub">Rasm va videolaringiz uchun shaxsiy bulutli xotira (Cloudflare R2). Faylni bir marta yuklab, istalgan postga tanlab ishlatasiz.</p></div>
+<div class="actions">{% if ok %}<form method="post" action="/ig/cloud/sync" data-busy="Solishtirilmoqda..." style="margin:0"><button class="btn sec">Bulut bilan solishtirish</button></form>{% endif %}<a class="btn sec" href="#settings">{{ ic('settings') }} Sozlamalar</a></div></div>
+{% if u.level == 'warn' %}<div class="cf-alert"><b>Xotira to'lib boryapti:</b> {{ fmt(u.used) }} / {{ fmt(u.limit) }}. Keraksiz fayllarni o'chiring: o'chirilgan fayl hajmi darhol ayriladi.</div>{% elif u.level == 'full' %}<div class="cf-alert full"><b>Xotira to'ldi:</b> yangi fayl yuklanmaydi. Eskilarini o'chiring.</div>{% endif %}
+<div class="card"><div class="card-h"><h2>{{ ic('cloud') }} Xotira</h2><span class="badge">{{ u.files }} ta fayl</span></div>
+<div style="font-size:22px;font-weight:700">{{ fmt(u.used) }} <span class="mut" style="font-size:14px;font-weight:400">/ {{ fmt(u.limit) }} · bo'sh {{ fmt(u.free) }}</span></div>
+<div class="cf-bar {{ 'warn' if u.level in ('warn','full') }} {{ 'full' if u.level == 'full' }}"><i style="width:{{ u.pct }}%"></i><em style="left:{{ u.warn_pct }}%"><span>ogohlantirish {{ fmt(u.warn) }}</span></em></div>
+<div style="height:18px"></div>
+{% if not ok %}<div class="note"><div>Cloudflare hali ulanmagan. Pastdagi <a href="#settings">Sozlamalar</a> va <a href="/ig/guide#cloud">Yo'riqnoma</a> bo'yicha 4 ta qiymatni kiriting (bepul: 10 GB).</div></div>{% endif %}</div>
+<div class="card"><div class="card-h"><h2>{{ ic('upload') }} Fayl yuklash</h2></div>
+<form method="post" action="/ig/cloud/upload" enctype="multipart/form-data" data-busy="Bulutga yuklanmoqda (katta video uchun biroz kuting)..." class="cf-drop">
+<div class="grid g2"><div><label class="l">Fayl(lar): rasm yoki video</label><input type="file" name="files" multiple required accept="image/*,video/mp4,video/quicktime"></div>
+<div><label class="l">Nomi (bitta fayl uchun; bo'sh = fayl nomi)</label><input type="text" name="name" maxlength="200" placeholder="masalan: Aksiya banneri oktyabr"></div></div>
+<div class="hint">Bir nechta fayl tanlansa nomga raqam qo'shiladi. PNG/WEBP JPEG'ga o'giriladi. Reels uchun vertikal MP4 (9:16).</div>
+<div class="actions" style="margin-top:10px"><button class="btn" {{ 'disabled' if not ok or u.level == 'full' }}>Yuklash</button></div></form></div>
+<div class="card"><div class="card-h"><h2>Fayllarim</h2>
+<form method="get" class="actions" style="margin:0"><input type="text" name="q" value="{{ q }}" placeholder="Nom bo'yicha qidirish" style="width:200px">
+<select name="o" onchange="this.form.submit()"><option value="new" {{ 'selected' if order == 'new' }}>Yangilari avval</option><option value="old" {{ 'selected' if order == 'old' }}>Eskilari avval</option><option value="size" {{ 'selected' if order == 'size' }}>Kattalari avval</option><option value="unused" {{ 'selected' if order == 'unused' }}>Ishlatilmaganlari avval</option><option value="name" {{ 'selected' if order == 'name' }}>Nom bo'yicha</option></select><button class="btn sm sec">Qidirish</button></form></div>
+{% if rows %}<form method="post" action="/ig/cloud/delete" id="delform" onsubmit="return confirm('Tanlangan fayllar bulutdan butunlay o\'chirilsinmi?')">
+<div class="tbl-wrap"><table class="aj-tbl"><thead><tr><th><input type="checkbox" id="all"></th><th></th><th>Nomi</th><th>Hajm</th><th>Yuklangan</th><th>Holat</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr><td><input type="checkbox" name="ids" value="{{ r.id }}" class="rc"></td>
+<td>{% if r.kind == 'video' %}<video class="cf-th" src="{{ url(r) }}#t=0.5" muted preload="metadata"></video>{% else %}<img class="cf-th" src="{{ url(r) }}" loading="lazy" alt="">{% endif %}</td>
+<td><div class="cf-name"><input type="text" value="{{ r.name }}" form="rn{{ r.id }}" name="name"><button class="btn sm sec" form="rn{{ r.id }}" title="Nomini saqlash">OK</button></div><div class="hint">{{ 'Video' if r.kind == 'video' else 'Rasm' }} · <a href="{{ url(r) }}" target="_blank" rel="noopener">ochish</a></div></td>
+<td>{{ fmt(r.size) }}</td><td>{{ r.created_at[:10] }}</td>
+<td>{% if refs.get(r.id) %}<span class="badge b-scheduled">rejada: {{ refs[r.id]|length }}</span>{% elif r.used_n %}<span class="badge b-sent">{{ r.used_n }} marta ishlatilgan</span>{% else %}<span class="badge">ishlatilmagan</span>{% endif %}</td>
+<td><button class="btn sm ghost" form="dl{{ r.id }}" title="O'chirish">{{ ic('trash') }}</button></td></tr>{% endfor %}</tbody></table></div>
+<div class="actions" style="margin-top:12px"><button class="btn sec" id="bulk" disabled>Tanlanganlarni o'chirish</button><label class="small"><input type="checkbox" name="force" value="1"> Rejadagi postlarda ishlatilganini ham o'chirish</label></div></form>
+{% for r in rows %}<form id="rn{{ r.id }}" method="post" action="/ig/cloud/{{ r.id }}/rename"></form><form id="dl{{ r.id }}" method="post" action="/ig/cloud/delete" onsubmit="return confirm('«{{ r.name|replace("'", "")|e }}» bulutdan o\'chirilsinmi?')"><input type="hidden" name="ids" value="{{ r.id }}"></form>{% endfor %}
+{% else %}<div class="empty">{{ 'Hech narsa topilmadi.' if q else 'Bulut bo\'sh. Yuqoridan fayl yuklang.' }}</div>{% endif %}</div>
+<div class="card" id="settings"><div class="card-h"><h2>Sozlamalar</h2>{% if ok %}<span class="badge b-good">Ulangan</span>{% else %}<span class="badge b-bad">Sozlanmagan</span>{% endif %}</div>
+{% if tests %}<div style="margin-bottom:12px">{% for n, good, d in tests %}<div class="note {{ '' if good else 'red' }}"><div><b>{{ '✓' if good else '✗' }} {{ n }}</b>: {{ d }}</div></div>{% endfor %}</div>{% endif %}
+<form method="post" action="/ig/cloud/settings"><div class="grid g2">
+<div><label class="l">Account ID</label><input type="text" name="account" value="{{ c.account }}" autocomplete="off"></div>
+<div><label class="l">Bucket nomi</label><input type="text" name="bucket" value="{{ c.bucket }}"></div>
+<div><label class="l">Access Key ID</label><input type="text" name="key_id" value="{{ c.key_id }}" autocomplete="off"></div>
+<div><label class="l">Secret Access Key {% if has_secret %}<span class="badge b-good">saqlangan</span>{% endif %}</label><input type="password" name="secret" autocomplete="off" placeholder="{{ 'o\'zgartirish uchun kiriting' if has_secret else '' }}"></div></div>
+<label class="l">Ochiq havola (Public Development URL, masalan https://pub-xxxx.r2.dev)</label><input type="text" name="public" value="{{ c.public }}">
+<div class="grid g3"><div><label class="l">Ogohlantirish chegarasi (GB)</label><input type="number" step="0.1" min="0.05" name="warn_gb" value="{{ c.warn_gb }}"></div>
+<div><label class="l">Yuklash to'xtaydigan limit (GB)</label><input type="number" step="0.1" min="0.1" name="limit_gb" value="{{ c.limit_gb }}"></div>
+<div><label class="l">Joylangach</label><label class="small"><input type="checkbox" name="autodelete" value="1" {{ 'checked' if c.autodelete }}> fayl bulutdan avto o'chirilsin</label></div></div>
+<div class="hint">Cloudflare R2 bepul tarifi 10 GB. O'chirilgan fayl joyni darhol bo'shatadi. Avto o'chirishda boshqa rejada kerak bo'lgan fayl saqlanadi. Secret shifrlangan holda saqlanadi.</div>
+<div class="actions" style="margin-top:12px"><button class="btn">Saqlash</button><button class="btn sec" formaction="/ig/cloud/test" data-busy="Tekshirilmoqda...">Ulanishni tekshirish</button></div></form></div>
+{% endblock %}
+{% block scripts %}<script>
+(function(){var a=document.getElementById('all'),b=document.getElementById('bulk'),rs=document.querySelectorAll('.rc');if(!a)return;
+function up(){var n=0;rs.forEach(function(x){if(x.checked)n++});b.disabled=!n;b.textContent=n?('Tanlanganlarni o\'chirish ('+n+')'):'Tanlanganlarni o\'chirish'}
+a.onchange=function(){rs.forEach(function(x){x.checked=a.checked});up()};rs.forEach(function(x){x.onchange=up})})();
+</script>{% endblock %}

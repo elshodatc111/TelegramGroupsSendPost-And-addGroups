@@ -1,4 +1,4 @@
-"""Majlislar: Zoom REST API (Server-to-Server OAuth) va Telegram Bot API.
+"""Zoom Online: Zoom REST API (Server-to-Server OAuth) va Telegram Bot API.
 
 - Faqat httpx ishlatiladi. Har bir Zoom akkaunt o'z Account ID / Client ID / Client Secret bilan ulanadi
   (Zoom Marketplace'da «Server-to-Server OAuth» ilovasi). Domen, Production-publish va 7 kunlik token kerak emas.
@@ -215,7 +215,7 @@ async def check_account(acc: dict, deep=True) -> list[dict]:
     m = None
     try:
         start = datetime.now(timezone(timedelta(hours=5))).replace(tzinfo=None) + timedelta(hours=1)
-        m = await create_meeting(acc, "Majlislar sinov (o'chiriladi)", start, 10)
+        m = await create_meeting(acc, "Zoom Online sinov (o'chiriladi)", start, 10)
         step("create", "Majlis yaratish", "ok", f"ID {m['id']}")
         step("start_url", "Boshlash havolasi (start_url)", "ok" if m.get("start_url") else "warn",
              "bor" if m.get("start_url") else "Zoom start_url qaytarmadi", "" if m.get("start_url") else "O'qituvchi host bo'lib kira olmasligi mumkin.")

@@ -1,4 +1,4 @@
-"""Majlislar (Zoom) bo'limi sinovlari: soxta Zoom + soxta Telegram Bot API bilan."""
+"""Zoom Online (Zoom) bo'limi sinovlari: soxta Zoom + soxta Telegram Bot API bilan."""
 from datetime import timedelta
 
 import pytest
@@ -405,9 +405,9 @@ def test_daily_sheet_and_health(w, run):
     run(S.provision(lid))
     wb = Workbook()
     R.add_daily_sheet(wb, st.strftime("%Y-%m-%d"))
-    assert "Majlislar" in wb.sheetnames and wb["Majlislar"].max_row == 2
+    assert "Zoom Online" in wb.sheetnames and wb["Zoom Online"].max_row == 2
     items = S.health_items()
-    assert items and all(i["group"] == "Majlislar (Zoom)" for i in items)
+    assert items and all(i["group"] == "Zoom Online (Zoom)" for i in items)
 
 
 def test_other_pages_unaffected(app_env, client):

@@ -125,7 +125,7 @@ async def chat(channel_id, purpose: str, system: str, user: str, *, model: str |
                max_out: int = 6000, effort: str | None = None, note: str = "") -> tuple[object, dict]:
     """Chat Completions. JSON rejimida dict, aks holda matn qaytaradi. (natija, meta) — meta: model, tokens."""
     if not configured():
-        raise AIError("OpenAI kaliti kiritilmagan. Kanallarim → Sozlamalar bo'limida kiriting.")
+        raise AIError("OpenAI kaliti kiritilmagan. Telegram SMM → Sozlamalar bo'limida kiriting.")
     check_cap(channel_id)
     tier = "idea" if purpose == "idea" else "analysis"
     chain = [model or model_for(tier)] + [m for m in FALLBACKS if m != (model or model_for(tier))]

@@ -155,7 +155,7 @@ class TelegramService:
         self._handlers_on = True
         ws = db.one("SELECT workspace FROM accounts WHERE id=?", (self.account_id,))
         if ws and ws["workspace"] == "channels":
-            return          # Kanallarim akkaunti Group Post inbox'iga yozmaydi
+            return          # Telegram SMM akkaunti Telegram Guruhlar inbox'iga yozmaydi
         aid = self.account_id
 
         @client.on(events.NewMessage(incoming=True))

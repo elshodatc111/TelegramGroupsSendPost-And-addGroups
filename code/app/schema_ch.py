@@ -1,4 +1,4 @@
-"""Kanallarim bo'limi jadvallari (ch_*). Group Post jadvallaridan butunlay alohida.
+"""Telegram SMM bo'limi jadvallari (ch_*). Telegram Guruhlar jadvallaridan butunlay alohida.
 
 DDL MySQL sintaksisida yozilgan; SQLite (eski rejim) uchun avtomatik moslashtiriladi.
 """

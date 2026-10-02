@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-h"><div><h1>Reja nazorati: @{{ a.username }}</h1><p class="sub">AI rejalashtirilgan postlaringizni maqsad va haqiqiy natijalarga solishtiradi va keyingi kontent g'oyalari hamda vaqtlarini aytadi.</p></div>
   <div class="actions"><form method="post" action="/ig/control/run" data-busy="AI rejani tekshirmoqda (1 daqiqagacha)..." style="margin:0"><button class="btn" {{ '' if ai_ok and a.niche else 'disabled' }}>{{ ic('check') }} Rejani tekshirish</button></form></div></div>
-{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div>OpenAI kaliti kerak (Kanallarim → Sozlamalar).</div></div>{% endif %}
+{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div>OpenAI kaliti kerak (Telegram SMM → Sozlamalar).</div></div>{% endif %}
 <div class="grid g2">
 <div class="card" style="margin:0"><div class="card-h"><h2>Kutayotgan postlar ({{ upcoming|length }})</h2></div>
 {% if upcoming %}{% for it in upcoming %}<div style="padding:6px 0;border-top:1px solid var(--bd)"><b>#{{ it.id }} {{ it.title }}</b> <span class="hint">{{ it.scheduled_at[:16] }} · {{ it.mtype }}</span></div>{% endfor %}{% else %}<div class="empty small">Rejada post yo'q: bu o'sishga to'sqinlik qiladi. <a href="/ig/plan">Reja tuzing</a>.</div>{% endif %}</div>

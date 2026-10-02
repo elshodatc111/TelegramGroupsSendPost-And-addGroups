@@ -1,4 +1,4 @@
-"""Kanallarim: bo'lim almashtirish, bosh sahifa, yagona akkaunt, kanallarni biriktirish, kanal profili."""
+"""Telegram SMM: bo'lim almashtirish, bosh sahifa, yagona akkaunt, kanallarni biriktirish, kanal profili."""
 from datetime import datetime
 
 from fastapi import APIRouter, Form, Request
@@ -20,8 +20,8 @@ def _safe(next_: str, default="/ch") -> str:
 # ---------------------------------------------------------------- bo'lim va kanal tanlash
 @router.post("/ws/switch")
 async def ws_switch(ws: str = Form("posting")):
-    ws = ws if ws in ("channels", "system", "instagram") else "posting"
-    resp = RedirectResponse({"channels": "/ch", "system": "/sys", "instagram": "/ig"}.get(ws, "/"), status_code=303)
+    ws = ws if ws in ("channels", "system", "instagram", "meet") else "posting"
+    resp = RedirectResponse({"channels": "/ch", "system": "/sys", "instagram": "/ig", "meet": "/meet"}.get(ws, "/"), status_code=303)
     resp.set_cookie("ws", ws, max_age=YEAR, samesite="lax")
     return resp
 
@@ -85,15 +85,15 @@ async def ch_account(request: Request):
 @router.post("/ch/account/add")
 async def ch_account_add(request: Request, name: str = Form(""), phone: str = Form(...)):
     if ch_data.channel_account():
-        return go("/ch/account", err="Kanallarim uchun faqat bitta akkaunt ulanadi")
+        return go("/ch/account", err="Telegram SMM uchun faqat bitta akkaunt ulanadi")
     if not (db.get_setting("api_id") and db.get_setting("api_hash")):
         return go("/ch/settings", err="Avval API ID va API HASH ni kiriting")
     phone = phone.strip()
     digits = "".join(c for c in phone if c.isdigit())
     clash = db.one("SELECT id FROM accounts WHERE workspace='posting' AND REPLACE(REPLACE(phone,'+',''),' ','')=?", (digits,))
     if clash:
-        return go("/ch/account", err="Bu raqam Group Post bo'limida ishlatilmoqda. Kanallarim uchun alohida raqam kerak "
-                                     "(Group Post akkaunti cheklov olsa, kanal boshqaruvi ham yo'qolmasligi uchun).")
+        return go("/ch/account", err="Bu raqam Telegram Guruhlar bo'limida ishlatilmoqda. Telegram SMM uchun alohida raqam kerak "
+                                     "(Telegram Guruhlar akkaunti cheklov olsa, kanal boshqaruvi ham yo'qolmasligi uchun).")
     aid = manager.create((name.strip() or "Kanal akkaunti"), request.state.user["id"], "channels")
     try:
         await manager.get(aid).send_code(phone)

@@ -1,8 +1,7 @@
-{% extends "base.html" %}{% from "meet_macros.html" import chip, pill, copybtn, banner, accstate %}{% block title %}Majlislar{% endblock %}
+{% extends "base.html" %}{% from "meet_macros.html" import chip, pill, copybtn, accstate %}{% block title %}Zoom Online{% endblock %}
 {% block content %}
-<div class="page-h"><div><h1>Majlislar</h1><p class="sub">Zoom darslari avtomatik: jadval bo'yicha majlis ochiladi, havola o'qituvchiga (bot) va guruhga yuboriladi, har 40 daqiqada dars uzilib qolmasligi nazorat qilinadi. Vaqt: Asia/Tashkent ({{ now_hm }}).</p></div>
+<div class="page-h"><div><h1>Zoom Online</h1><p class="sub">Zoom darslari avtomatik: jadval bo'yicha majlis ochiladi, havola o'qituvchiga (bot) va guruhga yuboriladi, har 40 daqiqada dars uzilib qolmasligi nazorat qilinadi. Vaqt: Asia/Tashkent ({{ now_hm }}).</p></div>
   <div class="actions"><a class="btn acc" href="/meet/groups">{{ ic('plus') }} Guruh va jadval</a><a class="btn sec" href="/meet/diag">{{ ic('activity') }} Zoom diagnostika</a></div></div>
-{{ banner(problems, pool) }}
 {% if not bot_ok %}<div class="mt-warn">{{ ic('alert') }}<div><b>O'qituvchilar boti ulanmagan.</b> Eslatma va havolalar o'qituvchiga yetmaydi. <a href="/meet/settings">Sozlamalar</a>da bot tokenini kiriting.</div></div>{% endif %}
 {% if not acc %}<div class="mt-warn">{{ ic('alert') }}<div><b>Telegram akkaunt ulanmagan.</b> Guruhlarga havola va eslatma yuborilmaydi. <a href="/meet/account">Telegram akkaunt</a> sahifasidan ulang.</div></div>{% endif %}
 <div class="grid g4">

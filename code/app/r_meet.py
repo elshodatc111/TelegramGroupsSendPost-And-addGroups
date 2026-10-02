@@ -1,4 +1,4 @@
-"""Majlislar bo'limi route'lari (Zoom darslari): bosh sahifa, o'z kalendar, guruhlar va jadval, darslar, o'qituvchilar,
+"""Zoom Online bo'limi route'lari (Zoom darslari): bosh sahifa, o'z kalendar, guruhlar va jadval, darslar, o'qituvchilar,
 Zoom akkauntlar puli, ogohlantirishlar, Zoom diagnostika, sozlamalar (o'qituvchilar boti), Telegram akkaunt, yo'riqnoma."""
 import json
 from datetime import datetime, timedelta
@@ -120,7 +120,7 @@ async def meet_calendar_ics(request: Request):
     gid = _int(request.query_params.get("group"))
     ls = S.lessons_between(S.fmt(S.now() - timedelta(days=14)), S.fmt(S.now() + timedelta(days=120)), gid)
     g = S.group(gid) if gid else None
-    return Response(S.ics(ls, g["title"] if g else "Majlislar (hamma guruhlar)"), media_type="text/calendar; charset=utf-8",
+    return Response(S.ics(ls, g["title"] if g else "Zoom Online (hamma guruhlar)"), media_type="text/calendar; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="majlislar.ics"'})
 
 
@@ -166,7 +166,7 @@ async def teachers_test(tid: int):
     if not t:
         return go("/meet/teachers", err="O'qituvchi topilmadi")
     try:
-        await B.send_teacher(t, "✅ Majlislar boti ishlayapti: sinov xabari.")
+        await B.send_teacher(t, "✅ Zoom Online boti ishlayapti: sinov xabari.")
     except B.BotFail as e:
         return go("/meet/teachers", err=f"{t['name']}: {e}")
     return go("/meet/teachers", msg=f"{t['name']} ga sinov xabari yuborildi")
@@ -559,7 +559,7 @@ async def diag_run():
         res["bot"] = {"state": "warn", "detail": "Bot tokeni kiritilmagan (Sozlamalar)"}
     acc = S.meet_account()
     if not acc:
-        res["tg"] = {"state": "warn", "detail": "Majlislar Telegram akkaunti ulanmagan (guruhlarga havola yuborilmaydi)"}
+        res["tg"] = {"state": "warn", "detail": "Zoom Online Telegram akkaunti ulanmagan (guruhlarga havola yuborilmaydi)"}
     else:
         try:
             await S._client()
@@ -570,7 +570,7 @@ async def diag_run():
     return go("/meet/diag")
 
 
-# ================================================================ Telegram akkaunt (Majlislar)
+# ================================================================ Telegram akkaunt (Zoom Online)
 def _acc(aid: int):
     return db.one("SELECT * FROM accounts WHERE id=? AND workspace='meet'", (aid,))
 
@@ -596,14 +596,14 @@ async def account_page(request: Request):
 @router.post("/meet/account/add")
 async def account_add(request: Request, name: str = Form(""), phone: str = Form(...)):
     if S.meet_account():
-        return go("/meet/account", err="Majlislar uchun faqat bitta akkaunt ulanadi")
+        return go("/meet/account", err="Zoom Online uchun faqat bitta akkaunt ulanadi")
     if not (db.get_setting("api_id") and db.get_setting("api_hash")):
-        return go("/meet/account", err="Avval Group Post → Sozlamalar da Telegram API ID va API HASH ni kiriting")
+        return go("/meet/account", err="Avval Telegram Guruhlar → Sozlamalar da Telegram API ID va API HASH ni kiriting")
     digits = "".join(c for c in phone if c.isdigit())
     clash = db.one("SELECT id FROM accounts WHERE workspace<>'meet' AND REPLACE(REPLACE(phone,'+',''),' ','')=?", (digits,))
     if clash:
-        return go("/meet/account", err="Bu raqam boshqa bo'limda ishlatilmoqda. Majlislar uchun alohida akkaunt kerak.")
-    aid = manager.create(name.strip() or "Majlislar akkaunti", request.state.user["id"], "meet")
+        return go("/meet/account", err="Bu raqam boshqa bo'limda ishlatilmoqda. Zoom Online uchun alohida akkaunt kerak.")
+    aid = manager.create(name.strip() or "Zoom Online akkaunti", request.state.user["id"], "meet")
     try:
         await manager.get(aid).send_code(phone.strip())
     except Exception as e:
@@ -674,7 +674,7 @@ async def account_delete(aid: int):
 @router.post("/meet/account/test")
 async def account_test():
     try:
-        await S.tg_send("me", "✅ Majlislar: Telegram akkaunt ishlayapti.")
+        await S.tg_send("me", "✅ Zoom Online: Telegram akkaunt ishlayapti.")
     except S.TgFail as e:
         return go("/meet/account", err=f"Yuborilmadi: {e}")
     return go("/meet/account", msg="Sinov xabari «Saqlangan xabarlar»ga yuborildi")

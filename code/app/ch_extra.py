@@ -1,4 +1,4 @@
-"""Kanallarim: viral post tahlili, A/B sinov, izohlar tahlili va oylik kontent-reja (OpenAI)."""
+"""Telegram SMM: viral post tahlili, A/B sinov, izohlar tahlili va oylik kontent-reja (OpenAI)."""
 import json
 import re
 import statistics

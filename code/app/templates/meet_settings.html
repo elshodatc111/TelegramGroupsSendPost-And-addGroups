@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% block title %}Majlislar sozlamalari{% endblock %}
+{% extends "base.html" %}{% block title %}Zoom Online sozlamalari{% endblock %}
 {% block content %}
 <div class="page-h"><div><h1>Sozlamalar</h1><p class="sub">O'qituvchilar boti, eslatma vaqtlari va 40 daqiqalik zanjir parametrlari.</p></div></div>
 <div class="card"><div class="card-h"><h2>{{ ic('send') }} O'qituvchilar boti (Telegram)</h2>{% if has_token and not bot_err %}<span class="badge b-good">@{{ bot_user }}</span>{% elif has_token %}<span class="badge b-bad">Xato</span>{% else %}<span class="badge b-warn">Ulanmagan</span>{% endif %}</div>

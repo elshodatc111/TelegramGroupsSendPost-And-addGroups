@@ -1,4 +1,4 @@
-"""Kanallarim: post kuzatuv havolalari (Cloudflare Worker) va bosishlar statistikasi.
+"""Telegram SMM: post kuzatuv havolalari (Cloudflare Worker) va bosishlar statistikasi.
 
 Kanal sozlamasidagi o'zgarmas havola (lead_url) o'zgarmaydi. Har bir post uchun alohida qisqa kod beriladi:
     <worker>/c<kanal_id>/<kod>  ->  (Worker) lead_url ga yo'naltiradi va bosishni sanaydi.
@@ -84,7 +84,7 @@ def apply(text: str, ch, code: str | None) -> str:
 # ---------------------------------------------------------------- Worker bilan aloqa
 async def _req(method, path, **kw):
     if not enabled():
-        raise TrackError("Kuzatuv havolasi sozlanmagan (Kanallarim → Sozlamalar)")
+        raise TrackError("Kuzatuv havolasi sozlanmagan (Telegram SMM → Sozlamalar)")
     async with httpx.AsyncClient(timeout=20, follow_redirects=False) as c:
         try:
             r = await c.request(method, f"{base()}{path}", params={"key": key()}, **kw)

@@ -1,4 +1,4 @@
-"""Kanallarim: statistika, auditoriya, ogohlantirishlar, A/B, izohlar, oylik reja, hisobotlar, rasm."""
+"""Telegram SMM: statistika, auditoriya, ogohlantirishlar, A/B, izohlar, oylik reja, hisobotlar, rasm."""
 import asyncio
 import json
 import os

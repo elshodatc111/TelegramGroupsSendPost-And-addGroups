@@ -26,7 +26,7 @@ class AccountManager:
         return svc
 
     def rows(self, uid=None, ws=None):
-        """ws: 'posting' (Group Post) yoki 'channels' (Kanallarim). None = hammasi."""
+        """ws: 'posting' (Telegram Guruhlar) yoki 'channels' (Telegram SMM). None = hammasi."""
         sql, args = "SELECT * FROM accounts WHERE 1=1", []
         if uid is not None:
             sql += " AND user_id=?"
@@ -37,7 +37,7 @@ class AccountManager:
         return db.q(sql + " ORDER BY id", args)
 
     def posting_ids(self) -> set[int]:
-        """Group Post akkauntlari. Fon jarayonlari (audit, chiqish, hisobot...) faqat shularga tegadi."""
+        """Telegram Guruhlar akkauntlari. Fon jarayonlari (audit, chiqish, hisobot...) faqat shularga tegadi."""
         return {r["id"] for r in db.q("SELECT id FROM accounts WHERE workspace='posting'")}
 
     def list(self, uid=None, ws="posting") -> list[dict]:

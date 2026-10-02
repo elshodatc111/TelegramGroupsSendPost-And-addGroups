@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-h"><div><h1>G'oya va ssenariy: @{{ a.username }}</h1><p class="sub">AI sahifa maqsadi, statistikasi, rejadagi postlar va oldingi g'oyalarni hisobga olib yozadi. Faqat so'raganingizda ishlaydi.</p></div>
   <div class="actions"><a class="chip {{ 'on' if kind == 'idea' }}" href="/ig/ideas">G'oyalar</a><a class="chip {{ 'on' if kind == 'script' }}" href="/ig/ideas?k=script">Video ssenariylar</a><span class="badge">Shu oy: {{ month_cost|usd }}</span></div></div>
-{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div><a href="/ch/settings"><b>Kanallarim → Sozlamalar</b></a> da OpenAI kalitini kiriting.</div></div>{% endif %}
+{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div><a href="/ch/settings"><b>Telegram SMM → Sozlamalar</b></a> da OpenAI kalitini kiriting.</div></div>{% endif %}
 {% if not a.niche %}<div class="note">{{ ic('alert') }}<div>Avval <a href="/ig/profile"><b>Profil va maqsad</b></a>da sahifa sohasini kiriting.</div></div>{% endif %}
 {% if kind == 'idea' %}
 <div class="card"><div class="card-h"><h2>{{ ic('bulb') }} Yangi g'oyalar</h2></div>

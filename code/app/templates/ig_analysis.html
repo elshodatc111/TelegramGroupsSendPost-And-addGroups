@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-h"><div><h1>AI tahlil: @{{ a.username }}</h1><p class="sub">Haqiqiy statistikaga tayanib: nima ishlayapti, nima yo'q, maqsadga qanchalik yaqin va keyingi 7 kunda nima qilish kerak.</p></div>
   <div class="actions"><form method="post" action="/ig/analysis/run" data-busy="AI tahlil qilmoqda (1 daqiqagacha)..." style="margin:0"><button class="btn" {{ '' if ai_ok and a.niche else 'disabled' }}>{{ ic('trending') }} Tahlil qilish</button></form></div></div>
-{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div>OpenAI kaliti kerak (Kanallarim → Sozlamalar).</div></div>{% endif %}
+{% if not ai_ok %}<div class="note red">{{ ic('alert') }}<div>OpenAI kaliti kerak (Telegram SMM → Sozlamalar).</div></div>{% endif %}
 {% if gp %}<div class="card"><div class="card-h"><h2>Maqsad: {{ gp.target|num }} obunachi</h2><span class="badge">{{ gp.pct }}%</span></div><div class="ig-prog"><i style="width:{{ gp.pct }}%"></i></div></div>{% endif %}
 {% if rep %}<div class="card"><div class="card-h"><h2>Xulosa</h2><span class="hint">{{ rep_at[:16] }}</span></div><p>{{ rep.summary }}</p><p class="small"><b>Maqsad bo'yicha:</b> {{ rep.goal_progress }}</p></div>
 <div class="grid g2"><div class="card" style="margin:0"><div class="card-h"><h2>Nima ishlayapti</h2></div>{% for x in rep.what_works %}<div class="sg"><b>{{ x.point }}</b><div class="small mut">{{ x.evidence }}</div></div>{% endfor %}</div>

@@ -1,4 +1,4 @@
-"""Soxta Zoom (OAuth + REST) va soxta Telegram Bot API: Majlislar sinovlari uchun. Haqiqiy tarmoqqa chiqilmaydi."""
+"""Soxta Zoom (OAuth + REST) va soxta Telegram Bot API: Zoom Online sinovlari uchun. Haqiqiy tarmoqqa chiqilmaydi."""
 import threading
 import time
 

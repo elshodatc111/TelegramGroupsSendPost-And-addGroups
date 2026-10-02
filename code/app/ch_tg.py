@@ -1,4 +1,4 @@
-"""Kanallarim: Telegram amallari (faqat o'qish + o'z kanaliga post qo'yish).
+"""Telegram SMM: Telegram amallari (faqat o'qish + o'z kanaliga post qo'yish).
 
 Muhim: bu modul hech qaysi kanal yoki guruhga QO'SHILMAYDI va raqobatchi kanallarga hech narsa yubormaydi.
 Raqobatchilar — akkaunt allaqachon a'zo bo'lgan (telefondan qo'shilgan) kanallar ro'yxatidan tanlanadi.
@@ -27,7 +27,7 @@ async def client(aid: int):
     svc = manager.get(aid)
     c = await svc._get_client()
     if not await c.is_user_authorized():
-        raise TgError("Akkaunt ulanmagan. Kanallarim → Akkaunt bo'limida qayta ulang.")
+        raise TgError("Akkaunt ulanmagan. Telegram SMM → Akkaunt bo'limida qayta ulang.")
     return c
 
 
@@ -176,7 +176,7 @@ async def own_stats(aid: int, tg_id: int) -> dict | None:
 
 
 async def send_post(aid: int, tg_id: int, text: str, parse_mode: str, media_names: list[str], media_type: str | None) -> list[int]:
-    """O'z kanalimizga post qo'yadi (Group Post'dagi send() bilan bir xil: rasm/video/albom, uzun matn alohida)."""
+    """O'z kanalimizga post qo'yadi (Telegram Guruhlar'dagi send() bilan bir xil: rasm/video/albom, uzun matn alohida)."""
     await client(aid)
     return await manager.get(aid).send(tg_id, text, parse_mode, media_names, media_type)
 
